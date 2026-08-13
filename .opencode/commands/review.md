@@ -1,7 +1,7 @@
 ---
 description: Perform a read-only architecture and code review of a scope or the current working changes
-agent: plan
-subtask: true
+agent: review
+subtask: false
 ---
 
 Perform a read-only review.

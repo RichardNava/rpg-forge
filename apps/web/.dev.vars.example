@@ -1,0 +1,6 @@
+# Generate a unique local value with: openssl rand -base64 32
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:3000
+# Google OAuth client values. Never commit real credentials.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=

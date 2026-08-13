@@ -126,18 +126,23 @@ La estrategia de entornos será:
 | Dev     | `rpg-forge-dev` remota     | Integración y beta futuras |
 | Prod    | `rpg-forge-prod` remota    | Producción futura          |
 
-Los tres entornos compartirán la misma definición Drizzle y la misma secuencia ordenada de migraciones. Cuando exista el tooling de base de datos, los únicos targets serán:
+Los tres entornos compartirán la misma definición Drizzle y la misma secuencia ordenada de migraciones. La implementación actual expone únicamente:
 
 ```text
 db:generate
 db:migrate:local
+```
+
+Cuando existan los entornos remotos aprobados, se añadirán targets explícitos para:
+
+```text
 db:migrate:dev
 db:migrate:prod
 ```
 
 No existirá un comando `db:migrate` ambiguo. Local puede migrarse durante el desarrollo normal; Dev exige aprobación explícita antes de una operación remota; Prod nunca se migra automáticamente por OpenCode y requiere ejecución y autorización humanas explícitas. Las migraciones aplicadas a entornos remotos compartidos son inmutables: las correcciones se realizan mediante una nueva migración. Toda migración destructiva requiere revisión y aprobación explícitas.
 
-Esta estrategia queda definida en ADR-049 y no crea todavía bases remotas, scripts ni configuración Drizzle.
+Esta estrategia queda definida en ADR-049. La implementación actual crea únicamente `DB` local mediante Wrangler/Miniflare, un schema Drizzle para las tablas core de Better Auth y la migración local correspondiente. No existen todavía bases Dev/Prod remotas ni scripts para migrarlas.
 
 ---
 

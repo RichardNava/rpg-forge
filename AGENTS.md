@@ -136,6 +136,7 @@ Do not create MVP tables for:
 
 - Local development uses Wrangler local D1 by default.
 - Future remote environments are `rpg-forge-dev` for integration/beta and `rpg-forge-prod` for production.
+- The current `DB` binding is local-only and intentionally has no remote `database_id`. It must not be used for deploy/upload commands because Wrangler may auto-provision an unbound resource. Add approved environment-specific remote IDs only when Dev/Prod are created.
 - Local, Dev, and Prod share one Drizzle schema definition and one ordered migration sequence.
 - Database migration commands must name their target explicitly. Do not create or use an ambiguous `db:migrate` command.
 - Agents may run local migrations normally once the scripts exist.
