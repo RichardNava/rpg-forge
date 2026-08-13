@@ -116,7 +116,32 @@ Motivo:
 
 ---
 
-## 4.3 Relaciones lógicas de autenticación
+## 4.3 Entornos D1 y migraciones
+
+La estrategia de entornos será:
+
+| Entorno | Base D1                    | Uso                        |
+| ------- | -------------------------- | -------------------------- |
+| Local   | D1 local mediante Wrangler | Desarrollo por defecto     |
+| Dev     | `rpg-forge-dev` remota     | Integración y beta futuras |
+| Prod    | `rpg-forge-prod` remota    | Producción futura          |
+
+Los tres entornos compartirán la misma definición Drizzle y la misma secuencia ordenada de migraciones. Cuando exista el tooling de base de datos, los únicos targets serán:
+
+```text
+db:generate
+db:migrate:local
+db:migrate:dev
+db:migrate:prod
+```
+
+No existirá un comando `db:migrate` ambiguo. Local puede migrarse durante el desarrollo normal; Dev exige aprobación explícita antes de una operación remota; Prod nunca se migra automáticamente por OpenCode y requiere ejecución y autorización humanas explícitas. Las migraciones aplicadas a entornos remotos compartidos son inmutables: las correcciones se realizan mediante una nueva migración. Toda migración destructiva requiere revisión y aprobación explícitas.
+
+Esta estrategia queda definida en ADR-049 y no crea todavía bases remotas, scripts ni configuración Drizzle.
+
+---
+
+## 4.4 Relaciones lógicas de autenticación
 
 ```mermaid
 erDiagram

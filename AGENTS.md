@@ -132,6 +132,18 @@ Do not create MVP tables for:
 - lore packs;
 - user sources.
 
+### D1 environments and migrations
+
+- Local development uses Wrangler local D1 by default.
+- Future remote environments are `rpg-forge-dev` for integration/beta and `rpg-forge-prod` for production.
+- Local, Dev, and Prod share one Drizzle schema definition and one ordered migration sequence.
+- Database migration commands must name their target explicitly. Do not create or use an ambiguous `db:migrate` command.
+- Agents may run local migrations normally once the scripts exist.
+- Dev migrations require explicit approval before any remote operation.
+- OpenCode must never run production migrations automatically; Prod requires explicit human authorization and execution.
+- Applied migrations in shared remote environments are immutable. Correct them with a new migration.
+- Destructive migrations require review and explicit approval.
+
 ### Table state
 
 The Table's canonical shared state belongs to its Durable Object.
