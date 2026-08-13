@@ -1,0 +1,90 @@
+RPG PROJECT — TARGET REPOSITORY TREE
+
+rpg-project/
+├── apps/
+│   ├── web/
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── (public)/
+│   │   │   │   ├── (auth)/
+│   │   │   │   ├── (table)/
+│   │   │   │   └── api/
+│   │   │   ├── features/
+│   │   │   │   ├── adventures/
+│   │   │   │   ├── maps/
+│   │   │   │   ├── npcs/
+│   │   │   │   ├── character-sheets/
+│   │   │   │   ├── dice/
+│   │   │   │   ├── auth/
+│   │   │   │   └── table/
+│   │   │   ├── core/
+│   │   │   │   ├── ai/
+│   │   │   │   ├── export/
+│   │   │   │   ├── storage/
+│   │   │   │   └── errors/
+│   │   │   ├── infrastructure/
+│   │   │   │   ├── ai/
+│   │   │   │   ├── auth/
+│   │   │   │   ├── db/
+│   │   │   │   ├── export/
+│   │   │   │   ├── storage/
+│   │   │   │   └── security/
+│   │   │   ├── shared/
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── ui/
+│   │   │   │   │   └── themed/
+│   │   │   │   ├── hooks/
+│   │   │   │   ├── utils/
+│   │   │   │   └── types/
+│   │   │   └── config/
+│   │   ├── drizzle/
+│   │   ├── public/
+│   │   ├── tests/integration/
+│   │   └── [Next/OpenNext/Wrangler config]
+│   │
+│   └── realtime/                    [create with Table]
+│       ├── src/
+│       │   ├── index.ts
+│       │   ├── table/
+│       │   │   ├── table-durable-object.ts
+│       │   │   ├── handlers/
+│       │   │   ├── state/
+│       │   │   └── storage/
+│       │   ├── security/
+│       │   └── config/
+│       └── tests/integration/
+│
+├── packages/
+│   ├── dice-engine/                 [create with Dice]
+│   └── table-contracts/             [create with Table]
+│
+├── docs/
+│   ├── product/
+│   │   ├── vision.md
+│   │   ├── mvp.md
+│   │   └── feature-map.md
+│   └── architecture/
+│       ├── architecture.md
+│       ├── stack.md
+│       ├── data-model.md
+│       ├── repository-structure.md
+│       └── adr/
+│
+├── tests/e2e/
+├── .github/workflows/
+├── .opencode/
+│   ├── agents/
+│   ├── skills/
+│   └── commands/
+├── AGENTS.md
+├── opencode.jsonc
+├── package.json
+├── pnpm-workspace.yaml
+├── pnpm-lock.yaml
+├── tsconfig.base.json
+├── eslint.config.mjs
+├── prettier.config.mjs
+├── .editorconfig
+├── .gitignore
+├── .nvmrc
+└── README.md

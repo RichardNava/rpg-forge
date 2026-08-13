@@ -1,0 +1,157 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // This is a private project. OpenCode conversations must not be shared
+  // automatically or manually from this project configuration.
+  "share": "disabled",
+
+  // Keep rollback/snapshot support enabled for agent changes.
+  "snapshot": true,
+
+  // Build remains the default coordinator. Specialized project agents can
+  // also be selected directly because they use mode: all.
+  "default_agent": "build",
+
+  // One delegation level keeps agent orchestration visible and bounded.
+  "subagent_depth": 1,
+
+  // Enable language-server assistance for code navigation and diagnostics.
+  "lsp": true,
+
+  // Keep the always-on context intentionally small. Detailed product and
+  // architecture documents are loaded on demand according to AGENTS.md.
+  "instructions": ["docs/opencode/project-context.md"],
+
+  // Context7 is the only MCP enabled from the start. It provides
+  // current, version-aware library/framework documentation.
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+    },
+  },
+
+  "permission": {
+    // MCP tools are deny-by-default and enabled only per approved agent.
+    "context7_*": "deny",
+    // Normal project reads/edits are allowed. Agent-specific restrictions
+    // will be added in Phase 6 and override these defaults when needed.
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.dev.vars": "deny",
+      "*.dev.vars.*": "deny",
+      "*.dev.vars.example": "allow",
+    },
+
+    "edit": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "lsp": "allow",
+    // Skills are deny-by-default. Build/Plan and custom agents receive
+    // explicit allow-lists below / in their agent frontmatter.
+    "skill": {
+      "*": "deny",
+    },
+    "task": "allow",
+    "question": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+
+    // Access outside the repository should always be an explicit decision.
+    "external_directory": "ask",
+
+    // Shell access is conservative: verification and read-only Git commands
+    // run freely; dependency changes, commits and deploys require approval;
+    // destructive operations and remote pushes are blocked at project level.
+    "bash": {
+      "*": "ask",
+
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git branch --show-current*": "allow",
+
+      "pnpm format:check*": "allow",
+      "pnpm lint*": "allow",
+      "pnpm typecheck*": "allow",
+      "pnpm test*": "allow",
+      "pnpm build*": "allow",
+      "pnpm test:e2e*": "allow",
+
+      "pnpm install*": "ask",
+      "pnpm add *": "ask",
+      "pnpm remove *": "ask",
+      "pnpm update*": "ask",
+      "pnpm deploy*": "ask",
+      "wrangler deploy*": "ask",
+
+      "git add *": "ask",
+      "git commit *": "ask",
+
+      "git push*": "deny",
+      "git reset *": "deny",
+      "git clean *": "deny",
+      "git checkout -- *": "deny",
+      "git restore *": "ask",
+      "rm *": "deny",
+      "Remove-Item *": "deny",
+    },
+  },
+
+  "agent": {
+    "build": {
+      "permission": {
+        "context7_*": "allow",
+        "skill": {
+          "*": "deny",
+          "feature-development": "allow",
+          "rpg-frontend-style": "allow",
+          "ai-generation": "allow",
+          "cloudflare": "allow",
+          "vercel-react-best-practices": "allow",
+          "web-design-guidelines": "allow",
+        },
+      },
+    },
+    "plan": {
+      "permission": {
+        "context7_*": "allow",
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+        },
+        "skill": {
+          "*": "deny",
+          "feature-development": "allow",
+          "rpg-frontend-style": "allow",
+          "ai-generation": "allow",
+          "cloudflare": "allow",
+          "vercel-react-best-practices": "allow",
+          "web-design-guidelines": "allow",
+        },
+      },
+    },
+  },
+
+  "watcher": {
+    "ignore": [
+      "node_modules/**",
+      ".next/**",
+      ".open-next/**",
+      ".wrangler/**",
+      "coverage/**",
+      "playwright-report/**",
+      "test-results/**",
+      "dist/**",
+    ],
+  },
+}

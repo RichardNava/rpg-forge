@@ -1,0 +1,52 @@
+# Architecture Decision Records
+
+Los ADR conservan una numeración histórica estable. Un ADR sustituido no se elimina; se marca y referencia el reemplazo.
+
+- [`001-cloudflare-first`](001-cloudflare-first.md) — ADR-001 — Arquitectura Cloudflare-first y free-first
+- [`002-nextjs-cloudflare-workers`](002-nextjs-cloudflare-workers.md) — ADR-002 — Next.js full-stack sobre Cloudflare Workers
+- [`003-modular-monolith`](003-modular-monolith.md) — ADR-003 — Monolito modular orientado a features
+- [`004-d1-better-auth`](004-d1-better-auth.md) — ADR-004 — D1 + Better Auth
+- [`005-ai-provider-abstraction`](005-ai-provider-abstraction.md) — ADR-005 — IA desacoplada del proveedor
+- [`006-table-durable-objects`](006-table-durable-objects.md) — ADR-006 — La Mesa mediante Realtime Worker + Durable Objects
+- [`007-r2-deferred-storage`](007-r2-deferred-storage.md) — ADR-007 — R2 diferido y almacenamiento efímero
+- [`008-node-pnpm`](008-node-pnpm.md) — ADR-008 — Node.js 24 LTS + pnpm
+- [`009-web-ui-stack`](009-web-ui-stack.md) — ADR-009 — Next.js 16 + Tailwind 4 + shadcn/Base UI
+- [`010-forms-validation`](010-forms-validation.md) — ADR-010 — React Hook Form + Zod 4
+- [`011-d1-drizzle-better-auth`](011-d1-drizzle-better-auth.md) — ADR-011 — D1 + Drizzle + Better Auth
+- [`012-workers-ai-native`](012-workers-ai-native.md) — ADR-012 — Workers AI binding + abstracción propia
+- [`013-table-client-stack`](013-table-client-stack.md) — ADR-013 — react-konva + Zustand + WebSocket nativo
+- [`014-testing-stack`](014-testing-stack.md) — ADR-014 — Stack de testing
+- [`015-pdf-stack`](015-pdf-stack.md) — ADR-015 — Exportación PDF
+- [`016-mvp-persistence-boundary`](016-mvp-persistence-boundary.md) — ADR-016 — Persistencia mínima del MVP
+- [`017-data-conventions`](017-data-conventions.md) — ADR-017 — Convenciones de datos
+- [`018-table-durable-storage`](018-table-durable-storage.md) — ADR-018 — Estado temporal de La Mesa
+- [`019-future-premium-model`](019-future-premium-model.md) — ADR-019 — Modelo premium futuro sin migraciones prematuras
+- [`020-pnpm-workspace`](020-pnpm-workspace.md) — ADR-020 — pnpm workspace sin Turborepo
+- [`021-web-realtime-separation`](021-web-realtime-separation.md) — ADR-021 — Web y Realtime como deployables separados
+- [`022-internal-packages`](022-internal-packages.md) — ADR-022 — Paquetes internos solo con reutilización real
+- [`023-feature-first-boundaries`](023-feature-first-boundaries.md) — ADR-023 — Organización feature-first
+- [`024-stable-doc-paths`](024-stable-doc-paths.md) — ADR-024 — Rutas documentales estables
+- [`025-opencode-context-strategy`](025-opencode-context-strategy.md) — ADR-025 — Contexto always-on pequeño + documentación bajo demanda
+- [`026-opencode-project-permissions`](026-opencode-project-permissions.md) — ADR-026 — Política base de permisos de OpenCode
+- [`027-opencode-private-sharing`](027-opencode-private-sharing.md) — ADR-027 — Sharing de OpenCode deshabilitado
+- [`028-opencode-model-not-pinned`](028-opencode-model-not-pinned.md) — ADR-028 — El modelo de desarrollo no se fija en el repositorio
+- [`029-specialists-mode-all`](029-specialists-mode-all.md) — ADR-029 — Specialized agents use `mode: all`
+- [`030-build-as-orchestrator`](030-build-as-orchestrator.md) — ADR-030 — Built-in Build remains the default coordinator
+- [`031-agent-write-boundaries`](031-agent-write-boundaries.md) — ADR-031 — Agent-specific write boundaries
+- [`032-review-agents-do-not-fix`](032-review-agents-do-not-fix.md) — ADR-032 — QA and Security separation
+- [`033-skills-on-demand`](033-skills-on-demand.md) — ADR-033 — Skills como procedimientos bajo demanda
+- [`034-curated-external-skills`](034-curated-external-skills.md) — ADR-034 — Catálogo externo deliberadamente pequeño
+- [`035-skill-permissions`](035-skill-permissions.md) — ADR-035 — Skills deny-by-default
+- [`036-external-skill-supply-chain`](036-external-skill-supply-chain.md) — ADR-036 — Revisión y versionado de skills externos
+- [`037-context7-only-initial-mcp`](037-context7-only-initial-mcp.md) — ADR-037 — Context7 como único MCP inicial
+- [`038-cloudflare-mcp-deferred`](038-cloudflare-mcp-deferred.md) — ADR-038 — Cloudflare API MCP diferido
+- [`039-github-playwright-mcp-omitted`](039-github-playwright-mcp-omitted.md) — ADR-039 — GitHub y Playwright MCP omitidos inicialmente
+- [`040-mcp-least-privilege`](040-mcp-least-privilege.md) — ADR-040 — MCP: mínimo privilegio y deny-by-default
+- [`041-project-command-catalog`](041-project-command-catalog.md) — ADR-041 — Catálogo mínimo de commands
+- [`042-command-agent-routing`](042-command-agent-routing.md) — ADR-042 — Routing de commands a agentes
+- [`043-no-command-shell-injection`](043-no-command-shell-injection.md) — ADR-043 — Sin shell-output injection en commands iniciales
+- [`044-command-model-inheritance`](044-command-model-inheritance.md) — ADR-044 — Commands no fijan modelo
+- [`045-cloudflare-c3-bootstrap`](045-cloudflare-c3-bootstrap.md) — ADR-045 — Bootstrap web mediante Cloudflare C3
+- [`046-bootstrap-runtime-pins`](046-bootstrap-runtime-pins.md) — ADR-046 — Pins de runtime para el bootstrap
+- [`047-shadcn-base-ui-bootstrap`](047-shadcn-base-ui-bootstrap.md) — ADR-047 — shadcn inicial con Base UI
+- [`048-bootstrap-no-remote-resources`](048-bootstrap-no-remote-resources.md) — ADR-048 — Bootstrap sin recursos remotos ni deploy
