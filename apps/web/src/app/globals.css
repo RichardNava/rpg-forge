@@ -147,6 +147,7 @@
   min-height: 100dvh;
   overflow-x: clip;
   background:
+    url("/assets/backgrounds/papyrus_bg.png") center / cover no-repeat,
     radial-gradient(circle at 12% 4%, #fff8e91f 0 1px, transparent 1.5px),
     radial-gradient(circle at 79% 15%, #6b44250d 0 1px, transparent 1.5px),
     repeating-linear-gradient(12deg, #5c371008 0 1px, transparent 1px 7px),
