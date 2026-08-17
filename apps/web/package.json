@@ -17,9 +17,11 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
   },
   "dependencies": {
+    "@3d-dice/dice-box-threejs": "0.0.12",
     "@base-ui/react": "^1.7.0",
     "@better-auth/drizzle-adapter": "^1.6.27",
     "@opennextjs/cloudflare": "^1.19.9",
+    "@repo/dice-engine": "workspace:*",
     "better-auth": "^1.6.27",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -35,12 +37,14 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.19.43",
     "@types/react": "^19.1.7",
     "@types/react-dom": "^19.1.7",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "typescript": "^5.7.4",
     "vitest": "^4.1.10",

@@ -6,7 +6,8 @@ Aplicación web para generar y utilizar recursos de juegos de rol de mesa.
 
 ## Estado
 
-Bootstrap técnico del MVP.
+Phase 13: COMPLETE - the public standalone Dice Roller is available at `/dice`.
+Campaigns are deferred to future persistence/premium work.
 
 ## Stack base
 
@@ -53,6 +54,13 @@ apps/realtime  → se creará al implementar La Mesa
 packages/      → paquetes compartidos solo cuando exista reutilización real
 docs/          → producto, arquitectura y OpenCode
 ```
+
+## Dados standalone
+
+`@repo/dice-engine` es un paquete TypeScript puro reutilizable por el navegador,
+tests y la futura Mesa. `/dice` no requiere login, no usa D1 y no guarda
+tiradas. El motor usa Web Crypto, admite hasta 20 dados por tirada y soporta
+`d20`, `2d6` y `2d6+3`.
 
 ## Desarrollo
 

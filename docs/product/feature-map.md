@@ -148,11 +148,17 @@ PDF / JPG
 
 ```text
 d4 d6 d8 d10 d12 d20 d100
-        +
+         +
 1d20 / 2d6 / 2d6+3
 ```
 
-Futuro: keep/drop, macros, historial y reglas por sistema.
+Implementado como `/dice`, público y sin persistencia. `@repo/dice-engine` es
+TypeScript puro, usa Web Crypto y limita cada tirada a 20 dados. Soporta
+keepHighest/keepLowest como primitivas de dominio; ventaja y desventaja son
+respectivamente `2d20` conservando el mayor o el menor. La futura Mesa podrá
+reutilizarlo para tiradas autoritativas en servidor.
+
+Futuro: macros, historial y reglas por sistema.
 
 ### Table
 
@@ -431,3 +437,44 @@ Persistence
 1. ningún generador debe depender de campañas, autenticación o persistencia para funcionar;
 2. en el MVP, ningún generador utiliza colaboración ni sincronización en tiempo real;
 3. La Mesa es el único módulo multiusuario/realtime del MVP.
+
+## 15. Estado de fases
+
+### Phase 12 — Campaigns
+
+**Status:** DEFERRED
+**Target:** future persistence/premium
+
+### Phase 13 — Dice Engine + Standalone Dice Roller
+
+**Status:** COMPLETE
+
+La ruta pública `/dice` usa `@3d-dice/dice-box-threejs` para la presentación
+física WebGL de tiradas locales. `packages/dice-engine` continúa siendo la
+fuente autoritativa del resultado: el renderer recibe caras predeterminadas y
+se verifica al finalizar la animación.
+
+La única instancia de DiceBox por mesa serializa los cambios visuales y la
+física. Antes de cada animación, el lanzador espera un frame para estabilizar
+el cambio de dock y sincroniza dimensiones; los cambios de `ResizeObserver`
+se difieren hasta que termina la física.
+
+Si DiceBox no devuelve las caras esperadas, la presentación queda sin verificar
+pero el resultado mostrado sigue siendo el del motor. El diagnóstico con las
+caras esperadas y recibidas solo se expone durante desarrollo; producción
+muestra un aviso accesible sin detalles técnicos.
+
+Si la inicialización o la física no terminan dentro del límite operativo, el
+lanzador completa con el fallback accesible del motor. Una física vencida se
+detiene mediante `clearDice()` antes de liberar la opción de reroll.
+
+El lanzador admite los dados estándar, notación limitada, modificadores y
+ventaja/desventaja de d20, con un máximo de 20 dados. Incluye configuración
+visual de colorset, textura y material, y sonidos locales opcionales. No hay
+autenticación, persistencia ni historial.
+
+Un success threshold opcional cuenta cada dado efectivo de la tirada después
+de aplicar el modificador individual, sin usar el total acumulado.
+
+WebGL es una mejora progresiva: reduced-motion y navegadores sin WebGL siguen
+recibiendo resultados textuales accesibles fuera del canvas.

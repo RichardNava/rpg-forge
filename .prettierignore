@@ -7,3 +7,7 @@ playwright-report
 test-results
 dist
 pnpm-lock.yaml
+
+# Vendored third-party skills; project-authored skills remain formatted.
+.opencode/skills/vercel-react-best-practices/**
+.opencode/skills/web-design-guidelines/**

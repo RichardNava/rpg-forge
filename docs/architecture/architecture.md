@@ -548,21 +548,19 @@ La biblioteca concreta para PDF se decidirá en la fase de stack después de com
 
 # 10. Dados
 
-El motor de dados será una librería de dominio pura.
+El motor de dados es una librería de dominio pura.
 
 ```text
-expression
+roll config / limited notation
    ↓
-tokenizer
-   ↓
-parser
-   ↓
-AST
-   ↓
-evaluator
+validation and evaluation
    ↓
 DiceResult
 ```
+
+`rollDice` evalúa una configuración estructurada y `rollNotation` compone el
+parseo de la notación limitada con la misma evaluación. No se materializa un
+tokenizer ni un AST en el MVP.
 
 No dependerá de:
 
@@ -577,7 +575,9 @@ No dependerá de:
 
 No se usará `Math.random()`.
 
-Se utilizará una fuente basada en Web Crypto.
+Se utilizará una fuente basada en Web Crypto. El package aplica rejection
+sampling antes de mapear enteros a caras para evitar modulo bias; `Math.random()`
+no se utiliza. La fuente aleatoria es inyectable en tests.
 
 ### Dados independientes
 
@@ -598,6 +598,12 @@ All players
 ```
 
 De esta forma todos ven exactamente el mismo resultado.
+
+El package `@repo/dice-engine` limita las tiradas a 20 dados, admite entre 2 y
+1000 caras, modificadores de -10000 a 10000 y notación limitada `NdX` con un
+modificador opcional. No conoce autenticación, almacenamiento ni animación.
+La animación de `/dice` representa un resultado ya resuelto y no interviene en
+la aleatoriedad.
 
 ---
 

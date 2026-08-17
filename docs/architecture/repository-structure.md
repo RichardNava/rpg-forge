@@ -46,7 +46,7 @@ Repository
 │   └── realtime/          [cuando llegue La Mesa]
 │
 ├── packages/
-│   ├── dice-engine/       [cuando llegue Dados]
+│   ├── dice-engine/       [implementado: Dados]
 │   └── table-contracts/   [cuando llegue La Mesa]
 │
 ├── docs/
@@ -130,11 +130,12 @@ rpg-project/
 │
 ├── packages/
 │   │
-│   ├── dice-engine/                      [DEFERRED: Dice]
+│   ├── dice-engine/                      [IMPLEMENTED: Dice]
 │   │   ├── src/
+│   │   │   ├── index.ts
+│   │   │   └── index.test.ts
 │   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   └── vitest.config.ts
+│   │   └── tsconfig.json
 │   │
 │   └── table-contracts/                  [DEFERRED: Table]
 │       ├── src/

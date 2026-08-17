@@ -146,6 +146,17 @@ d4 d6 d8 d10 d12 d20 d100
 
 El motor deberá ser independiente de la UI.
 
+La ruta pública `/dice` ofrece d4, d6, d8, d10, d12, d20 y d100, notación
+limitada (`d20`, `2d6`, `2d6+3`, con espacios opcionales), modificadores y
+ventaja/desventaja de d20 mediante keep highest/lowest. Las tiradas son locales,
+temporales y no requieren autenticación, campaña ni persistencia. El máximo es
+20 dados por tirada y la aleatoriedad usa Web Crypto.
+
+Un success threshold opcional evalúa cada dado efectivo (`kept`) de forma
+individual: `resultado del dado + modificador >= threshold`. Los dados
+descartados por ventaja/desventaja no cuentan éxitos. No se usa el total
+acumulado para esta evaluación.
+
 ### Fuera del MVP
 
 - historial persistente;
