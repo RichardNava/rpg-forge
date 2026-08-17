@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "spikes/phase-14"
 
 allowBuilds:
   esbuild: true

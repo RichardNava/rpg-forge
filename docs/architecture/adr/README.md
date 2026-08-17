@@ -50,4 +50,9 @@ Los ADR conservan una numeración histórica estable. Un ADR sustituido no se el
 - [`046-bootstrap-runtime-pins`](046-bootstrap-runtime-pins.md) — ADR-046 — Pins de runtime para el bootstrap
 - [`047-shadcn-base-ui-bootstrap`](047-shadcn-base-ui-bootstrap.md) — ADR-047 — shadcn inicial con Base UI
 - [`048-bootstrap-no-remote-resources`](048-bootstrap-no-remote-resources.md) — ADR-048 — Bootstrap sin recursos remotos ni deploy
+- [`049-d1-environment-and-migration-strategy`](049-d1-environment-and-migration-strategy.md) — ADR-049 — D1 environment and migration strategy
 - [`050-dice-engine-and-standalone-roller`](050-dice-engine-and-standalone-roller.md) — ADR-050 — Dice engine and standalone roller
+- [`051-workerd-pdf-page-extraction`](051-workerd-pdf-page-extraction.md) — ADR-051 — Workerd PDF page extraction
+- [`052-workerd-acroform-pdf-renderer`](052-workerd-acroform-pdf-renderer.md) — ADR-052 — Workerd AcroForm PDF renderer
+- [`053-embedding-model-and-vectorize-metric`](053-embedding-model-and-vectorize-metric.md) — ADR-053 — Embedding model, dimensions, and Vectorize metric
+- [`054-zod4-canonical-schema`](054-zod4-canonical-schema.md) — ADR-054 — Zod 4 as canonical runtime and JSON Schema source

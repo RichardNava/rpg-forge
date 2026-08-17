@@ -1,0 +1,5 @@
+{
+  "name": "rpg-forge-phase-14-pdf-extraction-spike",
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-08-12",
+}

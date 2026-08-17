@@ -1,0 +1,35 @@
+{
+  "name": "@rpg-forge/phase-14-spikes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "bundle:pdf-extraction": "wrangler deploy --dry-run --no-telemetry --config pdf-extraction/wrangler.jsonc --outdir .artifacts/pdf-extraction-bundle",
+    "bundle:pdf-renderer": "wrangler deploy --dry-run --no-telemetry --config pdf-renderer/wrangler.jsonc --outdir .artifacts/pdf-renderer-bundle",
+    "test": "vitest run --config vitest.config.ts",
+    "test:all": "pnpm test && pnpm test:workerd:pdf-extraction && pnpm test:workerd:pdf-renderer",
+    "test:workerd:pdf-extraction": "vitest run --config vitest.pdf-extraction.config.ts",
+    "test:workerd:pdf-renderer": "vitest run --config vitest.pdf-renderer.config.ts",
+    "typecheck": "tsc --noEmit",
+    "benchmark:embeddings": "tsx scripts/run-embedding-benchmark.ts",
+    "benchmark:structured-ai": "tsx scripts/run-structured-ai-benchmark.ts",
+    "benchmark:native-schema": "tsx scripts/run-native-schema-benchmark.ts"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "6.2.108",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.21.3",
+    "@cloudflare/workers-types": "5.20260811.1",
+    "@types/node": "24.13.3",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10",
+    "wrangler": "4.122.0"
+  }
+}
