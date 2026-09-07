@@ -1,0 +1,12 @@
+# Copy to .dev.vars for local `wrangler dev`. Never commit .dev.vars.
+#
+# Turnstile secret key for the TURNSTILE site. When absent the worker fails
+# closed: session creation is denied with HUMAN_VERIFICATION_REQUIRED.
+TURNSTILE_SECRET=
+#
+# Explicit local-development switch for the rate-limit boundary. This is the
+# ONLY value that enables the in-memory rate limiter when the Cloudflare
+# RATE_LIMITER binding is absent. Production deployments must NOT set this:
+# the default (absent) mode requires the RATE_LIMITER binding and fails closed
+# with RATE_LIMIT_UNAVAILABLE when it is missing.
+RATE_LIMIT_MODE=local

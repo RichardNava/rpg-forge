@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rules-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-12",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rpg-forge-rules-local",
+      "migrations_dir": "drizzle",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  /**
+   * DEFERRED PRODUCTION RESOURCE: Cloudflare Rate Limiting binding.
+   *
+   * The rate-limit boundary is implemented as an application port
+   * (RateLimitPort). The worker uses the env.RATE_LIMITER binding when the
+   * runtime provides one and falls back to an in-memory per-isolate limiter
+   * for local development and tests.
+   *
+   * No remote resource is created in Phase 14.2. When wiring production, add
+   * a real namespace id (an integer unique to the Cloudflare account) and uncomment:
+   *
+   * "ratelimits": [
+   *   {
+   *     "name": "RATE_LIMITER",
+   *     "namespace_id": "<ACCOUNT_UNIQUE_INTEGER>",
+   *     "simple": { "limit": 20, "period": 60 }
+   *   }
+   * ]
+   */
+}

@@ -1,0 +1,56 @@
+export type BearerToken = { ok: true; token: string } | { ok: false };
+
+const BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]+)$/;
+
+export function parseBearerToken(request: Request): BearerToken {
+  const header = request.headers.get("authorization");
+  if (header === null) {
+    return { ok: false };
+  }
+  const match = BEARER_PATTERN.exec(header);
+  if (match === null) {
+    return { ok: false };
+  }
+  const token = match[1];
+  if (token === undefined || token === "") {
+    return { ok: false };
+  }
+  return { ok: true, token };
+}
+
+export function hasJsonContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+  if (contentType === null) {
+    return false;
+  }
+  return contentType.split(";")[0]?.trim() === "application/json";
+}
+
+export const MAX_REQUEST_BODY_BYTES = 16 * 1024;
+
+export async function readBoundedJson(
+  request: Request,
+  maxBytes = MAX_REQUEST_BODY_BYTES,
+): Promise<unknown | null> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    const parsed = Number.parseInt(contentLength, 10);
+    if (Number.isFinite(parsed) && parsed > maxBytes) {
+      return null;
+    }
+  }
+  let text: string;
+  try {
+    text = await request.text();
+  } catch {
+    return null;
+  }
+  if (text.length > maxBytes) {
+    return null;
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
