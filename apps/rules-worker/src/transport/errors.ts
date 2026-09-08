@@ -6,6 +6,19 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   HUMAN_VERIFICATION_FAILED: 403,
   RATE_LIMITED: 429,
   RATE_LIMIT_UNAVAILABLE: 503,
+  RULEBOOK_UPLOAD_CONSENT_REQUIRED: 403,
+  RULEBOOK_INVALID_CONTENT_TYPE: 415,
+  RULEBOOK_TOO_LARGE: 413,
+  RULEBOOK_INVALID_PDF: 400,
+  RULEBOOK_TOO_MANY_PAGES: 422,
+  RULEBOOK_REQUIRES_OCR: 422,
+  RULEBOOK_ALREADY_ATTACHED: 409,
+  RULEBOOK_NOT_FOUND: 404,
+  RULEBOOK_STORAGE_UNAVAILABLE: 503,
+  RULEBOOK_WORKFLOW_UNAVAILABLE: 503,
+  RULEBOOK_PROCESSING_FAILED: 500,
+  RULEBOOK_EXTRACTION_TOO_LARGE: 422,
+  RULEBOOK_TOO_MANY_CHUNKS: 422,
   ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED: 404,
   ANALYSIS_SESSION_EXPIRED: 410,
   ANALYSIS_SESSION_DELETE_FAILED: 500,
@@ -20,6 +33,26 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   RATE_LIMITED: "Too many requests. Please try again later.",
   RATE_LIMIT_UNAVAILABLE:
     "Rate limiting is unavailable. Please try again later.",
+  RULEBOOK_UPLOAD_CONSENT_REQUIRED:
+    "Upload consent is required before attaching a rulebook.",
+  RULEBOOK_INVALID_CONTENT_TYPE: "Expected application/pdf.",
+  RULEBOOK_TOO_LARGE: "The rulebook exceeds the 50 MiB upload limit.",
+  RULEBOOK_INVALID_PDF: "The uploaded file is not a valid PDF.",
+  RULEBOOK_TOO_MANY_PAGES: "The rulebook exceeds the 500-page limit.",
+  RULEBOOK_REQUIRES_OCR:
+    "The rulebook does not contain enough selectable text and requires OCR.",
+  RULEBOOK_ALREADY_ATTACHED:
+    "Remove the current rulebook before attaching another one.",
+  RULEBOOK_NOT_FOUND: "No rulebook is attached to this analysis session.",
+  RULEBOOK_STORAGE_UNAVAILABLE:
+    "Temporary rulebook storage is unavailable. Please try again later.",
+  RULEBOOK_WORKFLOW_UNAVAILABLE:
+    "Rulebook processing is unavailable. Please try again later.",
+  RULEBOOK_PROCESSING_FAILED: "The rulebook could not be processed.",
+  RULEBOOK_EXTRACTION_TOO_LARGE:
+    "The rulebook contains more extractable text than this temporary service supports.",
+  RULEBOOK_TOO_MANY_CHUNKS:
+    "The rulebook would create too many temporary text chunks.",
   ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED:
     "The analysis session was not found or the supplied credentials are invalid.",
   ANALYSIS_SESSION_EXPIRED: "This analysis session has expired.",
@@ -43,6 +76,15 @@ export function jsonResponse(status: number, body: unknown): Response {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+export function emptyResponse(status: number): Response {
+  return new Response(null, {
+    status,
+    headers: {
       "cache-control": "no-store",
     },
   });

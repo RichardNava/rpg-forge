@@ -10,6 +10,11 @@ import {
   type SessionRepositoryPort,
   type SessionCrypto,
 } from "@repo/rules-analysis-session";
+import type {
+  RulebookProcessingWorkflowPort,
+  RulebookRepositoryPort,
+  TemporaryRulebookStoragePort,
+} from "@repo/rulebook-ingestion";
 import {
   parseBearerToken,
   hasJsonContentType,
@@ -20,6 +25,7 @@ import {
   AnalysisIdSchema,
   CreateSessionRequestSchema,
 } from "./transport/schemas.js";
+import { handleRulebookRequest } from "./rulebook-handler.js";
 
 export interface AppDeps {
   crypto: SessionCrypto;
@@ -28,10 +34,15 @@ export interface AppDeps {
   cleaner: AnalysisResourceCleanerPort;
   humanVerifier: HumanVerificationPort;
   rateLimiter: RateLimitPort;
+  rulebookRepository: RulebookRepositoryPort;
+  rulebookStorage?: TemporaryRulebookStoragePort;
+  rulebookWorkflow?: RulebookProcessingWorkflowPort;
 }
 
 const SESSIONS_PATH = "/v1/rules-analysis/sessions";
 const SESSION_PATH_PATTERN = /^\/v1\/rules-analysis\/sessions\/([^/]+)$/;
+const RULEBOOK_PATH_PATTERN =
+  /^\/v1\/rules-analysis\/sessions\/([^/]+)\/rulebook$/;
 
 export async function handleRequest(
   request: Request,
@@ -43,6 +54,11 @@ export async function handleRequest(
 
   if (method === "POST" && path === SESSIONS_PATH) {
     return handleCreateSession(request, deps);
+  }
+
+  const rulebookMatch = RULEBOOK_PATH_PATTERN.exec(path);
+  if (rulebookMatch !== null) {
+    return handleRulebookRequest(rulebookMatch[1] ?? "", request, deps);
   }
 
   const match = SESSION_PATH_PATTERN.exec(path);

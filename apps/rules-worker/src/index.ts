@@ -5,6 +5,7 @@ import {
 import { createAppDeps } from "./deps.js";
 import { type Env } from "./env.js";
 import { handleRequest } from "./handler.js";
+export { RulebookIngestionWorkflow } from "./rulebook-ingestion-workflow.js";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

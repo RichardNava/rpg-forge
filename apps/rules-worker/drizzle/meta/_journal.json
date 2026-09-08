@@ -8,6 +8,13 @@
       "when": 1788781204527,
       "tag": "0000_blue_logan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788857991790,
+      "tag": "0001_tense_the_stranger",
+      "breakpoints": true
     }
   ]
 }

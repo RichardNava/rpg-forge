@@ -26,6 +26,49 @@ export function hasJsonContentType(request: Request): boolean {
   return contentType.split(";")[0]?.trim() === "application/json";
 }
 
+export function hasPdfContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+  if (contentType === null) {
+    return false;
+  }
+  return contentType.split(";")[0]?.trim().toLowerCase() === "application/pdf";
+}
+
+export function readDeclaredContentLength(request: Request): number | null {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength === null || !/^\d+$/.test(contentLength.trim())) {
+    return null;
+  }
+  const parsed = Number(contentLength);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+export function requestBodyBytes(
+  request: Request,
+): AsyncIterable<Uint8Array> | null {
+  if (request.body === null) {
+    return null;
+  }
+  return readBytes(request.body);
+}
+
+async function* readBytes(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<Uint8Array> {
+  const reader = body.getReader();
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) {
+        return;
+      }
+      yield next.value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export const MAX_REQUEST_BODY_BYTES = 16 * 1024;
 
 export async function readBoundedJson(

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PublicRulebookSchema } from "@repo/rulebook-ingestion";
 
 export const ErrorCodeSchema = z.enum([
   "INVALID_REQUEST",
@@ -6,6 +7,19 @@ export const ErrorCodeSchema = z.enum([
   "HUMAN_VERIFICATION_FAILED",
   "RATE_LIMITED",
   "RATE_LIMIT_UNAVAILABLE",
+  "RULEBOOK_UPLOAD_CONSENT_REQUIRED",
+  "RULEBOOK_INVALID_CONTENT_TYPE",
+  "RULEBOOK_TOO_LARGE",
+  "RULEBOOK_INVALID_PDF",
+  "RULEBOOK_TOO_MANY_PAGES",
+  "RULEBOOK_REQUIRES_OCR",
+  "RULEBOOK_ALREADY_ATTACHED",
+  "RULEBOOK_NOT_FOUND",
+  "RULEBOOK_STORAGE_UNAVAILABLE",
+  "RULEBOOK_WORKFLOW_UNAVAILABLE",
+  "RULEBOOK_PROCESSING_FAILED",
+  "RULEBOOK_EXTRACTION_TOO_LARGE",
+  "RULEBOOK_TOO_MANY_CHUNKS",
   "ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED",
   "ANALYSIS_SESSION_EXPIRED",
   "ANALYSIS_SESSION_DELETE_FAILED",
@@ -47,6 +61,9 @@ export const SessionViewSchema = z.strictObject({
 });
 
 export type SessionView = z.infer<typeof SessionViewSchema>;
+
+export const RulebookViewSchema = PublicRulebookSchema;
+export type RulebookView = z.infer<typeof RulebookViewSchema>;
 
 export const AnalysisIdSchema = z.uuid();
 

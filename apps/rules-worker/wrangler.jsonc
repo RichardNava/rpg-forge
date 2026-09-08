@@ -11,6 +11,45 @@
       "migrations_dir": "drizzle",
     },
   ],
+  "workflows": [
+    {
+      "name": "rules-worker-rulebook-ingestion",
+      "binding": "RULEBOOK_INGESTION_WORKFLOW",
+      "class_name": "RulebookIngestionWorkflow",
+    },
+  ],
+  "triggers": {
+    "crons": ["*/15 * * * *"],
+  },
+  "env": {
+    "local": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "rpg-forge-rules-local",
+          "migrations_dir": "drizzle",
+        },
+      ],
+      "workflows": [
+        {
+          "name": "rules-worker-rulebook-ingestion",
+          "binding": "RULEBOOK_INGESTION_WORKFLOW",
+          "class_name": "RulebookIngestionWorkflow",
+        },
+      ],
+      /**
+       * LOCAL-ONLY R2 binding. Production bucket identity is deliberately
+       * deferred: the root environment has no R2 binding, so upload fails
+       * closed until an approved remote bucket is explicitly configured.
+       */
+      "r2_buckets": [
+        {
+          "binding": "RULEBOOK_BUCKET",
+          "bucket_name": "rpg-forge-rules-local",
+        },
+      ],
+    },
+  },
   "observability": {
     "enabled": true,
   },
@@ -19,8 +58,9 @@
    *
    * The rate-limit boundary is implemented as an application port
    * (RateLimitPort). The worker uses the env.RATE_LIMITER binding when the
-   * runtime provides one and falls back to an in-memory per-isolate limiter
-   * for local development and tests.
+   * runtime provides one. The in-memory fallback is allowed only with the
+   * explicit local RATE_LIMIT_MODE=local setting; all other modes fail closed
+   * when the binding is absent.
    *
    * No remote resource is created in Phase 14.2. When wiring production, add
    * a real namespace id (an integer unique to the Cloudflare account) and uncomment:
