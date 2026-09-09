@@ -3,12 +3,17 @@ import {
   RULEBOOK_STATUSES,
 } from "@repo/rulebook-ingestion";
 import {
+  RULE_BUILD_FAILURE_CODES,
+  RULES_ANALYSIS_RUN_STATUSES,
+} from "@repo/rules-analysis-run";
+import {
   index,
   integer,
   sqliteTable,
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const rulesAnalysisSession = sqliteTable(
   "rules_analysis_sessions",
@@ -59,3 +64,43 @@ export const rulesAnalysisRulebook = sqliteTable(
 
 export type RulesAnalysisRulebookRow =
   typeof rulesAnalysisRulebook.$inferSelect;
+
+/**
+ * Operational metadata for a rules-analysis run. D1 intentionally stores NO
+ * character intent, overrides, RulesContext JSON, retrieval text, candidate
+ * output, or vector ids: those live in generation-scoped temporary R2
+ * artifacts so that the shared status row stays small and queue-friendly.
+ */
+export const rulesAnalysisRun = sqliteTable(
+  "rules_analysis_runs",
+  {
+    runId: text("run_id").primaryKey(),
+    analysisId: text("analysis_id").notNull(),
+    ingestionId: text("ingestion_id").notNull(),
+    status: text("status", {
+      enum: RULES_ANALYSIS_RUN_STATUSES,
+    }).notNull(),
+    failureCode: text("failure_code", {
+      enum: RULE_BUILD_FAILURE_CODES,
+    }),
+    isCurrent: integer("is_current", { mode: "boolean" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("rules_analysis_runs_current_idx").on(
+      table.analysisId,
+      table.isCurrent,
+    ),
+    index("rules_analysis_runs_generation_idx").on(
+      table.analysisId,
+      table.ingestionId,
+    ),
+    index("rules_analysis_runs_cleanup_idx").on(table.status, table.updatedAt),
+    uniqueIndex("rules_analysis_runs_single_current_idx")
+      .on(table.analysisId)
+      .where(sql`${table.isCurrent} = 1`),
+  ],
+);
+
+export type RulesAnalysisRunRow = typeof rulesAnalysisRun.$inferSelect;

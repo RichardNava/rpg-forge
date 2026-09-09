@@ -8,22 +8,21 @@ import {
   toPublicRulebook,
   validatePdfUpload,
 } from "@repo/rulebook-ingestion";
-import { authorizeSession } from "@repo/rules-analysis-session";
 import {
   hasPdfContentType,
-  parseBearerToken,
   readDeclaredContentLength,
   requestBodyBytes,
 } from "./http.js";
 import { RulebookStorageUnavailableError } from "./infrastructure/r2-rulebook-storage.js";
 import { RulebookWorkflowUnavailableError } from "./infrastructure/rulebook-workflow.js";
-import type { AppDeps } from "./handler.js";
+import { authorizeActiveSession, type AppDeps } from "./handler.js";
+import { invalidateRulebookSemanticsForGeneration } from "./infrastructure/rulebook-cleaner.js";
 import {
   emptyResponse,
   errorResponse,
   jsonResponse,
 } from "./transport/errors.js";
-import { AnalysisIdSchema, RulebookViewSchema } from "./transport/schemas.js";
+import { RulebookViewSchema } from "./transport/schemas.js";
 
 export const RULEBOOK_UPLOAD_CONSENT_HEADER = "x-rules-upload-consent";
 const RULEBOOK_UPLOAD_CONSENT_VALUE = "accepted";
@@ -33,7 +32,7 @@ export async function handleRulebookRequest(
   request: Request,
   deps: AppDeps,
 ): Promise<Response> {
-  const authorized = await authorizeActiveRulebookSession(
+  const authorized = await authorizeActiveSession(
     analysisIdPath,
     request,
     deps,
@@ -169,6 +168,21 @@ async function deleteRulebook(
   }
 
   try {
+    if (current.status === "READY") {
+      const artifactStore = deps.rulesAnalysisArtifactStore;
+      const vectorIndex = deps.rulesAnalysisVectorIndex;
+      if (artifactStore === undefined || vectorIndex === undefined) {
+        return errorResponse("RULEBOOK_STORAGE_UNAVAILABLE");
+      }
+      await invalidateRulebookSemanticsForGeneration(
+        { analysisId, ingestionId: current.ingestionId },
+        {
+          runRepository: deps.rulesAnalysisRunRepository,
+          artifactStore,
+          vectorIndex,
+        },
+      );
+    }
     await removeRulebook(analysisId, {
       repository: deps.rulebookRepository,
       storage: deps.rulebookStorage,
@@ -178,53 +192,6 @@ async function deleteRulebook(
   } catch {
     return errorResponse("RULEBOOK_PROCESSING_FAILED");
   }
-}
-
-async function authorizeActiveRulebookSession(
-  analysisIdPath: string,
-  request: Request,
-  deps: AppDeps,
-): Promise<
-  { kind: "ok"; analysisId: string } | { kind: "response"; response: Response }
-> {
-  const parsedId = AnalysisIdSchema.safeParse(analysisIdPath);
-  if (!parsedId.success) {
-    return {
-      kind: "response",
-      response: errorResponse("INVALID_REQUEST", "Invalid analysis id."),
-    };
-  }
-  const bearer = parseBearerToken(request);
-  if (!bearer.ok) {
-    return {
-      kind: "response",
-      response: errorResponse(
-        "INVALID_REQUEST",
-        "Missing or malformed Authorization header.",
-      ),
-    };
-  }
-  const authorization = await authorizeSession(
-    parsedId.data,
-    bearer.token,
-    deps,
-  );
-  if (authorization.kind === "expired") {
-    return {
-      kind: "response",
-      response: errorResponse("ANALYSIS_SESSION_EXPIRED"),
-    };
-  }
-  if (
-    authorization.kind !== "ok" ||
-    authorization.session.status !== "ACTIVE"
-  ) {
-    return {
-      kind: "response",
-      response: errorResponse("ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED"),
-    };
-  }
-  return { kind: "ok", analysisId: parsedId.data };
 }
 
 function hasUploadConsent(request: Request): boolean {

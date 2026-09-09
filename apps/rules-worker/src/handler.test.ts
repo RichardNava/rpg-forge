@@ -9,6 +9,7 @@ import {
   FakeRulebookRepository,
   FakeRulebookStorage,
   FakeRulebookWorkflow,
+  FakeRulesAnalysisRunRepository,
   FakeSessionRepository,
 } from "./test/fakes.js";
 
@@ -33,6 +34,7 @@ interface Harness {
   rulebookRepository: FakeRulebookRepository;
   rulebookStorage: FakeRulebookStorage;
   rulebookWorkflow: FakeRulebookWorkflow;
+  rulesAnalysisRunRepository: FakeRulesAnalysisRunRepository;
 }
 
 function makeHarness(): Harness {
@@ -45,6 +47,7 @@ function makeHarness(): Harness {
   const rulebookRepository = new FakeRulebookRepository(clock);
   const rulebookStorage = new FakeRulebookStorage();
   const rulebookWorkflow = new FakeRulebookWorkflow();
+  const rulesAnalysisRunRepository = new FakeRulesAnalysisRunRepository();
   return {
     deps: {
       crypto,
@@ -56,6 +59,7 @@ function makeHarness(): Harness {
       rulebookRepository,
       rulebookStorage,
       rulebookWorkflow,
+      rulesAnalysisRunRepository,
     },
     clock,
     crypto,
@@ -66,6 +70,7 @@ function makeHarness(): Harness {
     rulebookRepository,
     rulebookStorage,
     rulebookWorkflow,
+    rulesAnalysisRunRepository,
   };
 }
 

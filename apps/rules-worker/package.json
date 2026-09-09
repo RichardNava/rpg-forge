@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@repo/rulebook-ingestion": "workspace:*",
+    "@repo/rules-analysis-run": "workspace:*",
     "@repo/rules-analysis-session": "workspace:*",
+    "@repo/rules-context": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pdfjs-dist": "6.2.108",
     "zod": "4.4.3"

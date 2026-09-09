@@ -1,16 +1,28 @@
 import { webCrypto } from "@repo/rules-analysis-session";
 import { systemClock } from "./infrastructure/clock.js";
+import { AiProviderUnavailableError } from "./infrastructure/ai-errors.js";
+import { createCloudflareAiEmbeddings } from "./infrastructure/ai-embeddings.js";
+import { createCloudflareAiRuleAnalysis } from "./infrastructure/ai-analysis.js";
 import { createD1SessionRepository } from "./infrastructure/db/repository.js";
 import { createD1RulebookRepository } from "./infrastructure/db/rulebook-repository.js";
+import { createD1RulesAnalysisRunRepository } from "./infrastructure/db/run-repository.js";
 import { createPdfJsPageExtractor } from "./infrastructure/pdfjs-extractor.js";
 import { createRateLimitPort } from "./infrastructure/rate-limit.js";
 import {
   createR2TemporaryRulebookStorage,
   RulebookStorageUnavailableError,
 } from "./infrastructure/r2-rulebook-storage.js";
+import { createR2ChunkSource } from "./infrastructure/r2-chunk-source.js";
+import { createR2RulebookFileHash } from "./infrastructure/r2-rulebook-file-hash.js";
+import { createR2RuleArtifacts } from "./infrastructure/r2-rule-artifacts.js";
 import { createRulebookResourceCleaner } from "./infrastructure/rulebook-cleaner.js";
 import { createCloudflareRulebookWorkflowPort } from "./infrastructure/rulebook-workflow.js";
+import { createCloudflareRulesAnalysisWorkflowPort } from "./infrastructure/rules-analysis-workflow.js";
 import { createTurnstileHumanVerification } from "./infrastructure/turnstile.js";
+import {
+  VectorIndexUnavailableError,
+  createVectorizeIndex,
+} from "./infrastructure/vectorize-index.js";
 import { type Env } from "./env.js";
 import { type AppDeps } from "./handler.js";
 
@@ -26,6 +38,24 @@ export function createAppDeps(env: Env): AppDeps {
     env.RULEBOOK_INGESTION_WORKFLOW === undefined
       ? undefined
       : createCloudflareRulebookWorkflowPort(env.RULEBOOK_INGESTION_WORKFLOW);
+  const rulesAnalysisRunRepository = createD1RulesAnalysisRunRepository(
+    env.DB,
+    {
+      clock,
+    },
+  );
+  const rulesAnalysisArtifactStore =
+    env.RULEBOOK_BUCKET === undefined
+      ? undefined
+      : createR2RuleArtifacts(env.RULEBOOK_BUCKET);
+  const rulesAnalysisVectorIndex =
+    env.VECTORIZE === undefined
+      ? undefined
+      : createVectorizeIndex(env.VECTORIZE);
+  const rulesAnalysisWorkflow =
+    env.RULES_ANALYSIS_WORKFLOW === undefined
+      ? undefined
+      : createCloudflareRulesAnalysisWorkflowPort(env.RULES_ANALYSIS_WORKFLOW);
 
   return {
     crypto: webCrypto,
@@ -35,12 +65,27 @@ export function createAppDeps(env: Env): AppDeps {
       repository: rulebookRepository,
       ...(rulebookStorage === undefined ? {} : { storage: rulebookStorage }),
       ...(rulebookWorkflow === undefined ? {} : { workflow: rulebookWorkflow }),
+      runRepository: rulesAnalysisRunRepository,
+      ...(rulesAnalysisArtifactStore === undefined
+        ? {}
+        : { artifactStore: rulesAnalysisArtifactStore }),
+      ...(rulesAnalysisVectorIndex === undefined
+        ? {}
+        : { vectorIndex: rulesAnalysisVectorIndex }),
     }),
     humanVerifier: createTurnstileHumanVerification(env),
     rateLimiter: createRateLimitPort(env, clock),
     rulebookRepository,
+    rulesAnalysisRunRepository,
     ...(rulebookStorage === undefined ? {} : { rulebookStorage }),
     ...(rulebookWorkflow === undefined ? {} : { rulebookWorkflow }),
+    ...(rulesAnalysisArtifactStore === undefined
+      ? {}
+      : { rulesAnalysisArtifactStore }),
+    ...(rulesAnalysisVectorIndex === undefined
+      ? {}
+      : { rulesAnalysisVectorIndex }),
+    ...(rulesAnalysisWorkflow === undefined ? {} : { rulesAnalysisWorkflow }),
   };
 }
 
@@ -55,5 +100,34 @@ export function createRulebookProcessingDeps(env: Env) {
     repository: createD1RulebookRepository(env.DB, { clock }),
     storage: createR2TemporaryRulebookStorage(env.RULEBOOK_BUCKET),
     extractor: createPdfJsPageExtractor(),
+  };
+}
+
+/**
+ * Processing deps for a rules analysis run. Construction fails closed when any
+ * required runtime binding is missing; the analysis workflow catches this and
+ * marks the run FAILED via D1 alone so it can never block begin forever.
+ */
+export function createRulesAnalysisRunDeps(env: Env) {
+  if (env.RULEBOOK_BUCKET === undefined) {
+    throw new RulebookStorageUnavailableError();
+  }
+  if (env.AI === undefined) {
+    throw new AiProviderUnavailableError();
+  }
+  if (env.VECTORIZE === undefined) {
+    throw new VectorIndexUnavailableError();
+  }
+  const clock = systemClock;
+  return {
+    clock,
+    runRepository: createD1RulesAnalysisRunRepository(env.DB, { clock }),
+    rulebookRepository: createD1RulebookRepository(env.DB, { clock }),
+    chunkSource: createR2ChunkSource(env.RULEBOOK_BUCKET),
+    fileHash: createR2RulebookFileHash(env.RULEBOOK_BUCKET),
+    embeddings: createCloudflareAiEmbeddings(env.AI),
+    vectorIndex: createVectorizeIndex(env.VECTORIZE),
+    analysis: createCloudflareAiRuleAnalysis(env.AI),
+    artifactStore: createR2RuleArtifacts(env.RULEBOOK_BUCKET),
   };
 }

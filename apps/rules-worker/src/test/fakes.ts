@@ -20,6 +20,25 @@ import type {
   RulebookRepositoryPort,
   TemporaryRulebookStoragePort,
 } from "@repo/rulebook-ingestion";
+import type {
+  RetrievalRecord,
+  RetrievedVector,
+  RuleBuildFailureCode,
+  RulesAnalysisInputArtifact,
+  RulesAnalysisRun,
+  RulesAnalysisRunRepositoryPort,
+  RunArtifactPort,
+  RunClaimResult,
+  RunCreationResult,
+  RuleVectorIndexPort,
+  VectorRecord,
+} from "@repo/rules-analysis-run";
+import type {
+  CharacterIntent,
+  RuleOverride,
+  RulesContext,
+} from "@repo/rules-context";
+import type { RulesAnalysisWorkflowPort } from "../infrastructure/rules-analysis-workflow.js";
 
 export class FakeClock implements Clock {
   private current: Date;
@@ -337,6 +356,342 @@ export class FakeRulebookWorkflow implements RulebookProcessingWorkflowPort {
   }
 }
 
+export class FakeRulesAnalysisRunRepository implements RulesAnalysisRunRepositoryPort {
+  readonly rows = new Map<string, RulesAnalysisRun>();
+
+  async createCurrent(run: RulesAnalysisRun): Promise<RunCreationResult> {
+    if (this.currentRun(run.analysisId) !== null) {
+      return "superseded";
+    }
+    this.rows.set(run.runId, cloneRun(run));
+    return "created_current";
+  }
+
+  async findCurrent(analysisId: string): Promise<RulesAnalysisRun | null> {
+    const current = this.currentRun(analysisId);
+    return current === null ? null : cloneRun(current);
+  }
+
+  async findRun(
+    analysisId: string,
+    runId: string,
+  ): Promise<RulesAnalysisRun | null> {
+    const run = this.rows.get(runId);
+    return run === undefined || run.analysisId !== analysisId
+      ? null
+      : cloneRun(run);
+  }
+
+  async claimRunningIfCurrent(
+    runId: string,
+    analysisId: string,
+    ingestionId: string,
+  ): Promise<RunClaimResult> {
+    const run = this.rows.get(runId);
+    if (
+      run === undefined ||
+      run.analysisId !== analysisId ||
+      run.ingestionId !== ingestionId ||
+      !run.isCurrent ||
+      run.status !== "QUEUED"
+    ) {
+      return "not_current";
+    }
+    run.status = "RUNNING";
+    return "claimed";
+  }
+
+  async finalizeIfCurrent(
+    runId: string,
+    input: { status: "READY" | "CONFLICTS" | "CONFIRMED"; updatedAt: Date },
+  ): Promise<boolean> {
+    const run = this.rows.get(runId);
+    if (
+      run === undefined ||
+      !run.isCurrent ||
+      !["RUNNING", "CONFLICTS"].includes(run.status)
+    ) {
+      return false;
+    }
+    run.status = input.status;
+    run.failureCode = null;
+    run.updatedAt = input.updatedAt;
+    return true;
+  }
+
+  async markFailedIfCurrent(
+    runId: string,
+    failureCode: RuleBuildFailureCode,
+    updatedAt: Date,
+  ): Promise<boolean> {
+    const run = this.rows.get(runId);
+    if (
+      run === undefined ||
+      !run.isCurrent ||
+      !["QUEUED", "RUNNING"].includes(run.status)
+    ) {
+      return false;
+    }
+    run.status = "FAILED";
+    run.failureCode = failureCode;
+    run.updatedAt = updatedAt;
+    return true;
+  }
+
+  async confirmIfCurrent(
+    runId: string,
+    input: {
+      analysisId: string;
+      ingestionId: string;
+      updatedAt: Date;
+    },
+  ): Promise<boolean> {
+    const run = this.rows.get(runId);
+    if (
+      run === undefined ||
+      run.analysisId !== input.analysisId ||
+      run.ingestionId !== input.ingestionId ||
+      !run.isCurrent ||
+      run.status !== "CONFLICTS"
+    ) {
+      return false;
+    }
+    run.status = "CONFIRMED";
+    run.updatedAt = input.updatedAt;
+    return true;
+  }
+
+  async markInvalidatedIfCurrent(
+    runId: string,
+    updatedAt: Date,
+  ): Promise<boolean> {
+    const run = this.rows.get(runId);
+    if (run === undefined || !run.isCurrent) {
+      return false;
+    }
+    run.status = "INVALIDATED";
+    run.updatedAt = updatedAt;
+    return true;
+  }
+
+  async invalidateRunsForGeneration(
+    analysisId: string,
+    ingestionId: string,
+  ): Promise<readonly RulesAnalysisRun[]> {
+    const affected: RulesAnalysisRun[] = [];
+    for (const run of this.rows.values()) {
+      if (
+        run.analysisId === analysisId &&
+        run.ingestionId === ingestionId &&
+        run.status !== "FAILED"
+      ) {
+        affected.push(cloneRun(run));
+        run.status = "INVALIDATED";
+      }
+    }
+    return affected;
+  }
+
+  async listForAnalysis(
+    analysisId: string,
+  ): Promise<readonly RulesAnalysisRun[]> {
+    const runs: RulesAnalysisRun[] = [];
+    for (const run of this.rows.values()) {
+      if (run.analysisId === analysisId) {
+        runs.push(cloneRun(run));
+      }
+    }
+    return runs;
+  }
+
+  async deleteAllForAnalysis(analysisId: string): Promise<void> {
+    for (const [runId, run] of this.rows) {
+      if (run.analysisId === analysisId) {
+        this.rows.delete(runId);
+      }
+    }
+  }
+
+  private currentRun(analysisId: string): RulesAnalysisRun | null {
+    for (const run of this.rows.values()) {
+      if (run.analysisId === analysisId && run.isCurrent) {
+        return run;
+      }
+    }
+    return null;
+  }
+}
+
+export class FakeRunArtifactStore implements RunArtifactPort {
+  readonly inputs = new Map<string, RulesAnalysisInputArtifact>();
+  readonly contexts = new Map<string, RulesContext>();
+  readonly retrievals = new Map<string, unknown>();
+  readonly manifests = new Map<string, readonly string[]>();
+  readonly deleted: Array<{
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+  }> = [];
+  failOnPutInput = false;
+
+  seedContext(
+    input: { analysisId: string; ingestionId: string; runId: string },
+    context: RulesContext,
+  ): void {
+    this.contexts.set(runArtifactKey(input), context);
+  }
+
+  seedInput(
+    input: { analysisId: string; ingestionId: string; runId: string },
+    artifact: RulesAnalysisInputArtifact,
+  ): void {
+    this.inputs.set(runArtifactKey(input), artifact);
+  }
+
+  seedManifest(
+    input: { analysisId: string; ingestionId: string; runId: string },
+    vectorIds: readonly string[],
+  ): void {
+    this.manifests.set(runArtifactKey(input), vectorIds);
+  }
+
+  async putInput(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+    characterIntent: CharacterIntent;
+    ruleOverrides: readonly RuleOverride[];
+  }): Promise<void> {
+    if (this.failOnPutInput) {
+      throw new Error("input artifact write failed");
+    }
+    const artifact: RulesAnalysisInputArtifact = {
+      version: 1,
+      runId: input.runId,
+      analysisId: input.analysisId,
+      ingestionId: input.ingestionId,
+      characterIntent: input.characterIntent,
+      ruleOverrides: [...input.ruleOverrides],
+    };
+    this.inputs.set(runArtifactKey(input), artifact);
+  }
+
+  async getInput(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+  }): Promise<RulesAnalysisInputArtifact | null> {
+    return this.inputs.get(runArtifactKey(input)) ?? null;
+  }
+
+  async putContext(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+    context: RulesContext;
+  }): Promise<void> {
+    this.contexts.set(runArtifactKey(input), input.context);
+  }
+
+  async getContext(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+  }): Promise<RulesContext | null> {
+    return this.contexts.get(runArtifactKey(input)) ?? null;
+  }
+
+  async putRetrieval(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+    retrieval: RetrievalRecord;
+  }): Promise<void> {
+    this.retrievals.set(runArtifactKey(input), input.retrieval);
+  }
+
+  async putVectorManifest(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+    vectorIds: readonly string[];
+  }): Promise<void> {
+    this.manifests.set(runArtifactKey(input), input.vectorIds);
+  }
+
+  async getVectorManifest(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+  }): Promise<readonly string[] | null> {
+    return this.manifests.get(runArtifactKey(input)) ?? null;
+  }
+
+  async deleteRunArtifacts(input: {
+    analysisId: string;
+    ingestionId: string;
+    runId: string;
+  }): Promise<void> {
+    const key = runArtifactKey(input);
+    this.inputs.delete(key);
+    this.contexts.delete(key);
+    this.retrievals.delete(key);
+    this.manifests.delete(key);
+    this.deleted.push(input);
+  }
+}
+
+export class FakeVectorIndex implements RuleVectorIndexPort {
+  readonly upserted: Array<{ namespace: string; count: number }> = [];
+  readonly deleted: Array<{ namespace: string; ids: readonly string[] }> = [];
+
+  async upsert(input: {
+    namespace: string;
+    vectors: readonly VectorRecord[];
+  }): Promise<void> {
+    this.upserted.push({
+      namespace: input.namespace,
+      count: input.vectors.length,
+    });
+  }
+
+  async query(): Promise<readonly RetrievedVector[]> {
+    return [];
+  }
+
+  async deleteByIds(input: {
+    namespace: string;
+    ids: readonly string[];
+  }): Promise<void> {
+    this.deleted.push({ namespace: input.namespace, ids: [...input.ids] });
+  }
+}
+
+export class FakeRulesAnalysisWorkflow implements RulesAnalysisWorkflowPort {
+  readonly started: Array<{
+    analysisId: string;
+    ingestionId: string;
+    rulesAnalysisRunId: string;
+  }> = [];
+  readonly terminated: string[] = [];
+  failOnStart = false;
+
+  async start(input: {
+    analysisId: string;
+    ingestionId: string;
+    rulesAnalysisRunId: string;
+  }): Promise<void> {
+    if (this.failOnStart) {
+      throw new Error("rules analysis workflow start failed");
+    }
+    this.started.push(input);
+  }
+
+  async terminate(rulesAnalysisRunId: string): Promise<void> {
+    this.terminated.push(rulesAnalysisRunId);
+  }
+}
+
 export class FakeSessionRepository implements SessionRepositoryPort {
   sessions = new Map<string, AnalysisSession>();
   deleteLog: string[] = [];
@@ -412,6 +767,22 @@ function cloneRulebook(rulebook: RulebookIngestion): RulebookIngestion {
   };
 }
 
+function cloneRun(run: RulesAnalysisRun): RulesAnalysisRun {
+  return {
+    ...run,
+    createdAt: new Date(run.createdAt.getTime()),
+    updatedAt: new Date(run.updatedAt.getTime()),
+  };
+}
+
 function rulebookKey(analysisId: string, ingestionId: string): string {
   return `${analysisId}/${ingestionId}`;
+}
+
+function runArtifactKey(input: {
+  analysisId: string;
+  ingestionId: string;
+  runId: string;
+}): string {
+  return `${input.analysisId}/${input.ingestionId}/${input.runId}`;
 }

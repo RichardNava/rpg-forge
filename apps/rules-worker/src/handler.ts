@@ -26,6 +26,16 @@ import {
   CreateSessionRequestSchema,
 } from "./transport/schemas.js";
 import { handleRulebookRequest } from "./rulebook-handler.js";
+import {
+  handleRulesContextConfirmation,
+  handleRulesContextRequest,
+} from "./rules-context-handler.js";
+import type {
+  RulesAnalysisRunRepositoryPort,
+  RuleVectorIndexPort,
+  RunArtifactPort,
+} from "@repo/rules-analysis-run";
+import type { RulesAnalysisWorkflowPort } from "./infrastructure/rules-analysis-workflow.js";
 
 export interface AppDeps {
   crypto: SessionCrypto;
@@ -37,12 +47,20 @@ export interface AppDeps {
   rulebookRepository: RulebookRepositoryPort;
   rulebookStorage?: TemporaryRulebookStoragePort;
   rulebookWorkflow?: RulebookProcessingWorkflowPort;
+  rulesAnalysisRunRepository: RulesAnalysisRunRepositoryPort;
+  rulesAnalysisArtifactStore?: RunArtifactPort;
+  rulesAnalysisVectorIndex?: RuleVectorIndexPort;
+  rulesAnalysisWorkflow?: RulesAnalysisWorkflowPort;
 }
 
 const SESSIONS_PATH = "/v1/rules-analysis/sessions";
 const SESSION_PATH_PATTERN = /^\/v1\/rules-analysis\/sessions\/([^/]+)$/;
 const RULEBOOK_PATH_PATTERN =
   /^\/v1\/rules-analysis\/sessions\/([^/]+)\/rulebook$/;
+const RULES_CONTEXT_CONFIRM_PATH_PATTERN =
+  /^\/v1\/rules-analysis\/sessions\/([^/]+)\/rules-context\/confirmation$/;
+const RULES_CONTEXT_PATH_PATTERN =
+  /^\/v1\/rules-analysis\/sessions\/([^/]+)\/rules-context$/;
 
 export async function handleRequest(
   request: Request,
@@ -54,6 +72,21 @@ export async function handleRequest(
 
   if (method === "POST" && path === SESSIONS_PATH) {
     return handleCreateSession(request, deps);
+  }
+
+  const rulesContextConfirmationMatch =
+    RULES_CONTEXT_CONFIRM_PATH_PATTERN.exec(path);
+  if (rulesContextConfirmationMatch !== null) {
+    return handleRulesContextConfirmation(
+      rulesContextConfirmationMatch[1] ?? "",
+      request,
+      deps,
+    );
+  }
+
+  const rulesContextMatch = RULES_CONTEXT_PATH_PATTERN.exec(path);
+  if (rulesContextMatch !== null) {
+    return handleRulesContextRequest(rulesContextMatch[1] ?? "", request, deps);
   }
 
   const rulebookMatch = RULEBOOK_PATH_PATTERN.exec(path);
@@ -179,4 +212,56 @@ async function handleDeleteSession(
   } catch {
     return errorResponse("ANALYSIS_SESSION_DELETE_FAILED");
   }
+}
+
+export type ActiveSessionAuthorization =
+  { kind: "ok"; analysisId: string } | { kind: "response"; response: Response };
+
+/**
+ * Shared session guard for analysis-session-scoped resource routes. Requires a
+ * parseable analysis id and an active (non-expired, non-DELETING) session.
+ */
+export async function authorizeActiveSession(
+  analysisIdPath: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<ActiveSessionAuthorization> {
+  const parsedId = AnalysisIdSchema.safeParse(analysisIdPath);
+  if (!parsedId.success) {
+    return {
+      kind: "response",
+      response: errorResponse("INVALID_REQUEST", "Invalid analysis id."),
+    };
+  }
+  const bearer = parseBearerToken(request);
+  if (!bearer.ok) {
+    return {
+      kind: "response",
+      response: errorResponse(
+        "INVALID_REQUEST",
+        "Missing or malformed Authorization header.",
+      ),
+    };
+  }
+  const authorization = await authorizeSession(
+    parsedId.data,
+    bearer.token,
+    deps,
+  );
+  if (authorization.kind === "expired") {
+    return {
+      kind: "response",
+      response: errorResponse("ANALYSIS_SESSION_EXPIRED"),
+    };
+  }
+  if (
+    authorization.kind !== "ok" ||
+    authorization.session.status !== "ACTIVE"
+  ) {
+    return {
+      kind: "response",
+      response: errorResponse("ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED"),
+    };
+  }
+  return { kind: "ok", analysisId: parsedId.data };
 }

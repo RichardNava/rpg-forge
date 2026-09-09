@@ -19,6 +19,15 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   RULEBOOK_PROCESSING_FAILED: 500,
   RULEBOOK_EXTRACTION_TOO_LARGE: 422,
   RULEBOOK_TOO_MANY_CHUNKS: 422,
+  RULES_CONTEXT_NO_READY_RULEBOOK: 409,
+  RULES_CONTEXT_STORAGE_UNAVAILABLE: 503,
+  RULES_CONTEXT_INDEX_UNAVAILABLE: 503,
+  RULES_CONTEXT_MODEL_UNAVAILABLE: 503,
+  RULES_CONTEXT_RUN_NOT_FOUND: 404,
+  RULES_CONTEXT_ALREADY_READY: 409,
+  RULES_CONTEXT_CONFIRMATION_NOT_NEEDED_OR_INVALID: 409,
+  RULES_CONTEXT_ANALYSIS_FAILED: 500,
+  RULES_CONTEXT_INVALID_CONFIRMATION: 400,
   ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED: 404,
   ANALYSIS_SESSION_EXPIRED: 410,
   ANALYSIS_SESSION_DELETE_FAILED: 500,
@@ -53,6 +62,20 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "The rulebook contains more extractable text than this temporary service supports.",
   RULEBOOK_TOO_MANY_CHUNKS:
     "The rulebook would create too many temporary text chunks.",
+  RULES_CONTEXT_NO_READY_RULEBOOK:
+    "A ready rulebook is required before analysis can begin.",
+  RULES_CONTEXT_STORAGE_UNAVAILABLE:
+    "Rules analysis storage is unavailable. Please try again later.",
+  RULES_CONTEXT_INDEX_UNAVAILABLE:
+    "The rules vector index is unavailable. Please try again later.",
+  RULES_CONTEXT_MODEL_UNAVAILABLE:
+    "The rules analysis model is unavailable. Please try again later.",
+  RULES_CONTEXT_RUN_NOT_FOUND: "No rules analysis run exists for this session.",
+  RULES_CONTEXT_ALREADY_READY: "The rules context is already ready.",
+  RULES_CONTEXT_CONFIRMATION_NOT_NEEDED_OR_INVALID:
+    "Confirmation is not needed, or the current run cannot be confirmed.",
+  RULES_CONTEXT_ANALYSIS_FAILED: "The rules analysis run has failed.",
+  RULES_CONTEXT_INVALID_CONFIRMATION: "The confirmation request is invalid.",
   ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED:
     "The analysis session was not found or the supplied credentials are invalid.",
   ANALYSIS_SESSION_EXPIRED: "This analysis session has expired.",

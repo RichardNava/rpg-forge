@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { PublicRulebookSchema } from "@repo/rulebook-ingestion";
+import {
+  RuleBuildFailureCodeSchema,
+  RulesAnalysisRequestSchema as RulesAnalysisRequestDomainSchema,
+  RulesAnalysisRunStatusSchema,
+} from "@repo/rules-analysis-run";
+import { RulesContextSchema } from "@repo/rules-context";
 
 export const ErrorCodeSchema = z.enum([
   "INVALID_REQUEST",
@@ -20,6 +26,15 @@ export const ErrorCodeSchema = z.enum([
   "RULEBOOK_PROCESSING_FAILED",
   "RULEBOOK_EXTRACTION_TOO_LARGE",
   "RULEBOOK_TOO_MANY_CHUNKS",
+  "RULES_CONTEXT_NO_READY_RULEBOOK",
+  "RULES_CONTEXT_STORAGE_UNAVAILABLE",
+  "RULES_CONTEXT_INDEX_UNAVAILABLE",
+  "RULES_CONTEXT_MODEL_UNAVAILABLE",
+  "RULES_CONTEXT_RUN_NOT_FOUND",
+  "RULES_CONTEXT_ALREADY_READY",
+  "RULES_CONTEXT_CONFIRMATION_NOT_NEEDED_OR_INVALID",
+  "RULES_CONTEXT_ANALYSIS_FAILED",
+  "RULES_CONTEXT_INVALID_CONFIRMATION",
   "ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED",
   "ANALYSIS_SESSION_EXPIRED",
   "ANALYSIS_SESSION_DELETE_FAILED",
@@ -70,3 +85,41 @@ export const AnalysisIdSchema = z.uuid();
 export const DeleteSessionResponseSchema = z.strictObject({
   deleted: z.literal(true),
 });
+
+export const RulesAnalysisRequestSchema = RulesAnalysisRequestDomainSchema;
+export type RulesAnalysisRequest = z.infer<typeof RulesAnalysisRequestSchema>;
+
+export const ConfirmationRequestSchema = z.strictObject({});
+export type ConfirmationRequest = z.infer<typeof ConfirmationRequestSchema>;
+
+export const PublicRulesAnalysisRunSchema = z.strictObject({
+  runId: z.uuid(),
+  analysisId: z.uuid(),
+  status: RulesAnalysisRunStatusSchema,
+  failure: RuleBuildFailureCodeSchema.nullable(),
+});
+export type PublicRulesAnalysisRunView = z.infer<
+  typeof PublicRulesAnalysisRunSchema
+>;
+
+export const RulesContextBeginResponseSchema = z.strictObject({
+  run: PublicRulesAnalysisRunSchema,
+});
+export type RulesContextBeginResponse = z.infer<
+  typeof RulesContextBeginResponseSchema
+>;
+
+export const RulesContextReadResponseSchema = z.strictObject({
+  run: PublicRulesAnalysisRunSchema,
+  context: RulesContextSchema.nullable(),
+});
+export type RulesContextReadResponse = z.infer<
+  typeof RulesContextReadResponseSchema
+>;
+
+export const RulesContextConfirmResponseSchema = z.strictObject({
+  run: PublicRulesAnalysisRunSchema,
+});
+export type RulesContextConfirmResponse = z.infer<
+  typeof RulesContextConfirmResponseSchema
+>;

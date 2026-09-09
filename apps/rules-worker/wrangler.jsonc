@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-12",
   "compatibility_flags": ["global_fetch_strictly_public"],
+  "ai": {
+    "binding": "AI",
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -17,12 +20,20 @@
       "binding": "RULEBOOK_INGESTION_WORKFLOW",
       "class_name": "RulebookIngestionWorkflow",
     },
+    {
+      "name": "rules-worker-rules-analysis",
+      "binding": "RULES_ANALYSIS_WORKFLOW",
+      "class_name": "RulesAnalysisWorkflow",
+    },
   ],
   "triggers": {
     "crons": ["*/15 * * * *"],
   },
   "env": {
     "local": {
+      "ai": {
+        "binding": "AI",
+      },
       "d1_databases": [
         {
           "binding": "DB",
@@ -35,6 +46,11 @@
           "name": "rules-worker-rulebook-ingestion",
           "binding": "RULEBOOK_INGESTION_WORKFLOW",
           "class_name": "RulebookIngestionWorkflow",
+        },
+        {
+          "name": "rules-worker-rules-analysis",
+          "binding": "RULES_ANALYSIS_WORKFLOW",
+          "class_name": "RulesAnalysisWorkflow",
         },
       ],
       /**

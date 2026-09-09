@@ -27,6 +27,15 @@ const identifierSchema = z
 const shortTextSchema = z.string().min(1).max(256).regex(/\S/);
 const summarySchema = z.string().min(1).max(2_000).regex(/\S/);
 
+/**
+ * Additive exports for provider-edge validation. Provider ports may validate
+ * model output against these bounded schemas before constructing a RulesContext.
+ */
+export const RuleIdentifierSchema = identifierSchema;
+export type RuleIdentifier = z.infer<typeof RuleIdentifierSchema>;
+export const RuleShortTextSchema = shortTextSchema;
+export const RuleSummarySchema = summarySchema;
+
 // Private recursive typing aid for schema construction; JsonValue is inferred below.
 type BoundedJsonValue =
   | string

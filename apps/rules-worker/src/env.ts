@@ -1,4 +1,5 @@
 import type { RulebookWorkflowParams } from "@repo/rulebook-ingestion";
+import type { RulesAnalysisWorkflowParams } from "./rules-analysis-workflow.js";
 
 export interface Env {
   DB: D1Database;
@@ -6,5 +7,8 @@ export interface Env {
   RATE_LIMIT_MODE?: string;
   RULEBOOK_BUCKET?: R2Bucket;
   RULEBOOK_INGESTION_WORKFLOW?: Workflow<RulebookWorkflowParams>;
+  RULES_ANALYSIS_WORKFLOW?: Workflow<RulesAnalysisWorkflowParams>;
   TURNSTILE_SECRET?: string;
+  AI?: Ai;
+  VECTORIZE?: VectorizeIndex;
 }
