@@ -27,15 +27,29 @@ const MAX_FIELD_VALUE_ENTRIES = MAX_FIELDS;
 const MAX_SOURCE_MAP_ENTRIES = MAX_FIELDS;
 const MAX_DOMAIN_ISSUES = 256;
 
-const identifierPattern =
-  /^(?!(?:__proto__|constructor|prototype)$)[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const colorPattern = /^#[0-9A-Fa-f]{6}$/;
 
+/**
+ * Sheet identifiers are server-minted opaque strings, never model-emitted, so
+ * the reserved-name guard is a runtime refinement rather than a regex. This
+ * keeps rejection semantics identical while leaving the emitted JSON Schema free
+ * of negative lookaheads, which Cloudflare AI's grammar engine does not support.
+ */
+const reservedIdentifierPattern = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
 const identifierSchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(identifierPattern, "Identifiers must use a safe opaque format.");
+  .regex(identifierPattern, "Identifiers must use a safe opaque format.")
+  .refine(
+    (value) => !reservedIdentifierPattern.has(value),
+    "Reserved identifiers are not allowed.",
+  );
 const shortTextSchema = z.string().min(1).max(256).regex(/\S/);
 const longTextSchema = z.string().min(1).max(2_000).regex(/\S/);
 
@@ -473,6 +487,7 @@ export const CharacterSheetDomainIssueCodeSchema = z.enum([
   "RESOURCE_FIELDS_MUST_DIFFER",
   "UNKNOWN_FORMULA_FIELD",
   "FORMULA_CYCLE",
+  "FORMULA_FORWARD_REFERENCE",
   "TOO_MANY_SOURCE_MAP_ENTRIES",
   "UNKNOWN_SOURCE_MAP_FIELD",
   "UNKNOWN_SOURCE_MAP_RULE",
@@ -1110,6 +1125,41 @@ export function validateCharacterSheetSpecDomain(
   }
 
   const calculatedFieldIds = new Set(calculatedFieldReferences.keys());
+
+  const sectionIndexByFieldId = new Map<string, number>();
+  for (const [sectionIndex, section] of spec.sections.entries()) {
+    for (const fieldId of section.fieldIds) {
+      sectionIndexByFieldId.set(fieldId, sectionIndex);
+    }
+  }
+
+  for (const [fieldId, references] of calculatedFieldReferences) {
+    const ownSectionIndex = sectionIndexByFieldId.get(fieldId);
+    if (ownSectionIndex === undefined) {
+      continue;
+    }
+    const calculatedFieldIndex = spec.fields.findIndex(
+      (field) => field.id === fieldId,
+    );
+    for (const referencedFieldId of references) {
+      if (!calculatedFieldIds.has(referencedFieldId)) {
+        continue;
+      }
+      const referencedSectionIndex =
+        sectionIndexByFieldId.get(referencedFieldId);
+      if (
+        referencedSectionIndex !== undefined &&
+        referencedSectionIndex > ownSectionIndex
+      ) {
+        addIssue(
+          issues,
+          "FORMULA_FORWARD_REFERENCE",
+          ["fields", calculatedFieldIndex, "formula"],
+          `Calculated field "${fieldId}" references calculated field "${referencedFieldId}" from a later section.`,
+        );
+      }
+    }
+  }
   const visited = new Set<string>();
   const active = new Set<string>();
   const traversal = [] as string[];

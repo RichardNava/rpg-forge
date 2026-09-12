@@ -628,6 +628,87 @@ describe("CharacterSheetSpecSchema", () => {
     );
   });
 
+  it("reports a forward reference to a calculated field in a later section", () => {
+    const sheet = createPlayerSheet();
+    const result = validateCharacterSheetSpecDomain(
+      CharacterSheetSpecSchema.parse({
+        ...sheet,
+        pages: [
+          {
+            id: "page-1",
+            layout: {
+              orientation: "portrait",
+              sizeIntent: "letter",
+              sectionIds: [
+                "identity-section",
+                "derived-section",
+                "later-section",
+              ],
+            },
+          },
+        ],
+        sections: [
+          { ...sheet.sections[0]!, fieldIds: ["name-field"] },
+          {
+            id: "derived-section",
+            title: "Derived",
+            layout: {
+              mode: "grid",
+              columns: 2,
+              order: 1,
+              emphasis: "secondary",
+            },
+            fieldIds: ["a-field"],
+          },
+          {
+            id: "later-section",
+            title: "Later",
+            layout: {
+              mode: "grid",
+              columns: 2,
+              order: 2,
+              emphasis: null,
+            },
+            fieldIds: ["b-field"],
+          },
+        ],
+        fields: [
+          ...sheet.fields,
+          {
+            id: "a-field",
+            type: "calculated",
+            label: "A",
+            requiredForPlayableNpc: false,
+            placement: {
+              order: 0,
+              columnStart: 1,
+              columnSpan: 2,
+              rowSpan: 1,
+              breakBefore: false,
+            },
+            formula: { op: "field", fieldId: "b-field" },
+          },
+          {
+            id: "b-field",
+            type: "calculated",
+            label: "B",
+            requiredForPlayableNpc: false,
+            placement: {
+              order: 1,
+              columnStart: 1,
+              columnSpan: 2,
+              rowSpan: 1,
+              breakBefore: false,
+            },
+            formula: { op: "literal", value: 1 },
+          },
+        ],
+      }),
+    );
+
+    expect(issueCodes(result)).toContain("FORMULA_FORWARD_REFERENCE");
+  });
+
   it("rejects unsupported formula operations structurally", () => {
     expect(
       FormulaSchema.safeParse({

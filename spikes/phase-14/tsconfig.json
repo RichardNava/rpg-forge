@@ -4,13 +4,8 @@
     "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2024", "WebWorker"],
-    "types": [
-      "node",
-      "vitest/globals",
-      "@cloudflare/workers-types",
-      "@cloudflare/vitest-pool-workers/types"
-    ],
+    "lib": ["ES2024"],
+    "types": ["node", "vitest/globals"],
     "noEmit": true,
     "skipLibCheck": true
   },

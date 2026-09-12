@@ -9,6 +9,7 @@
   "scripts": {
     "bundle:pdf-extraction": "wrangler deploy --dry-run --no-telemetry --config pdf-extraction/wrangler.jsonc --outdir .artifacts/pdf-extraction-bundle",
     "bundle:pdf-renderer": "wrangler deploy --dry-run --no-telemetry --config pdf-renderer/wrangler.jsonc --outdir .artifacts/pdf-renderer-bundle",
+    "bundle:sheet-benchmark": "wrangler deploy --dry-run --config sheet-benchmark/wrangler.jsonc --outdir .artifacts/sheet-benchmark-bundle",
     "test": "vitest run --config vitest.config.ts",
     "test:all": "pnpm test && pnpm test:workerd:pdf-extraction && pnpm test:workerd:pdf-renderer",
     "test:workerd:pdf-extraction": "vitest run --config vitest.pdf-extraction.config.ts",
@@ -16,7 +17,13 @@
     "typecheck": "tsc --noEmit",
     "benchmark:embeddings": "tsx scripts/run-embedding-benchmark.ts",
     "benchmark:structured-ai": "tsx scripts/run-structured-ai-benchmark.ts",
-    "benchmark:native-schema": "tsx scripts/run-native-schema-benchmark.ts"
+    "benchmark:native-schema": "tsx scripts/run-native-schema-benchmark.ts",
+    "benchmark:sheet-generation": "tsx scripts/run-sheet-benchmark.ts",
+    "benchmark:sheet-generation:raw": "tsx scripts/run-sheet-benchmark.ts --raw",
+    "benchmark:extraction-validation": "tsx scripts/run-instruction-extraction-validation.ts",
+    "benchmark:extraction-validation:validate-only": "tsx scripts/run-instruction-extraction-validation.ts --validate-only",
+    "benchmark:dual-model-extraction-validation": "tsx scripts/run-dual-model-extraction-validation.ts",
+    "benchmark:dual-model-extraction-validation:validate-only": "tsx scripts/run-dual-model-extraction-validation.ts --validate-only"
   },
   "dependencies": {
     "pdf-lib": "1.17.1",
@@ -26,6 +33,9 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.21.3",
     "@cloudflare/workers-types": "5.20260811.1",
+    "@repo/character-sheet-generation": "workspace:*",
+    "@repo/character-sheet-schema": "workspace:*",
+    "@repo/rules-context": "workspace:*",
     "@types/node": "24.13.3",
     "tsx": "4.23.12",
     "typescript": "5.9.3",

@@ -56,3 +56,5 @@ Los ADR conservan una numeración histórica estable. Un ADR sustituido no se el
 - [`052-workerd-acroform-pdf-renderer`](052-workerd-acroform-pdf-renderer.md) — ADR-052 — Workerd AcroForm PDF renderer
 - [`053-embedding-model-and-vectorize-metric`](053-embedding-model-and-vectorize-metric.md) — ADR-053 — Embedding model, dimensions, and Vectorize metric
 - [`054-zod4-canonical-schema`](054-zod4-canonical-schema.md) — ADR-054 — Zod 4 as canonical runtime and JSON Schema source
+- [`055-section-title-degeneracy-personas`](055-section-title-degeneracy-personas.md) — ADR-055 — Section-plan title degeneracy: contract levers and personas
+- [`056-deterministic-sheet-construction`](056-deterministic-sheet-construction.md) — ADR-056 — Deterministic character-sheet final construction
