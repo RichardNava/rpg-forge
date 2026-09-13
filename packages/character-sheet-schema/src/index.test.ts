@@ -826,6 +826,34 @@ describe("CharacterSheetSpecSchema", () => {
     expect(issueCodes(result)).toContain("PROVENANCE_CONTEXT_REQUIRED");
   });
 
+  it("accepts a GUI-only sheet with null rulesContextId and empty source map", () => {
+    const sheet = CharacterSheetSpecSchema.parse({
+      ...createPlayerSheet(),
+      rulesContextId: null,
+      sourceMap: {},
+    });
+
+    expect(sheet.rulesContextId).toBeNull();
+    expect(validateCharacterSheetSpecDomain(sheet, null)).toEqual({
+      valid: true,
+      issues: [],
+    });
+  });
+
+  it("rejects rulebook provenance on a null-rulesContextId sheet", () => {
+    const sheet = CharacterSheetSpecSchema.parse({
+      ...createPlayerSheet(),
+      rulesContextId: null,
+      sourceMap: {
+        "name-field": { ruleIds: ["rule-endurance"] },
+      },
+    });
+
+    const result = validateCharacterSheetSpecDomain(sheet, null);
+    expect(result.valid).toBe(false);
+    expect(issueCodes(result)).toContain("SOURCE_MAP_WITH_NULL_RULES_CONTEXT");
+  });
+
   it("accepts matching source-map provenance with RulesContext", () => {
     const context = createRulesContext();
     const citation = context.normalizedRules[0]!.citations[0]!;

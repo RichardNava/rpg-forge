@@ -432,7 +432,7 @@ export const CharacterSheetSpecSchema = z.strictObject({
   schemaVersion: z.literal(CHARACTER_SHEET_SPEC_VERSION),
   mode: CharacterSheetModeSchema,
   metadata: CharacterSheetMetadataSchema,
-  rulesContextId: RulesContextIdSchema,
+  rulesContextId: RulesContextIdSchema.nullable(),
   pages: z.array(CharacterSheetPageSchema).min(1).max(MAX_PAGES),
   sections: z.array(CharacterSheetSectionSchema).min(1).max(MAX_SECTIONS),
   fields: z.array(CharacterSheetFieldSchema).min(1).max(MAX_FIELDS),
@@ -495,6 +495,7 @@ export const CharacterSheetDomainIssueCodeSchema = z.enum([
   "SOURCE_MAP_CITATION_PAGE_OUT_OF_RANGE",
   "SOURCE_MAP_CITATION_NOT_LINKED_TO_RULE",
   "PROVENANCE_CONTEXT_REQUIRED",
+  "SOURCE_MAP_WITH_NULL_RULES_CONTEXT",
   "RULES_CONTEXT_ID_MISMATCH",
 ]);
 export type CharacterSheetDomainIssueCode = z.infer<
@@ -789,7 +790,7 @@ export function validateCharacterSheetSpecDomain(
   rulesContext?: Pick<
     RulesContext,
     "analysisId" | "normalizedRules" | "sources"
-  >,
+  > | null,
 ): CharacterSheetDomainValidationResult {
   const issues: CharacterSheetDomainIssue[] = [];
   const pageIds = spec.pages.map((page) => page.id);
@@ -1215,6 +1216,7 @@ export function validateCharacterSheetSpecDomain(
 
   if (
     rulesContext !== undefined &&
+    rulesContext !== null &&
     spec.rulesContextId !== rulesContext.analysisId
   ) {
     addIssue(
@@ -1232,6 +1234,15 @@ export function validateCharacterSheetSpecDomain(
       "TOO_MANY_SOURCE_MAP_ENTRIES",
       ["sourceMap"],
       `Source map may contain at most ${MAX_SOURCE_MAP_ENTRIES} entries.`,
+    );
+  }
+
+  if (spec.rulesContextId === null && sourceMapEntries.length > 0) {
+    addIssue(
+      issues,
+      "SOURCE_MAP_WITH_NULL_RULES_CONTEXT",
+      ["sourceMap"],
+      "A sheet without a RulesContext id must not carry rulebook provenance.",
     );
   }
 

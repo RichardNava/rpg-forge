@@ -318,7 +318,7 @@ export interface RulebookDerivationPromptInput {
 }
 
 export interface CharacterNamePromptInput {
-  context: RulesContext;
+  context: RulesContext | null;
   mode: CharacterSheetAuthoringMode;
 }
 
@@ -349,7 +349,9 @@ export function buildCharacterNameUserPrompt(
     input.mode === "npc" ? "npc" : "pc",
     "",
     "## Character context",
-    renderText(input.context.characterIntent),
+    input.context === null
+      ? "(no rules context)"
+      : renderText(input.context.characterIntent),
   ].join("\n");
 }
 

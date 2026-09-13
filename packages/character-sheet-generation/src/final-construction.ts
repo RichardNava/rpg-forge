@@ -75,13 +75,21 @@ const NEUTRAL_THREAT_BIAS = 0.5;
 export interface GenerateCharacterSheetSpecInput {
   /** Authoritative source of the sheet: mode, name intent, fields, provenance. */
   definition: NormalizedSheetDefinition;
-  /** Required to compile deterministic rule provenance and sheet identity. */
-  context: RulesContext;
+  /**
+   * Real RulesContext for rulebook provenance, or null for a genuinely
+   * GUI-only sheet. A null context may never carry ruleIds on any field.
+   */
+  context: RulesContext | null;
   /** Narrow Level-3 provider used only when the character name is missing. */
   namePort: Level3NamePort;
   /** Authorized formulas; defaults to the empty list (zero formulas is valid). */
   calculations?: readonly CalculationCandidate[];
   outputLocale?: OutputLocale | null;
+  /**
+   * Sheet metadata identity. Required when `context` is null (GUI-only);
+   * otherwise `context.analysisId` remains the identity unless supplied.
+   */
+  sheetId?: string;
   /**
    * Presentation-only input. Never alters mechanics, never invents fields, and
    * is not applied by this phase.
@@ -235,6 +243,7 @@ export async function generateCharacterSheetSpec(
       plan: { mode: compiledMode, sections },
       fieldsBySection,
       calculations,
+      ...(input.sheetId === undefined ? {} : { sheetId: input.sheetId }),
     });
   } catch (error) {
     if (error instanceof SheetCompileError) {
@@ -272,7 +281,7 @@ interface ResolvedCharacterName {
 async function resolveCharacterName(input: {
   definition: NormalizedSheetDefinition;
   mode: CharacterSheetAuthoringMode;
-  context: RulesContext;
+  context: RulesContext | null;
   namePort: Level3NamePort;
 }): Promise<ResolvedCharacterName> {
   const existing = input.definition.fields.filter(
@@ -337,7 +346,7 @@ async function resolveCharacterName(input: {
 
 async function generateCharacterName(input: {
   mode: CharacterSheetAuthoringMode;
-  context: RulesContext;
+  context: RulesContext | null;
   namePort: Level3NamePort;
 }): Promise<string> {
   const system = buildCharacterNameSystemPrompt();

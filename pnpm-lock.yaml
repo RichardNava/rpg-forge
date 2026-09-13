@@ -207,6 +207,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 5.20260811.1
         version: 5.20260811.1
+      '@repo/character-sheet-generation':
+        specifier: workspace:*
+        version: link:../character-sheet-generation
       '@types/node':
         specifier: ^20.19.43
         version: 20.19.43

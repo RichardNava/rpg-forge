@@ -47,10 +47,12 @@ type MappedField = DistributiveOmit<
  * internal invariants surface as `invariant`.
  */
 export function compileCharacterSheet(input: {
-  context: RulesContext;
+  context: RulesContext | null;
   plan: SectionPlanOutput;
   fieldsBySection: ReadonlyMap<string, readonly FieldCandidate[]>;
   calculations: readonly CalculationCandidate[];
+  /** Required for GUI-only metadata identity when `context` is null. */
+  sheetId?: string;
 }): CharacterSheetSpec {
   const { context, plan } = input;
   const fieldKeyToId = new Map<string, string>();
@@ -85,6 +87,26 @@ export function compileCharacterSheet(input: {
       "candidate_invalid",
       `A generated sheet may contain at most ${MAX_TOTAL_FIELDS} fields.`,
     );
+  }
+
+  if (context === null) {
+    if (input.sheetId === undefined || input.sheetId.length === 0) {
+      throw new SheetCompileError(
+        "invariant",
+        "GUI-only construction without a RulesContext requires an explicit sheetId.",
+      );
+    }
+    for (const candidates of sectionFieldCandidates.values()) {
+      for (const candidate of candidates) {
+        if (candidate.ruleIds.length > 0) {
+          throw new SheetCompileError(
+            "candidate_invalid",
+            `Field "${candidate.key}" carries rule ids but no RulesContext was ` +
+              "supplied; GUI-only construction never produces rulebook provenance.",
+          );
+        }
+      }
+    }
   }
 
   const fields: MappedField[] = [];
@@ -220,7 +242,7 @@ export function compileCharacterSheet(input: {
       }
       sourceMap[candidate.key] = buildFieldProvenance(
         candidate.ruleIds,
-        context,
+        context!,
       );
     }
   }
@@ -259,12 +281,12 @@ export function compileCharacterSheet(input: {
     schemaVersion: "1",
     mode: plan.mode,
     metadata: {
-      id: context.analysisId,
+      id: input.sheetId ?? context!.analysisId,
       title: plan.mode === "npc" ? "NPC Sheet" : "Character Sheet",
       description: null,
       locale: null,
     },
-    rulesContextId: context.analysisId,
+    rulesContextId: context === null ? null : context.analysisId,
     pages,
     sections,
     fields: fields.map((field) => {
