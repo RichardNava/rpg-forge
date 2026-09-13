@@ -72,6 +72,28 @@ Two further decisions were in play for the phase closeout:
 - ADR-055's title degeneracy is resolved structurally: section grouping and
   titles are server-owned; no section-plan persona delta was promoted.
 
+## Implementation status (Phase 14.7A)
+
+The deferred/blocking statements above are resolved or narrowed as follows,
+without changing the historical rationale:
+
+- **GUI-only no longer requires a synthetic RulesContext identity.** A
+  GUI-only `CharacterSheetSpec` now carries `rulesContextId = null` and a
+  genuine `metadata.id`, and is never minted without an explicit `sheetId`
+  (14.7A1). `rulesContextId` is required-nullable in the canonical schema.
+- **Persistence rulebook identities are nullable.** The D1
+  `sheet_generation_runs` `NOT NULL` constraints cited above were removed by
+  additive migration 0003: `analysis_id`, `rules_analysis_run_id` and
+  `ingestion_id` are nullable, so GUI-only runs persist without rule-analysis
+  rows (14.7A2).
+- **Final run currency is sheet-session scoped.** Generation runs belong to
+  temporary sheet sessions (`@repo/character-sheet-session`) with at most one
+  current run per session and repost-supersede semantics, not to the legacy
+  mandatory-`RulesContext` analysis pipeline (14.7A2).
+- The legacy worker pipeline rewiring is now scheduled as 14.7D (HTTP
+  orchestration) and remains unimplemented; free-text `contextInstructions`
+  extraction remains deferred.
+
 ## Related ADRs
 
 - ADR-005 — AI provider abstraction
