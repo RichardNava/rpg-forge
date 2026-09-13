@@ -168,6 +168,10 @@ export function combineDuplicate(
     ...(resolvedRange !== undefined
       ? { permittedValueRange: resolvedRange }
       : {}),
+    ...(existing.kind !== undefined ? { kind: existing.kind } : {}),
+    ...(existing.sectionKey !== undefined
+      ? { sectionKey: existing.sectionKey }
+      : {}),
     provenance: mergeProvenance(existing.provenance, incoming.provenance),
   };
 

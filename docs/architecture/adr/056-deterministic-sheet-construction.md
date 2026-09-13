@@ -43,10 +43,17 @@ Two further decisions were in play for the phase closeout:
   evidence and never rewrites formulas.
 - **Level-3 final construction is bounded.** `generateCharacterSheetSpec`
   determines grouping, localized canonical titles, formula mapping, page
-  placement, and NPC mechanical values (`value = min + THREAT_BIAS[threat] ·
-(max - min)`, in-range). A name provider is consulted only when the level-2/1
-  definitions leave the character name missing, with bounded retries and a
-  visible failure for unavailability or invalid output.
+  placement, and NPC mechanical values. NPC mechanical values are populated by
+  a **deterministic seeded pseudo-random** draw (no `Math.random`, no AI
+  provider): the same seed/run with the same inputs reproduces the same
+  values; different seeds may vary eligible values; every sampled value stays
+  inside the field's effective bounds; explicit and fixed (`min == max`) user
+  values always win; unbounded/non-numeric fields are never invented. Threat
+  biases the distribution (the `boss` tier has the strongest high-end bias but
+  never forces `max`). The seed is ignored for PC mechanical values. A name
+  provider is consulted only when the level-2/1 definitions leave the
+  character name missing, with bounded retries and a visible failure for
+  unavailability or invalid output.
 - **The shared deterministic compiler is reused.** Cycles and unknown field
   references already fail at compile time; compiled output is parsed with the
   canonical schema and domain-validated before it leaves the phase boundary.
@@ -93,6 +100,38 @@ without changing the historical rationale:
 - The legacy worker pipeline rewiring is now scheduled as 14.7D (HTTP
   orchestration) and remains unimplemented; free-text `contextInstructions`
   extraction remains deferred.
+
+### Phase 14.7C addendum
+
+- **Template-backed construction is now a first-class input.** A blank sheet
+  template (`@repo/character-sheet-template`, extraction port +
+  `extractSheetTemplate`) normalizes into validated `SourceResolvedFields`
+  (`normalizeTemplateFields`) and acts as the field-roster authority; the GUI
+  authoring request overlays values on top (`overlayTemplateWithGui`).
+  Incompatible template/GUI bounds and categories surface as visible conflicts
+  (`TEMPLATE_BOUND_DISAGREEMENT`, `TEMPLATE_CATEGORY_DISAGREEMENT`) exactly as
+  equal-authority Level-2 disagreements do.
+- **The character-name absent-fallback gained a provider-free default.**
+  `DeterministicLocalNamePort` is a seeded, locale-aware, syllable-based local
+  source adapted to the Level-3 contract
+  (`createDeterministicLevel3NamePort`). The same `(mode, seed, locale)`
+  triple yields the same name, and the standalone flow never consumes
+  inference quota for a name. This resolves the ADR's earlier "no production
+  `Level3NamePort` adapter exists" statement for the standalone path.
+- **NPC mechanical population is seeded and threat-biased, not a fixed
+  percentile.** `resolveNpcValue` draws deterministically from the shared
+  `deterministic.ts` PRNG (no `Math.random`) inside a window centered on the
+  tier's `THREAT_BIAS` (see the Decision above): same seed → same values,
+  different seed → in-bounds variation, explicit/fixed values always win, and
+  `boss` keeps a high-end bias without forcing `max`. The seed is threaded
+  through the template-backed flow (`generateTemplateBackedSheet → final
+construction`) and defaults to `sheetId`/`"template-backed"`. It never
+  affects PC mechanical values, which still resolve only from explicit values.
+- **The production multimodal template extractor is blocked** on a committed
+  vision model (none exists in configuration; see the phase 14.7 doc). The
+  reference extractor keeps the extraction surface tested offline.
+- `RulebookFieldDerivationPort` is retained but regarded as legacy/superseded
+  for the production template-backed flow.
 
 ## Related ADRs
 

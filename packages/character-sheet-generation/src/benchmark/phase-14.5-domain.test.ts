@@ -66,6 +66,7 @@ interface Pipeline {
   outputLocale?: string;
   presentation?: GenerateCharacterSheetSpecInput["presentation"];
   namePort?: BenchmarkNamePort;
+  seed?: string;
 }
 
 async function runPipeline(input: Pipeline): Promise<{
@@ -107,6 +108,7 @@ async function runPipeline(input: Pipeline): Promise<{
     ...(input.presentation !== undefined
       ? { presentation: input.presentation }
       : {}),
+    ...(input.seed !== undefined ? { seed: input.seed } : {}),
   });
   return {
     definition: outcome.result.definition,
@@ -249,7 +251,7 @@ describe("Phase 14.5 domain benchmark", () => {
     });
   });
 
-  describe("B — GUI-only NPC resolves threat-based values", () => {
+  describe("B — GUI-only NPC resolves threat-biased seeded values", () => {
     it("derives an in-range NPC value without any provider call", async () => {
       const { derivation, spec } = await runPipeline({
         context: null,
@@ -258,15 +260,29 @@ describe("Phase 14.5 domain benchmark", () => {
           threat: "dangerous",
           mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
         }),
+        seed: "benchmark-seed-b",
       });
       expect(derivation.calls).toBe(0);
       expect(spec.mode).toBe("npc");
       expect(spec.metadata.title).toBe("NPC Sheet");
-      expect(typeof spec.values.toughness).toBe("number");
-      expect(spec.values.toughness).toBeCloseTo(17.5, 10);
+      const toughness = Number(spec.values.toughness);
+      expect(typeof toughness).toBe("number");
+      expect(toughness).toBeGreaterThanOrEqual(10);
+      expect(toughness).toBeLessThanOrEqual(20);
       expect(validateCharacterSheetSpecDomain(spec, baseContext).valid).toBe(
         true,
       );
+
+      const repeated = await runPipeline({
+        context: null,
+        request: npcRequest({
+          characterName: "Sera",
+          threat: "dangerous",
+          mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
+        }),
+        seed: "benchmark-seed-b",
+      });
+      expect(Number(repeated.spec.values.toughness)).toBe(toughness);
     });
   });
 
@@ -324,7 +340,7 @@ describe("Phase 14.5 domain benchmark", () => {
   });
 
   describe("D — rulebook-only NPC resolves values inside derived ranges", () => {
-    it("combines derivation evidence with threat-bias value resolution", async () => {
+    it("combines derivation evidence with threat-biased seeded value resolution", async () => {
       const { derivation, definition, spec } = await runPipeline({
         context: baseContext,
         request: npcRequest({
@@ -340,11 +356,14 @@ describe("Phase 14.5 domain benchmark", () => {
             evidence: { ruleIds: [RULE_ATTACK_ID] },
           },
         ],
+        seed: "benchmark-seed-d",
       });
       expect(derivation.calls).toBe(1);
       expect(definition.npc?.threat).toBe("elite");
       expect(spec.sourceMap.attack?.ruleIds).toEqual([RULE_ATTACK_ID]);
-      expect(spec.values.attack).toBeCloseTo(18.1, 10);
+      const attack = Number(spec.values.attack);
+      expect(attack).toBeGreaterThanOrEqual(1);
+      expect(attack).toBeLessThanOrEqual(20);
       expect(validateCharacterSheetSpecDomain(spec, baseContext).valid).toBe(
         true,
       );
@@ -527,13 +546,11 @@ describe("Phase 14.5 domain benchmark", () => {
     });
   });
 
-  describe("J — NPC threat bias is deterministic and monotonic", () => {
+  describe("J — NPC threat bias is deterministic, in-range and seed-varying", () => {
     const threats = ["weak", "ordinary", "dangerous", "elite", "boss"] as const;
-    const expected = [12.5, 15, 17.5, 19, 20];
 
-    it("resolves strictly increasing in-range values with zero provider calls", async () => {
+    it("resolves in-range values with zero provider calls and never escapes the bounds", async () => {
       let toughnessFieldBounds: { min: number; max: number } | null = null;
-      const values: number[] = [];
       for (const threat of threats) {
         const { derivation, spec } = await runPipeline({
           context: null,
@@ -542,20 +559,56 @@ describe("Phase 14.5 domain benchmark", () => {
             threat,
             mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
           }),
+          seed: `benchmark-j-${threat}`,
         });
         expect(derivation.calls).toBe(0);
         const value = spec.values.toughness;
         expect(typeof value).toBe("number");
         expect(value as number).toBeGreaterThanOrEqual(10);
         expect(value as number).toBeLessThanOrEqual(20);
-        values.push(value as number);
         const field = fieldById(spec, "toughness");
         if (field?.type === "number") {
           toughnessFieldBounds = { min: field.min ?? 10, max: field.max ?? 20 };
         }
       }
-      expect(values).toEqual(expected);
       expect(toughnessFieldBounds).toEqual({ min: 10, max: 20 });
+    });
+
+    it("same seed reproduces the same value for every tier", async () => {
+      for (const threat of threats) {
+        const params = (threatValue: typeof threat) => ({
+          context: null,
+          request: npcRequest({
+            characterName: "Vex",
+            threat: threatValue,
+            mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
+          }),
+          seed: "benchmark-j-repro",
+        });
+        const first = await runPipeline(params(threat));
+        const second = await runPipeline(params(threat));
+        expect(second.spec.values.toughness).toBe(first.spec.values.toughness);
+      }
+    });
+
+    it("boss retains variation across seeds and does not always return the max", async () => {
+      const seen = new Set<number>();
+      for (let index = 0; index < 40; index += 1) {
+        const { spec } = await runPipeline({
+          context: null,
+          request: npcRequest({
+            characterName: "Vex",
+            threat: "boss",
+            mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
+          }),
+          seed: `benchmark-boss-${index}`,
+        });
+        const value = Number(spec.values.toughness);
+        expect(value).toBeGreaterThanOrEqual(10);
+        expect(value).toBeLessThanOrEqual(20);
+        seen.add(value);
+      }
+      expect(seen.size).toBeGreaterThan(1);
     });
 
     it("keeps a fixed min==max value under any threat", async () => {

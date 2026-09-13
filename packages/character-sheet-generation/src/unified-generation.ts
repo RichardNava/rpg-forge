@@ -28,6 +28,8 @@ export interface UnifiedSheetGenerationInput {
   npc?: NPCAuthoringDefinition;
   guiFields?: readonly SourceResolvedField[];
   rulebookFields?: readonly SourceResolvedField[];
+  /** Logical section grouping (template-backed flow); empty for rulebook/GUI flows. */
+  sections?: NormalizedSheetDefinition["sections"];
   /** Evidence-rejection/source conflicts recorded below Level-2 resolution. */
   sourceConflicts?: readonly GenerationConflict[];
   instructions?: readonly ProposedGenerationInstruction[];
@@ -73,6 +75,7 @@ export function resolveUnifiedSheetDefinition(
     mode: input.mode,
     characterName: input.characterName ?? null,
     fields: sourceResolution.fields,
+    sections: input.sections ?? [],
     conflicts: level2Conflicts,
     ...(input.npc !== undefined ? { npc: input.npc } : {}),
   });

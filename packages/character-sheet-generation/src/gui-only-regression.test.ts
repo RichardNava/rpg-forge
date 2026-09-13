@@ -135,7 +135,7 @@ describe("Phase 14.7A1 — genuine GUI-only generation", () => {
     ).toHaveLength(1);
   });
 
-  it("compiles a GUI-only NPC sheet with null RulesContext and preserved deterministic threat behavior", async () => {
+  it("compiles a GUI-only NPC sheet with null RulesContext and seeded threat-biased population", async () => {
     const derivationPort = new FakeRulebookFieldDerivationPort();
     const namePort = new FixedNamePort("Guard Captain");
 
@@ -156,20 +156,34 @@ describe("Phase 14.7A1 — genuine GUI-only generation", () => {
       throw new Error("expected ok outcome");
     }
 
-    const spec = await generateCharacterSheetSpec({
-      definition: normalized.result.definition,
-      context: null,
-      namePort,
-      sheetId: "sheet.gui.npc.0001",
-    });
+    const makeSpec = (seed: string) =>
+      generateCharacterSheetSpec({
+        definition: normalized.result.definition,
+        context: null,
+        namePort,
+        sheetId: "sheet.gui.npc.0001",
+        seed,
+      });
+
+    const spec = await makeSpec("npc-seed-a");
 
     expect(spec.mode).toBe("npc");
     expect(spec.rulesContextId).toBeNull();
     expect(spec.metadata.id).toBe("sheet.gui.npc.0001");
     expect(Object.keys(spec.sourceMap)).toHaveLength(0);
-    // dangerous threat bias = 0.75 -> 10 + 0.75 * (20 - 10) = 17.5
-    expect(spec.values.hit_points).toBe(17.5);
+    // dangerous tier: value stays inside the permitted bounds and is seeded.
+    const hitPoints = Number(spec.values.hit_points);
+    expect(hitPoints).toBeGreaterThanOrEqual(10);
+    expect(hitPoints).toBeLessThanOrEqual(20);
     expect(spec.values[CHARACTER_NAME_KEY]).toBe("Guard Captain");
+
+    // same seed reproduces the same in-bounds value
+    const sameSeed = await makeSpec("npc-seed-a");
+    expect(sameSeed.values.hit_points).toBe(spec.values.hit_points);
+    // a different seed may vary the eligible value
+    const otherSeed = await makeSpec("npc-seed-b");
+    expect(Number(otherSeed.values.hit_points)).toBeGreaterThanOrEqual(10);
+    expect(Number(otherSeed.values.hit_points)).toBeLessThanOrEqual(20);
   });
 
   it("still compiles a rulebook-only sheet with the real analysis id and provenance", async () => {

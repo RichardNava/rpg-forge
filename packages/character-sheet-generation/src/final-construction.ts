@@ -13,6 +13,7 @@ import type {
   VisualStyleKey,
 } from "./authoring.js";
 import { compileCharacterSheet, SheetCompileError } from "./compiler.js";
+import { createDeterministicRandom, stableNameSeed } from "./deterministic.js";
 import {
   CalculationCandidateSchema,
   FieldCandidateSchema,
@@ -59,9 +60,11 @@ const IDENTITY_SECTION_KEY = "identity";
 const ATTRIBUTES_SECTION_KEY = "attributes";
 
 /**
- * Deterministic threat bias used to resolve a bounded NPC value (min < max).
- * Values are always `min + bias * (max - min)`, so they stay inside the
- * permitted range and never depend on an AI provider.
+ * Threat bias centers the seeded NPC value distribution. A generated value is
+ * sampled deterministically inside an upper/lower window around the tier's
+ * bias (see resolveNpcValue), so tiers keep a real skew while different seeds
+ * still produce different in-bounds values. The window lets the boss tier hug
+ * the top of the range without forcing `max` on every draw.
  */
 const THREAT_BIAS: Record<NPCThreatLevel, number> = {
   weak: 0.25,
@@ -71,6 +74,15 @@ const THREAT_BIAS: Record<NPCThreatLevel, number> = {
   boss: 1,
 };
 const NEUTRAL_THREAT_BIAS = 0.5;
+
+/** Half-width of the sampled window around the tier bias (0..1 space). */
+const THREAT_BIAS_WINDOW = 0.25;
+
+/**
+ * Determinism seed used when the caller supplies neither seed nor sheetId so
+ * the standalone path stays reproducible across identical calls.
+ */
+const DEFAULT_VALUE_SEED = "template-backed";
 
 export interface GenerateCharacterSheetSpecInput {
   /** Authoritative source of the sheet: mode, name intent, fields, provenance. */
@@ -90,6 +102,13 @@ export interface GenerateCharacterSheetSpecInput {
    * otherwise `context.analysisId` remains the identity unless supplied.
    */
   sheetId?: string;
+  /**
+   * Determinism seed for seeded NPC value population. Defaults to `sheetId`,
+   * then to a fixed literal. The same seed reproduces the same in-bounds
+   * values; different seeds vary them. Always ignored for PC sheets and for
+   * explicit/fixed values. Never a `Math.random` source.
+   */
+  seed?: string;
   /**
    * Presentation-only input. Never alters mechanics, never invents fields, and
    * is not applied by this phase.
@@ -187,45 +206,68 @@ export async function generateCharacterSheetSpec(
     }
   }
 
-  const identitySourceFields: SourceResolvedField[] = [
-    resolvedName.field,
-    ...definition.fields.filter(
-      (field) =>
-        field.canonicalKey !== CHARACTER_NAME_KEY &&
-        field.category === "identity",
-    ),
-  ];
-  const mechanicalSourceFields = definition.fields.filter(
-    (field) => field.category === "mechanical",
+  // Template-declared sections keep their template order; every field is
+  // assigned to exactly one section: its declared section when present,
+  // otherwise a deterministic category fallback. A fallback key that coincides
+  // with a declared section joins that declared section instead.
+  const declaredSections = definition.sections;
+  const declaredByKey = new Map(
+    declaredSections.map((section) => [section.key, section]),
   );
+
+  const sectionKeyFor = (field: SourceResolvedField): string => {
+    if (field.sectionKey !== undefined && declaredByKey.has(field.sectionKey)) {
+      return field.sectionKey;
+    }
+    return field.category === "identity"
+      ? IDENTITY_SECTION_KEY
+      : ATTRIBUTES_SECTION_KEY;
+  };
+
+  const fieldsBySectionKey = new Map<string, SourceResolvedField[]>();
+  const addToSection = (key: string, field: SourceResolvedField): void => {
+    const bucket = fieldsBySectionKey.get(key);
+    if (bucket === undefined) {
+      fieldsBySectionKey.set(key, [field]);
+    } else {
+      bucket.push(field);
+    }
+  };
+
+  addToSection(sectionKeyFor(resolvedName.field), resolvedName.field);
+  for (const field of definition.fields) {
+    if (field.canonicalKey === CHARACTER_NAME_KEY) {
+      continue;
+    }
+    addToSection(sectionKeyFor(field), field);
+  }
+
+  const declaredKeys = new Set(declaredByKey.keys());
+  const orderedKeys = [
+    ...declaredSections
+      .map((section) => section.key)
+      .filter((key) => fieldsBySectionKey.has(key)),
+    ...[...fieldsBySectionKey.keys()].filter((key) => !declaredKeys.has(key)),
+  ];
 
   const fieldsBySection = new Map<string, FieldCandidate[]>();
   const sections: SectionPlanOutput["sections"] = [];
-  if (identitySourceFields.length > 0) {
+  for (const key of orderedKeys) {
+    const sourceFields = fieldsBySectionKey.get(key)!;
+    const declared = declaredByKey.get(key);
     fieldsBySection.set(
-      IDENTITY_SECTION_KEY,
-      identitySourceFields.map((field) => toCompilerCandidate(field, false)),
-    );
-    sections.push(
-      buildSection(
-        IDENTITY_SECTION_KEY,
-        identitySourceFields,
-        input.outputLocale,
-      ),
-    );
-  }
-  if (mechanicalSourceFields.length > 0) {
-    fieldsBySection.set(
-      ATTRIBUTES_SECTION_KEY,
-      mechanicalSourceFields.map((field) =>
+      key,
+      sourceFields.map((field) =>
         toCompilerCandidate(field, promotionKeys.has(field.canonicalKey)),
       ),
     );
     sections.push(
       buildSection(
-        ATTRIBUTES_SECTION_KEY,
-        mechanicalSourceFields,
+        key,
+        sourceFields,
         input.outputLocale,
+        declared?.title,
+        declared?.purpose,
       ),
     );
   }
@@ -234,6 +276,7 @@ export async function generateCharacterSheetSpec(
     definition,
     nameValue: resolvedName.value,
     promotionKeys,
+    seed: input.seed ?? input.sheetId ?? DEFAULT_VALUE_SEED,
   });
 
   let compiled: CharacterSheetSpec;
@@ -423,25 +466,33 @@ function withAiDefaultOrigin(
 }
 
 function buildSection(
-  key: "identity" | "attributes",
+  key: string,
   sourceFields: readonly SourceResolvedField[],
   locale: string | null | undefined,
+  titleOverride?: string,
+  purposeOverride?: string,
 ): SectionPlanOutput["sections"][number] {
   const spanish = isSpanishLocale(locale);
   return {
     key,
     title:
-      key === IDENTITY_SECTION_KEY
+      titleOverride ??
+      (key === IDENTITY_SECTION_KEY
         ? spanish
           ? "Identidad"
           : "Identity"
-        : spanish
-          ? "Atributos"
-          : "Attributes",
+        : key === ATTRIBUTES_SECTION_KEY
+          ? spanish
+            ? "Atributos"
+            : "Attributes"
+          : key),
     purpose:
-      key === IDENTITY_SECTION_KEY
+      purposeOverride ??
+      (key === IDENTITY_SECTION_KEY
         ? "The character's visible identity: name and personal traits."
-        : "The character's mechanical attributes.",
+        : key === ATTRIBUTES_SECTION_KEY
+          ? "The character's mechanical attributes."
+          : "The sheet's presented fields."),
     ruleIds: unionRuleIds(sourceFields),
   };
 }
@@ -473,18 +524,38 @@ function toCompilerCandidate(
     });
   }
   const ruleIds = field.provenance.ruleIds ?? [];
-  if (
-    field.canonicalKey === CHARACTER_NAME_KEY ||
-    field.category === "identity"
-  ) {
+  if (field.canonicalKey === CHARACTER_NAME_KEY) {
     return FieldCandidateSchema.parse({
       key: field.canonicalKey,
       label: field.label,
       ruleIds,
       type: "text",
-      ...(field.canonicalKey === CHARACTER_NAME_KEY
-        ? { maxLength: CHARACTER_NAME_MAX_LENGTH }
-        : {}),
+      maxLength: CHARACTER_NAME_MAX_LENGTH,
+    });
+  }
+  const type = compilerTypeFor(field);
+  if (type === "textarea") {
+    return FieldCandidateSchema.parse({
+      key: field.canonicalKey,
+      label: field.label,
+      ruleIds,
+      type: "textarea",
+    });
+  }
+  if (type === "checkbox") {
+    return FieldCandidateSchema.parse({
+      key: field.canonicalKey,
+      label: field.label,
+      ruleIds,
+      type: "checkbox",
+    });
+  }
+  if (type === "text") {
+    return FieldCandidateSchema.parse({
+      key: field.canonicalKey,
+      label: field.label,
+      ruleIds,
+      type: "text",
     });
   }
   const range = field.permittedValueRange;
@@ -497,10 +568,38 @@ function toCompilerCandidate(
   });
 }
 
+/**
+ * Maps a template-proposed kind onto the compiler type only when the template
+ * contract carries enough payload to compile it faithfully. Payload-free kinds
+ * (text, number, textarea, checkbox) map directly; payload-requiring kinds
+ * (radio, select, multiselect, rating, resource, list, table, calculated,
+ * image) fall back to the category base type until the template schema grows
+ * their payload — they are never silently invented.
+ */
+function compilerTypeFor(
+  field: SourceResolvedField,
+): "text" | "number" | "textarea" | "checkbox" {
+  switch (field.kind) {
+    case undefined:
+      return field.category === "identity" ? "text" : "number";
+    case "text":
+      return "text";
+    case "number":
+      return "number";
+    case "textarea":
+      return "textarea";
+    case "checkbox":
+      return "checkbox";
+    default:
+      return field.category === "identity" ? "text" : "number";
+  }
+}
+
 function buildFieldValues(input: {
   definition: NormalizedSheetDefinition;
   nameValue: string;
   promotionKeys: ReadonlySet<string>;
+  seed: string;
 }): Record<string, string | number> {
   const threat = input.definition.npc?.threat ?? null;
   const values: Record<string, string | number> = {
@@ -523,7 +622,7 @@ function buildFieldValues(input: {
     const value =
       input.definition.mode === "pc"
         ? resolvePcValue(field)
-        : resolveNpcValue(field, threat);
+        : resolveNpcValue(field, threat, input.seed);
     if (value !== null) {
       values[field.canonicalKey] = value;
     }
@@ -549,6 +648,7 @@ function resolvePcValue(field: SourceResolvedField): number | null {
 function resolveNpcValue(
   field: SourceResolvedField,
   threat: NPCThreatLevel | null,
+  seed: string,
 ): number | null {
   if (typeof field.explicitValue === "number") {
     assertNumericValueInRange(field, field.explicitValue);
@@ -567,8 +667,23 @@ function resolveNpcValue(
   if (range.min === range.max) {
     return range.min;
   }
+
   const bias = threat === null ? NEUTRAL_THREAT_BIAS : THREAT_BIAS[threat];
-  return range.min + bias * (range.max - range.min);
+  // Independent deterministic per-field stream: mixing the field identity and
+  // threat into the seed keeps values stable under field reordering and
+  // reproducible across runs, while different seeds vary the sampled value.
+  const random = createDeterministicRandom(
+    stableNameSeed(`${seed}|${threat ?? "none"}|${field.canonicalKey}`),
+  );
+  // Sample inside a window centered on the tier bias: every tier keeps its
+  // skew (the boss tier hugs the top of the range) but each draw still varies
+  // with the seed, so no tier is hard-coded to an exact value or to `max`.
+  const low = Math.max(0, bias - THREAT_BIAS_WINDOW);
+  const high = Math.min(1, bias + THREAT_BIAS_WINDOW);
+  const t = low + random() * (high - low);
+  const raw = range.min + t * (range.max - range.min);
+  const value = Math.round(raw);
+  return Math.min(range.max, Math.max(range.min, value));
 }
 
 function assertNumericValueInRange(

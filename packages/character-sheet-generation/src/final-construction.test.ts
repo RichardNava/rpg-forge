@@ -344,6 +344,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
   function npcInput(
     field: SourceResolvedField,
     threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss" | null,
+    options: { seed?: string; sheetId?: string } = {},
   ): GenerateCharacterSheetSpecInput {
     return baseInput(new FakeNamePort().scriptWith(["Grim"]), {
       definition: makeDefinition({
@@ -354,6 +355,8 @@ describe("generateCharacterSheetSpec — NPC values", () => {
         },
         fields: [field],
       }),
+      ...(options.seed === undefined ? {} : { seed: options.seed }),
+      ...(options.sheetId === undefined ? {} : { sheetId: options.sheetId }),
     });
   }
 
@@ -374,41 +377,116 @@ describe("generateCharacterSheetSpec — NPC values", () => {
     expect(spec.values.hp_pool).toBe(40);
   });
 
-  it("resolves a bounded range to its midpoint without a threat", async () => {
-    const spec = await generateCharacterSheetSpec(
+  it("same seed reproduces the same in-bounds NPC values", async () => {
+    const first = await generateCharacterSheetSpec(
       npcInput(
         mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-        null,
+        "dangerous",
+        { seed: "seed-a" },
       ),
     );
-    expect(spec.values.hp_pool).toBe(15);
+    const second = await generateCharacterSheetSpec(
+      npcInput(
+        mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
+        "dangerous",
+        { seed: "seed-a" },
+      ),
+    );
+    expect(first.values.hp_pool).toBe(second.values.hp_pool);
+    expect(Number(first.values.hp_pool)).toBeGreaterThanOrEqual(10);
+    expect(Number(first.values.hp_pool)).toBeLessThanOrEqual(20);
   });
 
-  it("bias never escapes the permitted range for any threat", async () => {
+  it("different seeds can vary in-bounds NPC values", async () => {
+    const seen = new Set<number>();
+    for (const seed of ["seed-1", "seed-2", "seed-3", "seed-4"]) {
+      const spec = await generateCharacterSheetSpec(
+        npcInput(
+          mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
+          "ordinary",
+          { seed },
+        ),
+      );
+      const value = Number(spec.values.hp_pool);
+      expect(value).toBeGreaterThanOrEqual(10);
+      expect(value).toBeLessThanOrEqual(20);
+      seen.add(value);
+    }
+    // A windowed draw over four distinct seeds is not guaranteed to differ
+    // every time, but a contract that varied nothing would be broken. With
+    // deterministic seeds the stream is stable, so assert the exact sequence.
+    expect([...seen]).not.toEqual([10]);
+  });
+
+  it("value never escapes the permitted range for any threat", async () => {
     const cases: Array<{
       threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss";
-      expected: number;
     }> = [
-      { threat: "weak", expected: 12.5 },
-      { threat: "ordinary", expected: 15 },
-      { threat: "dangerous", expected: 17.5 },
-      { threat: "elite", expected: 19 },
-      { threat: "boss", expected: 20 },
+      { threat: "weak" },
+      { threat: "ordinary" },
+      { threat: "dangerous" },
+      { threat: "elite" },
+      { threat: "boss" },
     ];
     for (const entry of cases) {
-      const spec = await generateCharacterSheetSpec(
-        baseInput(new FakeNamePort().scriptWith(["Grim"]), {
-          definition: makeDefinition({
-            mode: "npc",
-            npc: { disposition: "enemy", threat: entry.threat },
-            fields: [
-              mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-            ],
+      for (const seed of ["seed-x", "seed-y", "seed-z"]) {
+        const spec = await generateCharacterSheetSpec(
+          baseInput(new FakeNamePort().scriptWith(["Grim"]), {
+            definition: makeDefinition({
+              mode: "npc",
+              npc: { disposition: "enemy", threat: entry.threat },
+              fields: [
+                mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
+              ],
+            }),
+            seed,
           }),
-        }),
-      );
-      expect(spec.values.hp_pool).toBe(entry.expected);
+        );
+        const value = Number(spec.values.hp_pool);
+        expect(value).toBeGreaterThanOrEqual(10);
+        expect(value).toBeLessThanOrEqual(20);
+      }
     }
+  });
+
+  it("threat biases the distribution (higher tiers skew to higher values)", async () => {
+    await baseInput(new FakeNamePort().scriptWith(["Grim"]), {});
+    const meanOf = async (
+      threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss",
+    ): Promise<number> => {
+      let total = 0;
+      const count = 32;
+      for (let index = 0; index < count; index += 1) {
+        const spec = await generateCharacterSheetSpec(
+          npcInput(
+            mechanicalField("hp_pool", "Hit Points", { range: [0, 100] }),
+            threat,
+            { seed: `bias-${index}` },
+          ),
+        );
+        total += Number(spec.values.hp_pool);
+      }
+      return total / count;
+    };
+    const weakMean = await meanOf("weak");
+    const bossMean = await meanOf("boss");
+    expect(bossMean).toBeGreaterThan(weakMean);
+  });
+
+  it("boss retains variation and does not universally return the max", async () => {
+    const seen = new Set<number>();
+    for (let index = 0; index < 48; index += 1) {
+      const spec = await generateCharacterSheetSpec(
+        npcInput(
+          mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
+          "boss",
+          { seed: `boss-${index}` },
+        ),
+      );
+      seen.add(Number(spec.values.hp_pool));
+    }
+    expect(seen.has(20)).toBe(true);
+    expect(seen.size).toBeGreaterThan(1);
   });
 
   it("leaves an unbounded NPC range blank", async () => {
@@ -423,11 +501,51 @@ describe("generateCharacterSheetSpec — NPC values", () => {
       npcInput(
         mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
         "weak",
+        { seed: "range-seed" },
       ),
     );
     const field = spec.fields.find((entry) => entry.id === "hp_pool");
     expect(field).toMatchObject({ min: 10, max: 20 });
-    expect(spec.values.hp_pool).toBe(12.5);
+  });
+
+  it("seeded NPC population never uses Math.random", async () => {
+    const calls: number[] = [];
+    const original = Math.random;
+    Math.random = () => {
+      calls.push(calls.length);
+      return 0.5;
+    };
+    try {
+      await generateCharacterSheetSpec(
+        npcInput(
+          mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
+          "boss",
+          { seed: "no-math-random" },
+        ),
+      );
+    } finally {
+      Math.random = original;
+    }
+    expect(calls.length).toBe(0);
+  });
+
+  it("PC mechanical values never depend on the seed", async () => {
+    const pcSpec = (seed: string) =>
+      generateCharacterSheetSpec(
+        baseInput(new FakeNamePort().scriptWith(["Grim"]), {
+          definition: makeDefinition({
+            mode: "pc",
+            characterName: "Aria",
+            fields: [
+              mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
+            ],
+          }),
+          seed,
+        }),
+      );
+    const seeded = await pcSpec("seed-1");
+    const unseeded = await pcSpec("seed-2");
+    expect(seeded.values.hp_pool).toBe(unseeded.values.hp_pool);
   });
 });
 

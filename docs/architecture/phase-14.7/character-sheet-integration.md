@@ -1,6 +1,8 @@
 # Phase 14.7 Character-Sheet Integration — Generation Boundaries and Sheet Sessions
 
-**Status:** Implemented (14.7A + 14.7B)
+**Status:** Implemented (14.7A + 14.7B + 14.7C template-backed generation). The
+phase-14.7 slices are spike/terminal evaluation landmarks proven by committed
+automated suites; they are not yet product-facing UI features.
 **Date:** 2026-09-13
 
 ## Purpose
@@ -9,11 +11,13 @@ Phase 14.7 wires the deterministic character-sheet construction (Phase 14.5)
 and PDF renderer (Phase 14.6) into the temporary standalone generation model:
 a genuine GUI-only path that needs no RulesContext, persistent session/run
 bookkeeping in D1, clean temporary artifact storage in R2, and a clean
-boundary for the still-deferred HTTP orchestration slice.
+boundary for the still-deferred HTTP orchestration slice. 14.7C adds the
+template-backed path: a blank sheet template can be extracted from a source
+sheet and used as the authority for which fields a generated sheet contains.
 
-This document describes the **actual committed architecture** after 14.7A and
-14.7B. Planned slices are labeled explicitly as deferred and are never
-described as implemented.
+This document describes the **actual committed architecture** after 14.7A,
+14.7B and 14.7C. Planned slices are labeled explicitly as deferred and are
+never described as implemented.
 
 Slice summary:
 
@@ -31,24 +35,35 @@ Slice summary:
   `Cache-Control: no-store` metadata; write compensation; retrieval; and total
   session/run prefix cleanup. Local-only `SHEET_ARTIFACTS` binding; production
   bucket identity deferred.
+- **14.7C** — template-backed generation: `@repo/character-sheet-template`
+  (template contracts, extraction port, reference extractor); generation-side
+  template normalization and template/GUI overlay; the provider-free
+  `DeterministicLocalNamePort` default for the standalone character name; and
+  `generateTemplateBackedSheet` wiring. The production multimodal extraction
+  provider is **blocked** (no vision model is committed) and remains the only
+  deferred 14.7C item.
 
 By design, Phase 14.7 adds **no** HTTP routes, **no** production AI providers,
 **no** Workflow, and **no** UI.
 
 ## Boundaries
 
-Implemented through 14.7B:
+Implemented through 14.7C:
 
 - domain contracts
 - GUI-only final construction
 - rulebook-capable final construction
+- template-backed construction (template normalization + template/GUI overlay)
 - deterministic PDF renderer
 - sheet session/run persistence (D1 operational metadata only)
 - temporary R2 artifact storage (spec + PDF per run, total prefix cleanup)
 
 Deferred:
 
-- production provider adapters — 14.7C
+- production multimodal template extractor adapter (blocked: no vision model
+  is committed) — the only remaining 14.7C item
+- production `RulebookFieldDerivationPort` adapter — superseded for the
+  template-backed flow; kept as a legacy port
 - HTTP orchestration — 14.7D
 - web UI / preview / E2E — later 14.7 slices
 
@@ -123,9 +138,15 @@ For rulebook-backed construction:
 
 - The supplied character name stays exact; a blank name uses the narrow
   `Level3NamePort` fallback with bounded retries and a visible failure.
-- No production `Level3NamePort` adapter exists; only fakes are used in
-  automated tests. The provider implementation belongs to 14.7C.
-- The name provider grants **no** gameplay or mechanical authority: it can
+- In the standalone template-backed flow, the default fallback is the
+  provider-free `DeterministicLocalNamePort`: a seeded, locale-aware,
+  syllable-based local name source (`createDeterministicLevel3NamePort`
+  adapts it to the Level-3 contract). The same `(mode, seed, locale)` triple
+  yields the exact same name, and the public standalone generator never needs
+  a model or inference quota for a usable character name.
+- No production AI `Level3NamePort` adapter exists; automated tests use fakes
+  (and the deterministic adapter) exclusively.
+- The name source grants **no** gameplay or mechanical authority: it can
   supply only a bounded display string for the visible `character_name` field.
 
 ## Free-text instructions boundary
@@ -375,13 +396,16 @@ This is implemented in 14.7B.
 
 ## Runtime and testing
 
-Committed suites (all green on the committed tree):
+Verified suites (all green in the current Phase 14.7C working tree):
 
+- `@repo/character-sheet-template`: 21 tests / 3 files (template schema,
+  extraction gate, reference extractor).
 - `@repo/character-sheet-schema`: 26 tests / 1 file.
-- `@repo/character-sheet-generation`: 372 tests / 18 files (includes the
-  GUI-only regression suite).
-- `@repo/character-sheet-pdf-renderer`: 34 tests / 2 files (renderer + the
-  GUI-only PDF integration test).
+- `@repo/character-sheet-generation`: 401 tests / 21 files (includes the
+  GUI-only regression suite, template-normalization, deterministic local name,
+  and template-service suites).
+- `@repo/character-sheet-pdf-renderer`: 38 tests / 3 files (renderer, the
+  GUI-only PDF integration test, and the template-backed PDF integration test).
 - `@repo/character-sheet-session`: 22 tests / 1 file (port contract suites).
 - `@repo/character-sheet-artifacts`: 23 tests / 3 files (keys with
   similar-prefix isolation, serialization, port reference store).
@@ -394,9 +418,15 @@ Committed suites (all green on the committed tree):
 
 ## Deferred work
 
-- **14.7C** — production provider adapters (text and image), including the
-  `Level3NamePort` and `RulebookFieldDerivationPort` production
-  implementations. Not present today.
+- **14.7C remainder** — production multimodal template extractor. The port
+  and reference extractor are implemented, but no production adapter can be
+  written until a vision model is committed: only text and embedding models
+  exist in configuration (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
+  `@cf/google/embeddinggemma-300m`); vision types appear only in generated
+  `cloudflare-env.d.ts` unions, not in any provider selection. There is no
+  committed multimodal model. Also deferred: the production
+  `RulebookFieldDerivationPort` adapter, marked legacy/superseded for the
+  template-backed flow.
 - **14.7D** — HTTP orchestration: session creation/authorization, run
   management, ownership validation, artifact preview/download. Not present
   today.
@@ -419,6 +449,52 @@ CharacterSheetSpec / PDF
 The D1 session/run tables remain the source of cleanup candidates; 14.7D's
 orchestrator and sweep use them to call `deleteRunArtifacts` /
 `deleteSessionArtifacts`.
+
+## 14.7C delivered slice
+
+Delivered in 14.7C:
+
+```text
+blank sheet template                          (@repo/character-sheet-template)
+  → CharacterSheetTemplateExtractionPort        (provider-agnostic; system/user contract)
+  → extractSheetTemplate                         (schema gate + bounded replay)
+  → reference extractor                          (offline catalog: no provider)
+  → normalizeTemplateFields                      (template → SourceResolvedFields, sheet-template origin)
+  → overlayTemplateWithGui                       (template authority + GUI overlay,
+                                                 TEMPLATE_BOUND/CATEGORY disagreements visible)
+  → resolveUnifiedSheetDefinition                (Level-2 + Level-1, unchanged)
+  → DeterministicLocalNamePort                   (seeded, locale-aware, AI-free name default)
+  → generateCharacterSheetSpec                   (Level-3, unchanged)
+```
+
+Template-semantics highlights:
+
+- **Template source model.** `CharacterSheetTemplateSourceSchema` supports
+  `direct-sheet` and `rulebook-contained-sheet`; the extraction port receives
+  only the source reference, never raw text or rendered values.
+- **Template authority.** The template owns the field roster, category,
+  section grouping and printed bounds; a GUI authoring request overlays
+  values on top. Template `TEMPLATE_MODE_MISMATCH` returns a dedicated
+  `{ kind: "template_mode_mismatch" }` outcome before any merge.
+- **Visible conflicts.** Template-bound disagreements surface as generation
+  conflicts (`TEMPLATE_BOUND_DISAGREEMENT`,
+  `TEMPLATE_CATEGORY_DISAGREEMENT`) rather than silent winners, and duplicate
+  template labels are rejected (`DUPLICATE_TEMPLATE_FIELD_LABEL`).
+- **Deterministic name default.** The standalone template-backed flow never
+  depends on a model for a usable character name; an AI `namePort` is an
+  explicit override, not the default.
+- **Renderer integration proof (spike-verified).** The template-backed path
+  renders a genuine RPG Forge-authored PDF: section order/titles come from the
+  template's declared sections, template field kinds (text/textarea/number)
+  reach the compiled spec, explicit GUI values land inside template bounds and
+  blanks stay blank, seeded NPC values stay in-bounds and reproduce reliably,
+  a merged GUI-only mechanical field still renders, and the output embeds no
+  source-sheet raster artwork (zero image XObjects) — any in-sheet artwork is
+  _not_ copied into the generated PDF. `spec.rulesContextId` stays null and
+  `sourceMap` is empty, so no provenance or source-page decoration is applied.
+- **No persistence impact.** This slice adds no D1 tables, no migrations, no
+  new R2 artifact kinds, and no HTTP surface. Templates remain inputs to
+  generation, not stored resources.
 
 ## Related documents
 

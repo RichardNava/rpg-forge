@@ -21,3 +21,6 @@ export * from "./extraction-schemas.js";
 export * from "./extraction.js";
 export * from "./services.js";
 export * from "./final-construction.js";
+export * from "./template-normalization.js";
+export * from "./deterministic-local-name.js";
+export * from "./template-service.js";

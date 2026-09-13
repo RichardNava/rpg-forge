@@ -1,3 +1,4 @@
+import { TemplateFieldKindSchema } from "@repo/character-sheet-template";
 import {
   NormalizedRuleIdSchema,
   RuleCitationSchema,
@@ -11,7 +12,11 @@ import {
   NPCThreatLevelSchema,
 } from "./authoring.js";
 import { SymbolicKeySchema } from "./intermediate.js";
-import { MAX_REFERENCED_RULES_PER_FIELD, MAX_TOTAL_FIELDS } from "./model.js";
+import {
+  MAX_REFERENCED_RULES_PER_FIELD,
+  MAX_PLAN_SECTIONS,
+  MAX_TOTAL_FIELDS,
+} from "./model.js";
 
 export const MAX_SOURCE_CITATIONS_PER_FIELD = 64;
 export const MAX_OVERRIDE_STRING_VALUE_CHARS = 10_000;
@@ -113,6 +118,7 @@ export const SheetFieldOriginSchema = z.enum([
   "rulebook",
   "context-override",
   "ai-default",
+  "sheet-template",
 ]);
 export type SheetFieldOrigin = z.infer<typeof SheetFieldOriginSchema>;
 
@@ -185,6 +191,10 @@ export const SourceResolvedFieldSchema = z
       .nullable()
       .optional(),
     permittedValueRange: NumericValueRangeSchema.optional(),
+    /** Template-proposed field kind; only the payload-free kinds compile directly. */
+    kind: TemplateFieldKindSchema.optional(),
+    /** Template-proposed logical section the field belongs to. */
+    sectionKey: SymbolicKeySchema.optional(),
     provenance: SheetFieldSourceProvenanceSchema,
   })
   .superRefine((field, context) => {
@@ -383,6 +393,10 @@ export const GENERATION_CONFLICT_CODES = [
   "NPC_MECHANICAL_VALUE_FORBIDDEN",
   "FABRICATED_RULE_EVIDENCE",
   "FOREIGN_CITATION_EVIDENCE",
+  "DUPLICATE_TEMPLATE_FIELD_LABEL",
+  "TEMPLATE_MODE_MISMATCH",
+  "TEMPLATE_CATEGORY_DISAGREEMENT",
+  "TEMPLATE_BOUND_DISAGREEMENT",
 ] as const;
 
 export const GenerationConflictCodeSchema = z.enum(GENERATION_CONFLICT_CODES);
@@ -408,6 +422,40 @@ export type NPCAuthoringDefinition = z.infer<
 >;
 
 /**
+ * Logical section grouping carried by a normalized definition. Template-backed
+ * definitions fill it from the extracted sheet template so final construction
+ * can preserve the source sheet's grouping instead of always collapsing to the
+ * built-in identity/attributes fallbacks. Non-template definitions leave it
+ * empty and Level-3 falls back to exactly today's behavior.
+ */
+export const SheetSectionDescriptorSchema = z.strictObject({
+  key: SymbolicKeySchema,
+  title: z.string().min(1).max(200).regex(/\S/),
+  purpose: z.string().min(1).max(1_000).regex(/\S/).optional(),
+});
+export type SheetSectionDescriptor = z.infer<
+  typeof SheetSectionDescriptorSchema
+>;
+
+const definitionSectionsSchema = z
+  .array(SheetSectionDescriptorSchema)
+  .max(MAX_PLAN_SECTIONS)
+  .default([])
+  .superRefine((sections, context) => {
+    const seen = new Set<string>();
+    sections.forEach((section, index) => {
+      if (seen.has(section.key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [String(index), "key"],
+          message: `Section key "${section.key}" repeats in the normalized definition.`,
+        });
+      }
+      seen.add(section.key);
+    });
+  });
+
+/**
  * Private intermediate contract between source resolution and the section
  * planner. Fields, overrides and conflicts are explicit so later stages never
  * re-derive authority silently. Identity and mechanical namespaces coexist by
@@ -422,6 +470,7 @@ export const NormalizedSheetDefinitionSchema = z
       .array(SourceResolvedFieldSchema)
       .max(MAX_TOTAL_FIELDS)
       .default([]),
+    sections: definitionSectionsSchema,
     overrides: z
       .array(ExplicitSheetOverrideSchema)
       .max(MAX_EXPLICIT_INPUT_OVERRIDES)

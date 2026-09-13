@@ -540,6 +540,8 @@ export function applyGenerationInstructions(
       ...(source.permittedValueRange !== undefined
         ? { permittedValueRange: source.permittedValueRange }
         : {}),
+      ...(source.kind !== undefined ? { kind: source.kind } : {}),
+      ...(source.sectionKey !== undefined ? { sectionKey: source.sectionKey } : {}),
       provenance: mergeProvenance(source.provenance, {
         origins: ["context-override"],
       }),
@@ -867,6 +869,7 @@ export function applyGenerationInstructions(
     mode,
     characterName,
     fields,
+    sections: definition.sections,
     overrides,
     conflicts,
     ...(definition.npc !== undefined ? { npc: definition.npc } : {}),

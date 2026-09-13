@@ -1,5 +1,5 @@
 {
-  "name": "@repo/character-sheet-generation",
+  "name": "@repo/character-sheet-template",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@repo/character-sheet-schema": "workspace:*",
-    "@repo/character-sheet-template": "workspace:*",
-    "@repo/rules-analysis-run": "workspace:*",
-    "@repo/rules-analysis-session": "workspace:*",
-    "@repo/rules-context": "workspace:*",
     "zod": "4.4.3"
   },
   "devDependencies": {
