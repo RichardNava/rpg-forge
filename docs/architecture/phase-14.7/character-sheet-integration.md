@@ -1,9 +1,10 @@
 # Phase 14.7 Character-Sheet Integration — Generation Boundaries and Sheet Sessions
 
-**Status:** Implemented (14.7A + 14.7B + 14.7C template-backed generation). The
-phase-14.7 slices are spike/terminal evaluation landmarks proven by committed
-automated suites; they are not yet product-facing UI features.
-**Date:** 2026-09-13
+**Status:** Implemented (14.7A + 14.7B + 14.7C template-backed generation, 14.7E
+editable authoring surface). The phase-14.7 slices are spike/terminal evaluation
+landmarks proven by committed automated suites; they are not yet product-facing
+UI features.
+**Date:** 2026-09-14
 
 ## Purpose
 
@@ -14,10 +15,15 @@ bookkeeping in D1, clean temporary artifact storage in R2, and a clean
 boundary for the still-deferred HTTP orchestration slice. 14.7C adds the
 template-backed path: a blank sheet template can be extracted from a source
 sheet and used as the authority for which fields a generated sheet contains.
+14.7E adds the **editable authoring surface**: generated output stays editable
+before export through versioned, temporary draft snapshots (domain in
+`@repo/character-sheet-draft`, R2 adapter in rules-worker). The web
+rehydration store interfaces that will drive these drafts from the UI remain
+deferred to a dedicated later slice.
 
 This document describes the **actual committed architecture** after 14.7A,
-14.7B and 14.7C. Planned slices are labeled explicitly as deferred and are
-never described as implemented.
+14.7B, 14.7C and 14.7E. Planned slices are labeled explicitly as deferred and
+are never described as implemented.
 
 Slice summary:
 
@@ -42,13 +48,22 @@ Slice summary:
   `generateTemplateBackedSheet` wiring. The production multimodal extraction
   provider is **blocked** (no vision model is committed) and remains the only
   deferred 14.7C item.
+- **14.7E** — editable authoring surface: `@repo/character-sheet-draft`
+  (bounded surface model, guided-edit edits map, order-preserving mutation API,
+  deterministic reroll of read-locked fields, versioned immutable snapshots,
+  R2 keys under the sheet-session tenant, the `CharacterSheetDraftStore` port)
+  plus the `createR2CharacterSheetDraftStore` adapter in rules-worker. Web
+  rehydration store interfaces and the glance-edit UI are deferred to a
+  dedicated later slice.
 
 By design, Phase 14.7 adds **no** HTTP routes, **no** production AI providers,
-**no** Workflow, and **no** UI.
+**no** Workflow, and **no** UI. 14.7E adds no D1 tables and no new R2 bindings:
+drafts share the existing `SHEET_ARTIFACTS` bucket and sit under the same
+session tenant so the 14.7B session sweep already covers them.
 
 ## Boundaries
 
-Implemented through 14.7C:
+Implemented through 14.7E:
 
 - domain contracts
 - GUI-only final construction
@@ -57,9 +72,12 @@ Implemented through 14.7C:
 - deterministic PDF renderer
 - sheet session/run persistence (D1 operational metadata only)
 - temporary R2 artifact storage (spec + PDF per run, total prefix cleanup)
+- editable authoring surface (draft domain + R2 draft store adapter; versioned
+  snapshots under the sheet-session tenant)
 
 Deferred:
 
+- web rehydration store interfaces and glance-edit UI — dedicated later slice
 - production multimodal template extractor adapter (blocked: no vision model
   is committed) — the only remaining 14.7C item
 - production `RulebookFieldDerivationPort` adapter — superseded for the
@@ -93,10 +111,25 @@ temporary R2 artifacts
 preview/download
 ```
 
+Editable path (14.7E surface, web rehydration deferred):
+
+```text
+CharacterSheetSpec / PDF   (final run)
+  ↓
+draft snapshot             (@repo/character-sheet-draft domain)
+  ↓
+guided edits / reroll      (order-preserving mutation API + read-locked reroll)
+  ↓
+versioned draft snapshots  (R2, sheet-session tenant, immutable v<version>.json)
+  ↓
+future web rehydration     (store interfaces + glance-edit UI, deferred)
+```
+
 Implemented today: domain contracts, GUI-only and rulebook-capable final
 construction, the deterministic PDF renderer, sheet session/run persistence,
-and temporary R2 artifact storage. The web authoring UI, HTTP orchestration,
-and preview/download are deferred.
+temporary R2 artifact storage, and the editable draft domain + R2 draft store
+adapter. The web authoring UI, HTTP orchestration, glance-edit UI and
+rehydration store interfaces are deferred.
 
 ## GUI-only is first-class
 
@@ -394,9 +427,88 @@ Compensation removes the **entire run prefix**, not just the two known objects,
 so it also clears any pre-existing or future artifacts belonging to that run.
 This is implemented in 14.7B.
 
+## Editable authoring surface (14.7E)
+
+Generated sheets stay editable before export. 14.7E ships the **draft domain**
+and the **R2 draft store adapter**; the web rehydration store interfaces and
+the glance-edit UI are the next slice.
+
+### Draft package
+
+`@repo/character-sheet-draft` is a pure, dependency-free domain package (no
+React, no Cloudflare, no Drizzle) — the same technology-neutral rule as the
+other character-sheet packages. It defines:
+
+- **Surface model.** A `CharacterSheetDraft` is a _bounded surface_: up to 192
+  fields and 192 values, every draft key on the safe field-key alphabet
+  (`A-Za-z0-9._:-`, so every draft key is a valid `CharacterSheetSpec` field id
+  and a path-safe R2 segment — the same guard as the artifact keys policy).
+  Field types: `text`, `number`, `textarea`, `checkbox`, `choice`. Drafts are
+  system-agnostic: no game-system rules live in the package.
+- **Character-name boundary.** `characterName` is a derived display convenience
+  that must mirror `values["character_name"]` (or `null`); a mismatch fails
+  validation (`invalid_draft`). No dual source of truth.
+- **Read locks and reroll ownership.** Each field carries `locked`.
+  Locked fields carry a "draw grammar" — a `choice` lock declares `options`, a
+  `number` lock declares `min`/`max` — so rerolling a locked field is a
+  deterministic, seeded redraw, never free text editing. Unlocked fields are
+  freely editable. Reroll uses the shared seeded PRNG (`deterministic.ts`, no
+  `Math.random`): the same `(mode, seed)` reproduces the same values, explicit
+  values always win, and every drawn value stays in bounds.
+- **Versioned immutable snapshots.** A draft identity is
+  `(sessionId, draftId)`; `version` starts at `1` and every persisted snapshot
+  is a full, immutable `v<version>.json`. Mutation/preview never rewrites
+  history. Future concurrency is belated-write detection via
+  `assertDraftVersion`, not a CRDT.
+- **Guided-edit edits map.** Future client edits are described as an ordered,
+  order-preserving map of typed additions/updates/deletes against surface keys.
+  When values belong to unknown keys, the map is a plain record; when the map
+  itself is unwieldy, an alternate map keyed on `type` preserves per-type
+  ordering (`draftStoreKey`). In-flight rules keep R2 writes single-put and
+  idempotent by version.
+- **Order-preserving mutation API.** `applyDraftMutation` applies single ops
+  (`set_value`, `unset_value`, `add_field`, `remove_field`, `rename_field`,
+  `set_label`, `toggle_read_lock`, `unlock_field`) and rejects invalid targets
+  with a typed taxonomy (`invalid_mutation`, `field_read_locked`,
+  `draft_session_mismatch`, `session_expired`, `surface_out_of_bounds`,
+  `draft_inflight`).
+- **One port.** `CharacterSheetDraftStore`:
+  `putDraft(draft)`, `getDraftVersion(identity, version)`,
+  `listDraftVersions(identity)`, `getLatestDraft(identity)`,
+  `deleteDraft(identity)`. Transport-neutral error taxonomy:
+  `invalid_draft | invalid_draft_identity | corrupt_draft |
+storage_unavailable | cleanup_failed` (plus the domain codes above).
+
+### Draft keys and lifetime
+
+Drafts live under the **same session tenant as run artifacts**, as a sibling
+of `runs/`:
+
+```text
+temp/character-sheets/v1/sessions/<sessionId>/drafts/<draftId>/v<version>.json
+```
+
+- Identities ride the same `draftPathSegment` policy as `artifactPathSegment`
+  (non-empty, ≤128 chars, no `/`, `\` or `..`, percent-encoded), and every
+  snapshot key embeds both opaque identities.
+- Draft snapshots are temporary state, not persistent user resources: they are
+  never event logs, never D1 rows, and never referenced from D1.
+- **The 14.7B total session-prefix sweep already covers drafts by
+  construction**: `deleteSessionArtifacts(sessionId)` lists the whole
+  `.../sessions/<sessionId>/` prefix (pages of at most 1000 keys) and deletes
+  every object, so the `drafts/` subtree is wiped with `runs/`. A dedicated
+  regression suite remotely-verifies this cross-adapter behavior in workerd.
+- `deleteDraft` exposes single-draft prefix cleanup for a client that abandons
+  one open draft without ending the session.
+
+### R2 binding
+
+Drafts reuse the existing local-only `SHEET_ARTIFACTS` binding; no new bucket,
+binding, or remote identity is added in 14.7E.
+
 ## Runtime and testing
 
-Verified suites (all green in the current Phase 14.7C working tree):
+Verified suites (all green in the current Phase 14.7E working tree):
 
 - `@repo/character-sheet-template`: 21 tests / 3 files (template schema,
   extraction gate, reference extractor).
@@ -409,15 +521,24 @@ Verified suites (all green in the current Phase 14.7C working tree):
 - `@repo/character-sheet-session`: 22 tests / 1 file (port contract suites).
 - `@repo/character-sheet-artifacts`: 23 tests / 3 files (keys with
   similar-prefix isolation, serialization, port reference store).
-- `rules-worker` node suite: 103 tests / 7 files (includes the fake-bucket
-  adapter suite with deterministic multi-page cleanup, total run-prefix
-  cleanup, and write compensation).
-- `rules-worker` workerd suite: 107 tests / 15 files (includes the real-D1
-  sheet-session 8-test, sheet-run 15-test repository suites, and the real-R2
-  `SHEET_ARTIFACTS` adapter suite).
+- `@repo/character-sheet-draft`: 73 tests / 9 files (schema boundaries,
+  authoring-session ownership, guided-edit surface, mutation API, reroll
+  determinism and locked-field protection, preview projection + spec writeback,
+  versioning and identity/keys).
+- `rules-worker` node suite: 116 tests / 8 files (includes the fake-bucket
+  adapter suites for artifacts and drafts, deterministic multi-page cleanup,
+  total run/session prefix cleanup, and write compensation).
+- `rules-worker` workerd suite: 110 tests / 16 files (includes the real-D1
+  sheet-session 8-test, sheet-run 15-test repository suites, the real-R2
+  `SHEET_ARTIFACTS` adapter suite, and the real-R2 draft adapter suite with the
+  session-sweep regression proving `deleteSessionArtifacts` also wipes drafts).
 
 ## Deferred work
 
+- **Web rehydration slice** — the glance-edit UI and rehydration store
+  interfaces that drive drafts from the web app, plus any intermediate widgets.
+  The 14.7E domain (`@repo/character-sheet-draft`) and the R2 draft adapter are
+  their foundation.
 - **14.7C remainder** — production multimodal template extractor. The port
   and reference extractor are implemented, but no production adapter can be
   written until a vision model is committed: only text and embedding models
@@ -496,9 +617,49 @@ Template-semantics highlights:
   new R2 artifact kinds, and no HTTP surface. Templates remain inputs to
   generation, not stored resources.
 
+## 14.7E delivered slice
+
+Delivered in 14.7E:
+
+```text
+CharacterSheetSpec / PDF   (final run, unchanged)
+  → CharacterSheetDraft         (@repo/character-sheet-draft surface domain)
+  → guided edits / mutation API (order-preserving single ops; typed taxonomy)
+  → reroll                      (seeded PRNG, read-locked draw surface)
+  → preview / writeback         (draft ↔ CharacterSheetSpec projection)
+  → versioned snapshots         (immutable v<version>.json; no event log)
+  → CharacterSheetDraftStore    (port: put/get/list/latest/delete)
+  → createR2CharacterSheetDraftStore (rules-worker R2 adapter)
+  → same session tenant         (14.7B session sweep covers drafts by design)
+```
+
+Authoring-semantics highlights:
+
+- **Editable surface, not a spec.** The draft is a bounded field/value surface
+  that stays editable before export; the final `CharacterSheetSpec` remains
+  authoritative for export. `projectDraftToSpec` / `writebackDraftToSpec` are
+  the explicit two-way projection boundary and fail closed
+  (`projection_invalid`, `writeback_invalid`).
+- **Deterministic reroll.** Locked fields keep a draw grammar (`number`
+  bound / `choice` options); reroll draws through the shared seeded PRNG with
+  no `Math.random`, so the same `(mode, seed)` reproduces the same values and
+  every sampled value stays in bounds. Unlocked/edited values are never
+  overwritten.
+- **Versioned immutability.** Versions start at 1 and are never rewritten;
+  edits append new versions, and concurrent writers are detected
+  (`assertDraftVersion`) rather than merged.
+- **Cleanup by construction.** Draft keys sit under
+  `.../sessions/<sessionId>/drafts/` in the existing `SHEET_ARTIFACTS` tenant;
+  `deleteSessionArtifacts` already wipes them (pinned by a workerd regression
+  suite), and `deleteDraft` cleans up a single abandoned draft.
+- **No D1, no new bindings.** Drafts add zero D1 tables and zero migrations,
+  and reuse the local-only `SHEET_ARTIFACTS` binding.
+
 ## Related documents
 
 - ADR-056 — Deterministic character-sheet final construction
+- ADR-057 — Editable character-sheet drafts (surface model + rehydration
+  snapshots)
 - ADR-015 / ADR-052 — PDF export stack and workerd AcroForm renderer
 - ADR-054 — Zod 4 as canonical runtime validation
 - Phase 14.6 — Character-Sheet PDF Renderer
