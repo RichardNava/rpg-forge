@@ -1,6 +1,6 @@
 # Phase 14.7 Character-Sheet Integration — Generation Boundaries and Sheet Sessions
 
-**Status:** Implemented (A1 + A2)
+**Status:** Implemented (14.7A + 14.7B)
 **Date:** 2026-09-13
 
 ## Purpose
@@ -8,11 +8,11 @@
 Phase 14.7 wires the deterministic character-sheet construction (Phase 14.5)
 and PDF renderer (Phase 14.6) into the temporary standalone generation model:
 a genuine GUI-only path that needs no RulesContext, persistent session/run
-bookkeeping in D1, and a clean boundary for the still-deferred artifact
-storage (R2) and HTTP orchestration slices.
+bookkeeping in D1, clean temporary artifact storage in R2, and a clean
+boundary for the still-deferred HTTP orchestration slice.
 
-This document describes the **actual committed architecture** after 14.7A1 and
-14.7A2. Planned slices are labeled explicitly as deferred and are never
+This document describes the **actual committed architecture** after 14.7A and
+14.7B. Planned slices are labeled explicitly as deferred and are never
 described as implemented.
 
 Slice summary:
@@ -26,23 +26,28 @@ Slice summary:
   `sheet_sessions` and `sheet_generation_runs` D1 tables; nullable rulebook
   identity triple; one current run per session; repost-supersede semantics;
   additive migration 0003; real D1/workerd repository tests.
+- **14.7B** — `@repo/character-sheet-artifacts`; the `CharacterSheetArtifactStore`
+  port; R2 adapter in rules-worker; controlled object keys; content types and
+  `Cache-Control: no-store` metadata; write compensation; retrieval; and total
+  session/run prefix cleanup. Local-only `SHEET_ARTIFACTS` binding; production
+  bucket identity deferred.
 
-By design, Phase 14.7A adds **no** R2 adapter, **no** HTTP routes, **no**
-production AI providers, **no** Workflow, and **no** UI.
+By design, Phase 14.7 adds **no** HTTP routes, **no** production AI providers,
+**no** Workflow, and **no** UI.
 
 ## Boundaries
 
-Implemented through 14.7A:
+Implemented through 14.7B:
 
 - domain contracts
 - GUI-only final construction
 - rulebook-capable final construction
 - deterministic PDF renderer
 - sheet session/run persistence (D1 operational metadata only)
+- temporary R2 artifact storage (spec + PDF per run, total prefix cleanup)
 
 Deferred:
 
-- R2 artifact persistence — 14.7B
 - production provider adapters — 14.7C
 - HTTP orchestration — 14.7D
 - web UI / preview / E2E — later 14.7 slices
@@ -74,8 +79,8 @@ preview/download
 ```
 
 Implemented today: domain contracts, GUI-only and rulebook-capable final
-construction, the deterministic PDF renderer, and sheet session/run
-persistence. The web authoring UI, the R2 artifact step, HTTP orchestration,
+construction, the deterministic PDF renderer, sheet session/run persistence,
+and temporary R2 artifact storage. The web authoring UI, HTTP orchestration,
 and preview/download are deferred.
 
 ## GUI-only is first-class
@@ -259,7 +264,7 @@ Generation currency is scoped by **sheet session**, not by analysis id.
 
 ## Artifact storage boundary
 
-R2 is 14.7B. The expected conceptual ownership tree is:
+R2 is implemented in 14.7B. The actual ownership tree is:
 
 ```text
 sheet session
@@ -268,31 +273,109 @@ sheet session
       └─ sheet.pdf
 ```
 
-- Exact object-key syntax is not frozen here; 14.7B owns it.
-- 14.7B owns: the project artifact port, the R2 adapter, controlled object
-  keys, content types, cleanup, and artifact replacement/deletion.
+Concrete object keys (frozen in 14.7B):
 
-Across 14.7A, D1 contains no R2 keys and no artifact references; the run/session
+```text
+temp/character-sheets/v1/sessions/<sessionId>/runs/<runId>/spec.json
+temp/character-sheets/v1/sessions/<sessionId>/runs/<runId>/sheet.pdf
+```
+
+- `<sessionId>` and `<runId>` pass through `artifactPathSegment`: non-empty,
+  at most 128 characters, must not contain `/`, `\`, or `..`, then
+  percent-encoded. Every key embeds both opaque identities, so a stale run can
+  never address another session's or run's objects.
+- Both the session prefix and the run prefix end with a trailing separator
+  (`.../sessions/<sessionId>/`, `.../runs/<runId>/`), so prefix matching is
+  isolated by construction even for similar ids (e.g. `session-a` never matches
+  `session-a2`).
+- The spec is serialized through `CharacterSheetSpecSchema` on write
+  (`invalid_spec` on rejection) and re-validated on read (`corrupt_spec` on
+  storage corruption or a contract change). Missing reads return `null`.
+- Content types: `application/json; charset=utf-8` for `spec.json`,
+  `application/pdf` for `sheet.pdf`. All objects are stored with
+  `Cache-Control: no-store`.
+
+### Port and error taxonomy
+
+`@repo/character-sheet-artifacts` defines the `CharacterSheetArtifactStore`
+port with exactly five identity-keyed methods and deliberately **no**
+arbitrary-key read/write API:
+
+- `putRunArtifacts({ sessionId, runId, spec, pdfBytes })`
+- `getSpec({ sessionId, runId })`
+- `getPdfBytes({ sessionId, runId })`
+- `deleteRunArtifacts({ sessionId, runId })`
+- `deleteSessionArtifacts(sessionId)`
+
+Transport-neutral error codes:
+
+```text
+invalid_artifact_identity | invalid_spec | storage_unavailable | corrupt_spec | cleanup_failed
+```
+
+The adapter (`createR2CharacterSheetArtifactStore` in rules-worker) depends on
+a narrow `R2BucketLike` shape (put/get/list/delete) so it is unit-testable with
+a fake bucket while remaining structurally compatible with the real `R2Bucket`.
+
+### R2 binding
+
+- `SHEET_ARTIFACTS` is a **LOCAL-ONLY** binding to bucket
+  `rpg-forge-sheets-local` in the `local` env.
+- The root environment has **no** R2 binding: artifact storage fails closed
+  until an approved remote bucket is explicitly configured (same policy as
+  `RULEBOOK_BUCKET`).
+- The local binding deliberately is **not** `RULEBOOK_BUCKET`: rulebook and
+  sheet artifacts are distinct tenants with separate lifecycle and cleanup.
+
+Across 14.7B, D1 contains no R2 keys and no artifact references; the run/session
 repositories are the sole persistence surface.
 
 ## 14.7B cleanup requirement (acceptance condition)
 
-R2 artifact cleanup must cover **all** artifacts owned by a sheet session/run,
+R2 artifact cleanup covers **all** artifacts owned by a sheet session/run,
 including artifacts belonging to runs that are `READY`, `FAILED`,
-`INVALIDATED`, or `EXPIRED`.
+`INVALIDATED`, or `EXPIRED`, and including any unknown/future artifact kinds
+that appear under the owning prefix:
 
-- A session deletion/expiry must not leave orphaned `spec.json`, PDF, or
-  future artifact objects behind.
-- 14.7B must not design cleanup solely around
-  `findCleanupCandidates(status = EXPIRED)` if doing so could leave superseded
-  or failed artifacts behind.
-- 14.7B must define a **total session/run artifact cleanup strategy**.
+- `deleteRunArtifacts` performs a **total run-prefix sweep**: it lists the
+  exact `temp/character-sheets/v1/sessions/<sessionId>/runs/<runId>/` prefix
+  in pages of at most 1000 keys and deletes every returned object, so a
+  stale run leaves no artifacts behind regardless of how many kinds it has.
+- `deleteSessionArtifacts` performs the same **total session-prefix sweep**
+  under `temp/character-sheets/v1/sessions/<sessionId>/`, so a session
+  deletion/expiry leaves no orphaned artifacts regardless of run status.
+- Both sweeps share one pagination-safe helper: list by exact trailing-slash
+  prefix, delete each page, repeat until no objects remain, and stay
+  idempotent (an empty prefix deletes nothing).
+- Both prefixes end with a trailing separator, so a session or run id is
+  never a string prefix of a distinct id: `session-a` cannot match
+  `session-a2` and `run-1` cannot match `run-10`.
+- Cleanup failure surfaces as `cleanup_failed`; the caller (14.7D
+  orchestration/cleanup sweep) retries against the D1 run/session operational
+  records, not an artifact inventory.
 
-(This is a documentation-only statement today; it is not implemented.)
+This is implemented in 14.7B.
+
+## 14.7B write compensation requirement (acceptance condition)
+
+`putRunArtifacts` writes `spec.json` first, then `sheet.pdf`. If a later write
+fails after an earlier one succeeded, the write must not leave a partial or
+orphaned run behind:
+
+- spec PUT fails → nothing was written → no compensation → `storage_unavailable`.
+- spec PUT succeeds, PDF PUT fails, compensation cleanup succeeds →
+  `storage_unavailable`, with **zero run artifacts remaining**.
+- spec PUT succeeds, PDF PUT fails, compensation cleanup fails →
+  `cleanup_failed`, so the caller knows cleanup still needs retry/recovery.
+  The compensation failure is never masked as an ordinary storage error.
+
+Compensation removes the **entire run prefix**, not just the two known objects,
+so it also clears any pre-existing or future artifacts belonging to that run.
+This is implemented in 14.7B.
 
 ## Runtime and testing
 
-Committed A1+A2 suites (all green on the committed tree):
+Committed suites (all green on the committed tree):
 
 - `@repo/character-sheet-schema`: 26 tests / 1 file.
 - `@repo/character-sheet-generation`: 372 tests / 18 files (includes the
@@ -300,44 +383,42 @@ Committed A1+A2 suites (all green on the committed tree):
 - `@repo/character-sheet-pdf-renderer`: 34 tests / 2 files (renderer + the
   GUI-only PDF integration test).
 - `@repo/character-sheet-session`: 22 tests / 1 file (port contract suites).
-- `rules-worker` node suite: 88 tests / 6 files.
-- `rules-worker` workerd suite: 104 tests / 14 files (includes the real-D1
-  sheet-session 8-test and sheet-run 15-test repository suites).
+- `@repo/character-sheet-artifacts`: 23 tests / 3 files (keys with
+  similar-prefix isolation, serialization, port reference store).
+- `rules-worker` node suite: 103 tests / 7 files (includes the fake-bucket
+  adapter suite with deterministic multi-page cleanup, total run-prefix
+  cleanup, and write compensation).
+- `rules-worker` workerd suite: 107 tests / 15 files (includes the real-D1
+  sheet-session 8-test, sheet-run 15-test repository suites, and the real-R2
+  `SHEET_ARTIFACTS` adapter suite).
 
 ## Deferred work
 
-- **14.7B** — temporary artifact port, R2 adapter, controlled object keys,
-  content types, retrieval, and total cleanup (see entry conditions below).
 - **14.7C** — production provider adapters (text and image), including the
   `Level3NamePort` and `RulebookFieldDerivationPort` production
   implementations. Not present today.
 - **14.7D** — HTTP orchestration: session creation/authorization, run
-  management, ownership validation, preview/download. Not present today.
+  management, ownership validation, artifact preview/download. Not present
+  today.
 - **Later 14.7 slices** — web UI, preview, E2E.
 
-## Exact 14.7B entry conditions
+## 14.7B delivered slice
 
-Available now from committed code:
-
-- stable sheet `sessionId`
-- stable `runId`
-- one-current-run invariant (partial unique index + supersede semantics)
-- explicit run/session expiry (`expiresAt` inherited from session)
-- GUI-only independent of rulebook identities (nullable triple)
-- cleanup candidate primitives (session + run)
-- deterministic `CharacterSheetSpec`
-- deterministic PDF renderer
-
-14.7B's exact responsibility:
+Delivered in 14.7B:
 
 ```text
 CharacterSheetSpec / PDF
-  → temporary artifact port
-  → R2 implementation
-  → controlled ownership/keying
-  → retrieval
-  → total cleanup (including failed and superseded run artifacts)
+  → CharacterSheetArtifactStore port   (@repo/character-sheet-artifacts)
+  → createR2CharacterSheetArtifactStore  (rules-worker R2 adapter)
+  → controlled ownership/keying          (trailing-slash session/run prefixes)
+  → retrieval                            (spec re-validated, pdf bytes)
+  → write compensation                   (failed PDF write sweeps whole run prefix)
+  → total cleanup                        (run + session prefix sweep)
 ```
+
+The D1 session/run tables remain the source of cleanup candidates; 14.7D's
+orchestrator and sweep use them to call `deleteRunArtifacts` /
+`deleteSessionArtifacts`.
 
 ## Related documents
 

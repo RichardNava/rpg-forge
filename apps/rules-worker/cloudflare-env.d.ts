@@ -3,6 +3,7 @@
 // Runtime types generated with workerd@1.20260811.1 2026-08-12 global_fetch_strictly_public
 interface __BaseEnv_Env {
   RULEBOOK_BUCKET: R2Bucket;
+  SHEET_ARTIFACTS: R2Bucket;
   DB: D1Database;
   AI: Ai;
   RULEBOOK_INGESTION_WORKFLOW: Workflow<

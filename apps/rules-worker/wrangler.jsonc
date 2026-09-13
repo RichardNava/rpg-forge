@@ -54,14 +54,18 @@
         },
       ],
       /**
-       * LOCAL-ONLY R2 binding. Production bucket identity is deliberately
-       * deferred: the root environment has no R2 binding, so upload fails
-       * closed until an approved remote bucket is explicitly configured.
+       * LOCAL-ONLY R2 bindings. Production bucket identities are deliberately
+       * deferred: the root environment has no R2 binding, so uploads fail
+       * closed until approved remote buckets are explicitly configured.
        */
       "r2_buckets": [
         {
           "binding": "RULEBOOK_BUCKET",
           "bucket_name": "rpg-forge-rules-local",
+        },
+        {
+          "binding": "SHEET_ARTIFACTS",
+          "bucket_name": "rpg-forge-sheets-local",
         },
       ],
     },
