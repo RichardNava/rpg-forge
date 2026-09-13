@@ -15,6 +15,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@repo/character-sheet-session": "workspace:*",
     "@repo/rulebook-ingestion": "workspace:*",
     "@repo/rules-analysis-run": "workspace:*",
     "@repo/rules-analysis-session": "workspace:*",

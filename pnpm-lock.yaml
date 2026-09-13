@@ -17,6 +17,9 @@ importers:
 
   apps/rules-worker:
     dependencies:
+      '@repo/character-sheet-session':
+        specifier: workspace:*
+        version: link:../../packages/character-sheet-session
       '@repo/rulebook-ingestion':
         specifier: workspace:*
         version: link:../../packages/rulebook-ingestion
@@ -235,6 +238,22 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.16.9)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/character-sheet-session:
+    dependencies:
+      '@repo/rules-analysis-session':
+        specifier: workspace:*
+        version: link:../rules-analysis-session
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+      typescript:
+        specifier: ^5.7.4
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@20.19.43)(jsdom@30.0.1(@noble/hashes@2.3.0))(vite@8.2.1(@types/node@20.19.43)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.16.9)(tsx@4.23.12)(yaml@2.9.0))
 
   packages/dice-engine:
     devDependencies:

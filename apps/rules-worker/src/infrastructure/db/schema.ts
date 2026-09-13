@@ -1,4 +1,10 @@
 import {
+  SHEET_RUN_FAILURE_CODES,
+  SHEET_RUN_MODES,
+  SHEET_RUN_STATUSES,
+  SHEET_SESSION_STATUSES,
+} from "@repo/character-sheet-session";
+import {
   RULEBOOK_FAILURE_CODES,
   RULEBOOK_STATUSES,
 } from "@repo/rulebook-ingestion";
@@ -104,3 +110,65 @@ export const rulesAnalysisRun = sqliteTable(
 );
 
 export type RulesAnalysisRunRow = typeof rulesAnalysisRun.$inferSelect;
+
+/**
+ * Temporary sheet-generation session. Persisted D1 state is limited to the
+ * SHA-256 token hash, lifecycle and cleanup timestamps; the plaintext token
+ * is returned exactly once to the caller and never stored.
+ */
+export const sheetSession = sqliteTable(
+  "sheet_sessions",
+  {
+    sessionId: text("session_id").primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    status: text("status", { enum: SHEET_SESSION_STATUSES }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("sheet_sessions_cleanup_idx").on(table.status, table.expiresAt),
+  ],
+);
+
+export type SheetSessionRow = typeof sheetSession.$inferSelect;
+
+/**
+ * Operational metadata for a sheet-generation run. D1 intentionally stores NO
+ * spec JSON, PDF bytes, RulesContext, job payload, or artifact keys: those live
+ * in generation-scoped temporary artifacts. A GUI-only run keeps all three
+ * rulebook identities NULL. expiresAt inherits the owning session's expiry so
+ * cleanup candidates derive from one authoritative lifetime.
+ */
+export const sheetGenerationRun = sqliteTable(
+  "sheet_generation_runs",
+  {
+    runId: text("run_id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    analysisId: text("analysis_id"),
+    rulesAnalysisRunId: text("rules_analysis_run_id"),
+    ingestionId: text("ingestion_id"),
+    mode: text("mode", { enum: SHEET_RUN_MODES }).notNull(),
+    status: text("status", { enum: SHEET_RUN_STATUSES }).notNull(),
+    failureCode: text("failure_code", { enum: SHEET_RUN_FAILURE_CODES }),
+    isCurrent: integer("is_current", { mode: "boolean" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("sheet_generation_runs_current_idx").on(
+      table.sessionId,
+      table.isCurrent,
+    ),
+    index("sheet_generation_runs_cleanup_idx").on(
+      table.status,
+      table.expiresAt,
+    ),
+    uniqueIndex("sheet_generation_runs_single_current_idx")
+      .on(table.sessionId)
+      .where(sql`${table.isCurrent} = 1`),
+  ],
+);
+
+export type SheetGenerationRunRow = typeof sheetGenerationRun.$inferSelect;
