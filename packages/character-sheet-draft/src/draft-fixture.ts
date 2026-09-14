@@ -1,4 +1,4 @@
-import type { CharacterSheetDraft } from "./draft-schema.js";
+import type { CharacterSheetDraft } from "./draft-schema";
 
 /**
  * Factory for a fully valid PC draft used across the draft suites. Locked

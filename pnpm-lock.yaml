@@ -93,6 +93,9 @@ importers:
       '@opennextjs/cloudflare':
         specifier: ^1.19.9
         version: 1.20.2(next@16.2.11(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(supports-color@10.2.2)(wrangler@4.122.0(@cloudflare/workers-types@5.20260811.1))
+      '@repo/character-sheet-draft':
+        specifier: workspace:*
+        version: link:../../packages/character-sheet-draft
       '@repo/dice-engine':
         specifier: workspace:*
         version: link:../../packages/dice-engine
@@ -129,6 +132,9 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3

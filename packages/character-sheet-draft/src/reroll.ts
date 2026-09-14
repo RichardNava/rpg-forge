@@ -2,12 +2,12 @@ import type {
   CharacterSheetDraft,
   DraftField,
   DraftValue,
-} from "./draft-schema.js";
+} from "./draft-schema";
 import {
   createSeededRandom,
   stableDraftSeed,
   type SeededRandom,
-} from "./reroll-random.js";
+} from "./reroll-random";
 
 export interface DraftRerollResult {
   draft: CharacterSheetDraft;

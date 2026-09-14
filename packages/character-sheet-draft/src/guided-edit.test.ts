@@ -7,8 +7,8 @@ import {
   mustBeWithinDraftSurface,
   pruneSurfaceToDraftBounds,
   surfaceKeys,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 describe("draft guided-edit surface", () => {
   it("lists surface keys in field order", () => {

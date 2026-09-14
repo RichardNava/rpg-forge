@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyDraftMutation, DraftError, validateDraft } from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+import { applyDraftMutation, DraftError, validateDraft } from "./index";
+import { makeDraft } from "./draft-fixture";
 
 function unlocked(key: string) {
   return applyDraftMutation(makeDraft(), { op: "unlock_field", key });

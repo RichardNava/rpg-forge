@@ -1,4 +1,4 @@
-import { draftError } from "./errors.js";
+import { draftError } from "./errors";
 
 export const CHARACTER_SHEET_DRAFT_KEY_TENANT =
   "temp/character-sheets" as const;

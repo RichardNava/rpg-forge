@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { draftError } from "./errors.js";
+import { draftError } from "./errors";
 
 export const CHARACTER_SHEET_DRAFT_VERSION = "1" as const;
 

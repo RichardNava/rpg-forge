@@ -7,8 +7,8 @@ import {
   MAX_DRAFT_VALUES_FIELDS,
   draftForwardCompatibility,
   validateDraft,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 describe("character sheet draft schema", () => {
   it("accepts the fixture draft", () => {

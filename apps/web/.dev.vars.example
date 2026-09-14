@@ -4,3 +4,6 @@ BETTER_AUTH_URL=http://localhost:3000
 # Google OAuth client values. Never commit real credentials.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+# Server-side base URL of the rules-worker character-sheet API. Only read by
+# the web proxy route; never expose it through NEXT_PUBLIC_*.
+RULES_WORKER_URL=

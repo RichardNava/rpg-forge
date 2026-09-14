@@ -5,8 +5,8 @@ import {
   completeInFlightDraft,
   DraftError,
   isDraftInFlight,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 describe("in-flight draft processing", () => {
   it("marks a snapshot as saving then saved", () => {

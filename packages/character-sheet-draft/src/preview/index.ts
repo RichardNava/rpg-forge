@@ -1,2 +1,2 @@
-export * from "./projection.js";
-export * from "./writeback.js";
+export * from "./projection";
+export * from "./writeback";

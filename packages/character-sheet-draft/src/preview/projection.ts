@@ -8,10 +8,10 @@ import type {
   CharacterSheetDraft,
   DraftField,
   DraftValue,
-} from "../draft-schema.js";
-import { MAX_DRAFT_TEXT_VALUE_CHARS } from "../draft-schema.js";
-import { draftError } from "../errors.js";
-import { surfaceKeys } from "../guided-edit.js";
+} from "../draft-schema";
+import { MAX_DRAFT_TEXT_VALUE_CHARS } from "../draft-schema";
+import { draftError } from "../errors";
+import { surfaceKeys } from "../guided-edit";
 
 const FIELD_PLACEMENT = {
   order: 0,

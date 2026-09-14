@@ -1,4 +1,4 @@
-import type { CharacterSheetDraft } from "./draft-schema.js";
+import type { CharacterSheetDraft } from "./draft-schema";
 
 export interface CharacterSheetDraftIdentity {
   sessionId: string;

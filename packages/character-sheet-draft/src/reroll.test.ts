@@ -4,8 +4,8 @@ import {
   rerollLockedDraftValues,
   stableDraftSeed,
   validateDraft,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 describe("seeded reroll randomness", () => {
   it("reproduces the same stream for the same seed", () => {

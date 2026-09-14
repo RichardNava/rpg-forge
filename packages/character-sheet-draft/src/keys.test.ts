@@ -6,7 +6,7 @@ import {
   getDraftSnapshotKey,
   getSessionDraftsPrefix,
   parseDraftVersionFromObjectKey,
-} from "./index.js";
+} from "./index";
 
 const SESSION = "b15b4b3a-9a5f-4b6e-8d3c-1f7a6e2d4c0a";
 const DRAFT = "draft.4f1e8a2b-c3d4-4e5f-8a6b-7c090d1e2f3a";

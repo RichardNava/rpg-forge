@@ -7,8 +7,8 @@ import {
   profileAuthoringSession,
   validateAuthoringContext,
   type AuthoringSessionSnapshot,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 const activeSession: AuthoringSessionSnapshot = {
   sessionId: "session.abc123",

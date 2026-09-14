@@ -1,5 +1,5 @@
-import type { CharacterSheetDraft } from "./draft-schema.js";
-import { draftError } from "./errors.js";
+import type { CharacterSheetDraft } from "./draft-schema";
+import { draftError } from "./errors";
 
 export const DRAFT_IN_FLIGHT_STATUSES = ["saving", "saved"] as const;
 

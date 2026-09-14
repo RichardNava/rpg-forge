@@ -5,8 +5,8 @@ import {
   initialDraftVersion,
   nextDraftVersion,
   type CharacterSheetDraft,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 describe("draft versioning", () => {
   it("bumps positive integer versions", () => {

@@ -3,10 +3,10 @@ import type {
   CharacterSheetDraft,
   DraftField,
   DraftValue,
-} from "./draft-schema.js";
-import { DraftValueSchema, MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema.js";
-import { draftError } from "./errors.js";
-import { assertDraftFieldExists } from "./guided-edit.js";
+} from "./draft-schema";
+import { DraftValueSchema, MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
+import { draftError } from "./errors";
+import { assertDraftFieldExists } from "./guided-edit";
 
 export const DraftMutationSchema = z.discriminatedUnion("op", [
   z.strictObject({

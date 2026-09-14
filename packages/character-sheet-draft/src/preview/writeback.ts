@@ -3,8 +3,8 @@ import {
   validateCharacterSheetSpecDomain,
   type CharacterSheetSpec,
 } from "@repo/character-sheet-schema";
-import type { CharacterSheetDraft, DraftValue } from "../draft-schema.js";
-import { draftError } from "../errors.js";
+import type { CharacterSheetDraft, DraftValue } from "../draft-schema";
+import { draftError } from "../errors";
 
 /**
  * Overlays the draft's edited values onto the generated `baseSpec` that owns

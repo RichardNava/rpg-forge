@@ -5,8 +5,8 @@ import {
   DraftError,
   projectDraftToSpec,
   writebackDraftToSpec,
-} from "./index.js";
-import { makeDraft } from "./draft-fixture.js";
+} from "./index";
+import { makeDraft } from "./draft-fixture";
 
 function baseSpec() {
   const draft = makeDraft();

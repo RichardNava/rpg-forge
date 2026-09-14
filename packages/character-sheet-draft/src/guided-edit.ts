@@ -2,12 +2,12 @@ import type {
   CharacterSheetDraft,
   DraftField,
   DraftValue,
-} from "./draft-schema.js";
+} from "./draft-schema";
 import {
   MAX_DRAFT_SURFACE_FIELDS,
   MAX_DRAFT_VALUES_FIELDS,
-} from "./draft-schema.js";
-import { draftError } from "./errors.js";
+} from "./draft-schema";
+import { draftError } from "./errors";
 
 /** Ordered canonical keys of the draft surface. */
 export function surfaceKeys(draft: CharacterSheetDraft): string[] {
