@@ -11,6 +11,9 @@ import {
   FakeRulebookWorkflow,
   FakeRulesAnalysisRunRepository,
   FakeSessionRepository,
+  FakeSheetSessionRepository,
+  FakeDraftHeadRepository,
+  FakeCharacterSheetDraftStore,
 } from "./test/fakes.js";
 
 const BASE_URL = "https://rules-worker.test";
@@ -35,6 +38,9 @@ interface Harness {
   rulebookStorage: FakeRulebookStorage;
   rulebookWorkflow: FakeRulebookWorkflow;
   rulesAnalysisRunRepository: FakeRulesAnalysisRunRepository;
+  sheetSessionRepository: FakeSheetSessionRepository;
+  sheetDraftHeadRepository: FakeDraftHeadRepository;
+  sheetDraftStore: FakeCharacterSheetDraftStore;
 }
 
 function makeHarness(): Harness {
@@ -48,6 +54,9 @@ function makeHarness(): Harness {
   const rulebookStorage = new FakeRulebookStorage();
   const rulebookWorkflow = new FakeRulebookWorkflow();
   const rulesAnalysisRunRepository = new FakeRulesAnalysisRunRepository();
+  const sheetSessionRepository = new FakeSheetSessionRepository();
+  const sheetDraftHeadRepository = new FakeDraftHeadRepository();
+  const sheetDraftStore = new FakeCharacterSheetDraftStore();
   return {
     deps: {
       crypto,
@@ -60,6 +69,9 @@ function makeHarness(): Harness {
       rulebookStorage,
       rulebookWorkflow,
       rulesAnalysisRunRepository,
+      sheetSessionRepository,
+      sheetDraftHeadRepository,
+      sheetDraftStore,
     },
     clock,
     crypto,
@@ -71,6 +83,9 @@ function makeHarness(): Harness {
     rulebookStorage,
     rulebookWorkflow,
     rulesAnalysisRunRepository,
+    sheetSessionRepository,
+    sheetDraftHeadRepository,
+    sheetDraftStore,
   };
 }
 

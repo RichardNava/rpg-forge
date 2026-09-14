@@ -20,6 +20,8 @@ import {
   FakeRunArtifactStore,
   FakeSessionRepository,
   FakeVectorIndex,
+  FakeSheetSessionRepository,
+  FakeDraftHeadRepository,
 } from "./test/fakes.js";
 
 const BASE_URL = "https://rules-worker.test";
@@ -73,6 +75,8 @@ function makeHarness(): Harness {
     rulesAnalysisArtifactStore: artifactStore,
     rulesAnalysisVectorIndex: vectorIndex,
     rulesAnalysisWorkflow,
+    sheetSessionRepository: new FakeSheetSessionRepository(),
+    sheetDraftHeadRepository: new FakeDraftHeadRepository(),
   };
   return {
     deps,

@@ -38,6 +38,18 @@ export const ErrorCodeSchema = z.enum([
   "ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED",
   "ANALYSIS_SESSION_EXPIRED",
   "ANALYSIS_SESSION_DELETE_FAILED",
+  "SHEET_SESSION_NOT_FOUND_OR_UNAUTHORIZED",
+  "SHEET_SESSION_EXPIRED",
+  "SHEET_DRAFT_INVALID",
+  "SHEET_DRAFT_STORAGE_UNAVAILABLE",
+  "SHEET_DRAFT_CORRUPT",
+  "SHEET_DRAFT_NOT_FOUND",
+  "SHEET_DRAFT_ALREADY_EXISTS",
+  "SHEET_DRAFT_VERSION_CONFLICT",
+  "SHEET_DRAFT_INFLIGHT",
+  "SHEET_DRAFT_MUTATION_INVALID",
+  "SHEET_DRAFT_FIELD_READ_LOCKED",
+  "SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS",
   "INTERNAL_ERROR",
 ]);
 
@@ -122,4 +134,42 @@ export const RulesContextConfirmResponseSchema = z.strictObject({
 });
 export type RulesContextConfirmResponse = z.infer<
   typeof RulesContextConfirmResponseSchema
+>;
+
+// --- Character-sheet session and draft schemas ---
+
+export const SheetSessionCreateResponseSchema = z.strictObject({
+  sessionId: z.uuid(),
+  accessToken: z.string().min(1),
+  expiresAt: z.iso.datetime(),
+});
+
+export type SheetSessionCreateResponse = z.infer<
+  typeof SheetSessionCreateResponseSchema
+>;
+
+export const SheetSessionViewSchema = z.strictObject({
+  sessionId: z.uuid(),
+  status: z.enum(["ACTIVE", "DELETING"]),
+  expiresAt: z.iso.datetime(),
+});
+
+export type SheetSessionView = z.infer<typeof SheetSessionViewSchema>;
+
+export const SheetDraftCreateResponseSchema = z.strictObject({
+  draftId: z.string().min(1),
+  sessionId: z.string().min(1),
+  version: z.number().int().min(1),
+});
+
+export type SheetDraftCreateResponse = z.infer<
+  typeof SheetDraftCreateResponseSchema
+>;
+
+export const SheetDraftRerollRequestSchema = z.strictObject({
+  seed: z.string().min(1).max(256),
+});
+
+export type SheetDraftRerollRequest = z.infer<
+  typeof SheetDraftRerollRequestSchema
 >;

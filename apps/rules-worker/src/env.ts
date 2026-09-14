@@ -6,6 +6,7 @@ export interface Env {
   RATE_LIMITER?: RateLimit;
   RATE_LIMIT_MODE?: string;
   RULEBOOK_BUCKET?: R2Bucket;
+  SHEET_ARTIFACTS?: R2Bucket;
   RULEBOOK_INGESTION_WORKFLOW?: Workflow<RulebookWorkflowParams>;
   RULES_ANALYSIS_WORKFLOW?: Workflow<RulesAnalysisWorkflowParams>;
   TURNSTILE_SECRET?: string;

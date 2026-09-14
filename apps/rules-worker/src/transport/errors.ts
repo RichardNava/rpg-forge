@@ -31,6 +31,18 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   ANALYSIS_SESSION_NOT_FOUND_OR_UNAUTHORIZED: 404,
   ANALYSIS_SESSION_EXPIRED: 410,
   ANALYSIS_SESSION_DELETE_FAILED: 500,
+  SHEET_SESSION_NOT_FOUND_OR_UNAUTHORIZED: 404,
+  SHEET_SESSION_EXPIRED: 410,
+  SHEET_DRAFT_INVALID: 400,
+  SHEET_DRAFT_STORAGE_UNAVAILABLE: 503,
+  SHEET_DRAFT_CORRUPT: 500,
+  SHEET_DRAFT_NOT_FOUND: 404,
+  SHEET_DRAFT_ALREADY_EXISTS: 409,
+  SHEET_DRAFT_VERSION_CONFLICT: 409,
+  SHEET_DRAFT_INFLIGHT: 409,
+  SHEET_DRAFT_MUTATION_INVALID: 422,
+  SHEET_DRAFT_FIELD_READ_LOCKED: 422,
+  SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS: 422,
   INTERNAL_ERROR: 500,
 };
 
@@ -80,6 +92,27 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "The analysis session was not found or the supplied credentials are invalid.",
   ANALYSIS_SESSION_EXPIRED: "This analysis session has expired.",
   ANALYSIS_SESSION_DELETE_FAILED: "The analysis session could not be deleted.",
+  SHEET_SESSION_NOT_FOUND_OR_UNAUTHORIZED:
+    "The sheet session was not found or the supplied credentials are invalid.",
+  SHEET_SESSION_EXPIRED: "This sheet session has expired.",
+  SHEET_DRAFT_INVALID:
+    "The draft is invalid. Check that the initial snapshot is well-formed.",
+  SHEET_DRAFT_STORAGE_UNAVAILABLE:
+    "Character sheet draft storage is unavailable. Please try again later.",
+  SHEET_DRAFT_CORRUPT: "The stored draft failed schema validation.",
+  SHEET_DRAFT_NOT_FOUND:
+    "No draft was found for the given session and draft id.",
+  SHEET_DRAFT_ALREADY_EXISTS:
+    "A draft with this id already exists for this session.",
+  SHEET_DRAFT_VERSION_CONFLICT:
+    "The draft version has changed; retry against the current version.",
+  SHEET_DRAFT_INFLIGHT:
+    "The draft is mid-save; retry after the current save completes.",
+  SHEET_DRAFT_MUTATION_INVALID: "The draft mutation is invalid.",
+  SHEET_DRAFT_FIELD_READ_LOCKED:
+    "The field is read-locked; unlock it before editing.",
+  SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS:
+    "The mutation references a field outside the draft surface.",
   INTERNAL_ERROR: "An internal error occurred.",
 };
 

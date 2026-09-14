@@ -15,6 +15,11 @@ import type {
   RulebookRepositoryPort,
   TemporaryRulebookStoragePort,
 } from "@repo/rulebook-ingestion";
+import type {
+  SheetSessionRepositoryPort,
+  DraftHeadRepositoryPort,
+} from "@repo/character-sheet-session";
+import type { CharacterSheetDraftStore } from "@repo/character-sheet-draft";
 import {
   parseBearerToken,
   hasJsonContentType,
@@ -30,6 +35,7 @@ import {
   handleRulesContextConfirmation,
   handleRulesContextRequest,
 } from "./rules-context-handler.js";
+import { handleCharacterSheetRequest } from "./character-sheet-handler.js";
 import type {
   RulesAnalysisRunRepositoryPort,
   RuleVectorIndexPort,
@@ -51,6 +57,9 @@ export interface AppDeps {
   rulesAnalysisArtifactStore?: RunArtifactPort;
   rulesAnalysisVectorIndex?: RuleVectorIndexPort;
   rulesAnalysisWorkflow?: RulesAnalysisWorkflowPort;
+  sheetSessionRepository: SheetSessionRepositoryPort;
+  sheetDraftHeadRepository: DraftHeadRepositoryPort;
+  sheetDraftStore?: CharacterSheetDraftStore;
 }
 
 const SESSIONS_PATH = "/v1/rules-analysis/sessions";
@@ -103,6 +112,10 @@ export async function handleRequest(
     if (method === "DELETE") {
       return handleDeleteSession(analysisId, request, deps);
     }
+  }
+
+  if (path.startsWith("/v1/character-sheets")) {
+    return handleCharacterSheetRequest(request, deps);
   }
 
   return errorResponse("INVALID_REQUEST", "Route not found.", 404);

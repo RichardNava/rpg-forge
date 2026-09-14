@@ -6,6 +6,8 @@ import { createCloudflareAiRuleAnalysis } from "./infrastructure/ai-analysis.js"
 import { createD1SessionRepository } from "./infrastructure/db/repository.js";
 import { createD1RulebookRepository } from "./infrastructure/db/rulebook-repository.js";
 import { createD1RulesAnalysisRunRepository } from "./infrastructure/db/run-repository.js";
+import { createD1SheetSessionRepository } from "./infrastructure/db/sheet-session-repository.js";
+import { createD1DraftHeadRepository } from "./infrastructure/db/draft-head-repository.js";
 import { createPdfJsPageExtractor } from "./infrastructure/pdfjs-extractor.js";
 import { createRateLimitPort } from "./infrastructure/rate-limit.js";
 import {
@@ -15,6 +17,7 @@ import {
 import { createR2ChunkSource } from "./infrastructure/r2-chunk-source.js";
 import { createR2RulebookFileHash } from "./infrastructure/r2-rulebook-file-hash.js";
 import { createR2RuleArtifacts } from "./infrastructure/r2-rule-artifacts.js";
+import { createR2CharacterSheetDraftStore } from "./infrastructure/r2-character-sheet-drafts.js";
 import { createRulebookResourceCleaner } from "./infrastructure/rulebook-cleaner.js";
 import { createCloudflareRulebookWorkflowPort } from "./infrastructure/rulebook-workflow.js";
 import { createCloudflareRulesAnalysisWorkflowPort } from "./infrastructure/rules-analysis-workflow.js";
@@ -57,6 +60,15 @@ export function createAppDeps(env: Env): AppDeps {
       ? undefined
       : createCloudflareRulesAnalysisWorkflowPort(env.RULES_ANALYSIS_WORKFLOW);
 
+  const sheetSessionRepository = createD1SheetSessionRepository(env.DB, {
+    clock,
+  });
+  const sheetDraftHeadRepository = createD1DraftHeadRepository(env.DB);
+  const sheetDraftStore =
+    env.SHEET_ARTIFACTS === undefined
+      ? undefined
+      : createR2CharacterSheetDraftStore(env.SHEET_ARTIFACTS);
+
   return {
     crypto: webCrypto,
     clock,
@@ -86,6 +98,9 @@ export function createAppDeps(env: Env): AppDeps {
       ? {}
       : { rulesAnalysisVectorIndex }),
     ...(rulesAnalysisWorkflow === undefined ? {} : { rulesAnalysisWorkflow }),
+    sheetSessionRepository,
+    sheetDraftHeadRepository,
+    ...(sheetDraftStore === undefined ? {} : { sheetDraftStore }),
   };
 }
 

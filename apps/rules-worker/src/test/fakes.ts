@@ -38,6 +38,24 @@ import type {
   RuleOverride,
   RulesContext,
 } from "@repo/rules-context";
+import type {
+  SheetSessionRepositoryPort,
+  DraftHeadRepositoryPort,
+  SheetSession,
+  DraftHead,
+  DraftHeadIdentity,
+  DraftHeadStableView,
+  DraftHeadClaimResult,
+  DraftHeadCommitResult,
+  DraftHeadReleaseResult,
+  CreateDraftHeadResult,
+} from "@repo/character-sheet-session";
+import { toDraftHeadStableView } from "@repo/character-sheet-session";
+import type {
+  CharacterSheetDraft,
+  CharacterSheetDraftStore,
+  CharacterSheetDraftIdentity,
+} from "@repo/character-sheet-draft";
 import type { RulesAnalysisWorkflowPort } from "../infrastructure/rules-analysis-workflow.js";
 
 export class FakeClock implements Clock {
@@ -785,4 +803,291 @@ function runArtifactKey(input: {
   runId: string;
 }): string {
   return `${input.analysisId}/${input.ingestionId}/${input.runId}`;
+}
+
+function cloneSheetSession(session: SheetSession): SheetSession {
+  return {
+    ...session,
+    createdAt: new Date(session.createdAt.getTime()),
+    updatedAt: new Date(session.updatedAt.getTime()),
+    expiresAt: new Date(session.expiresAt.getTime()),
+  };
+}
+
+export class FakeSheetSessionRepository implements SheetSessionRepositoryPort {
+  readonly rows = new Map<string, SheetSession>();
+  readonly deleteLog: string[] = [];
+  readonly createLog: string[] = [];
+
+  async create(session: SheetSession): Promise<void> {
+    this.createLog.push(session.sessionId);
+    this.rows.set(session.sessionId, cloneSheetSession(session));
+  }
+
+  async findById(sessionId: string): Promise<SheetSession | null> {
+    const row = this.rows.get(sessionId);
+    return row === undefined ? null : cloneSheetSession(row);
+  }
+
+  async markDeletingIfActive(sessionId: string): Promise<RepositoryTransition> {
+    const row = this.rows.get(sessionId);
+    if (row === undefined) {
+      return "not_found";
+    }
+    if (row.status === "DELETING") {
+      return "already_deleting";
+    }
+    this.rows.set(sessionId, { ...row, status: "DELETING" });
+    return "transitioned";
+  }
+
+  async findCleanupCandidates(
+    now: Date,
+    limit: number,
+  ): Promise<SheetSession[]> {
+    const candidates: SheetSession[] = [];
+    for (const row of this.rows.values()) {
+      const expired = row.expiresAt.getTime() <= now.getTime();
+      if (row.status === "ACTIVE" && expired) {
+        candidates.push(cloneSheetSession(row));
+      }
+      if (candidates.length >= limit) break;
+    }
+    return candidates;
+  }
+
+  async delete(sessionId: string): Promise<void> {
+    this.deleteLog.push(sessionId);
+    this.rows.delete(sessionId);
+  }
+}
+
+function cloneDraftHead(head: DraftHead): DraftHead {
+  return {
+    ...head,
+    ...(head.pendingSince === null
+      ? {}
+      : { pendingSince: new Date(head.pendingSince.getTime()) }),
+    createdAt: new Date(head.createdAt.getTime()),
+    updatedAt: new Date(head.updatedAt.getTime()),
+  };
+}
+
+export class FakeDraftHeadRepository implements DraftHeadRepositoryPort {
+  readonly rows = new Map<string, DraftHead>();
+
+  private key(identity: DraftHeadIdentity): string {
+    return `${identity.sessionId}:${identity.draftId}`;
+  }
+
+  async create(identity: DraftHeadIdentity): Promise<CreateDraftHeadResult> {
+    const existing = this.rows.get(this.key(identity));
+    if (existing !== undefined) {
+      return { kind: "already_exists", head: cloneDraftHead(existing) };
+    }
+    const now = new Date();
+    const head: DraftHead = {
+      sessionId: identity.sessionId,
+      draftId: identity.draftId,
+      currentVersion: 1,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.rows.set(this.key(identity), head);
+    return { kind: "created", head: cloneDraftHead(head) };
+  }
+
+  async getHead(identity: DraftHeadIdentity): Promise<DraftHead | null> {
+    const head = this.rows.get(this.key(identity));
+    return head === undefined ? null : cloneDraftHead(head);
+  }
+
+  async getStable(
+    identity: DraftHeadIdentity,
+  ): Promise<DraftHeadStableView | null> {
+    const head = this.rows.get(this.key(identity));
+    return head === undefined ? null : toDraftHeadStableView(head);
+  }
+
+  async claim(
+    identity: DraftHeadIdentity,
+    expectedVersion: number,
+    claimId: string,
+    claimsAt: Date,
+  ): Promise<DraftHeadClaimResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) return { kind: "not_found" };
+    if (head.pendingVersion !== null) {
+      return { kind: "already_pending", head: cloneDraftHead(head) };
+    }
+    if (head.currentVersion !== expectedVersion) {
+      return { kind: "version_conflict", head: cloneDraftHead(head) };
+    }
+    const claimed: DraftHead = {
+      ...head,
+      pendingVersion: expectedVersion + 1,
+      pendingClaimId: claimId,
+      pendingSince: claimsAt,
+      updatedAt: claimsAt,
+    };
+    this.rows.set(this.key(identity), claimed);
+    return {
+      kind: "claimed",
+      head: cloneDraftHead(claimed),
+      claimedVersion: expectedVersion + 1,
+    };
+  }
+
+  async commit(
+    identity: DraftHeadIdentity,
+    claimId: string,
+    expectedCurrentVersion: number,
+    committedAt: Date,
+  ): Promise<DraftHeadCommitResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) return { kind: "not_found" };
+    const nextVersion = expectedCurrentVersion + 1;
+    const ownsClaim =
+      head.pendingClaimId === claimId &&
+      head.pendingVersion === nextVersion &&
+      head.currentVersion === expectedCurrentVersion;
+    if (!ownsClaim) {
+      if (
+        head.pendingClaimId !== claimId ||
+        head.pendingVersion !== nextVersion
+      ) {
+        return { kind: "wrong_claim", head: cloneDraftHead(head) };
+      }
+      return { kind: "version_conflict", head: cloneDraftHead(head) };
+    }
+    const committed: DraftHead = {
+      ...head,
+      currentVersion: nextVersion,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      updatedAt: committedAt,
+    };
+    this.rows.set(this.key(identity), committed);
+    return { kind: "committed", head: cloneDraftHead(committed) };
+  }
+
+  async release(
+    identity: DraftHeadIdentity,
+    claimId: string,
+    versionToRelease: number,
+    releasedAt: Date,
+  ): Promise<DraftHeadReleaseResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) return { kind: "not_found" };
+    if (
+      head.pendingClaimId !== claimId ||
+      head.pendingVersion !== versionToRelease
+    ) {
+      return { kind: "wrong_claim", head: cloneDraftHead(head) };
+    }
+    const released: DraftHead = {
+      ...head,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      updatedAt: releasedAt,
+    };
+    this.rows.set(this.key(identity), released);
+    return { kind: "released", head: cloneDraftHead(released) };
+  }
+
+  async findStalePending(
+    now: Date,
+    staleAfterMs: number,
+    limit: number,
+  ): Promise<DraftHead[]> {
+    const cutoff = now.getTime() - staleAfterMs;
+    const candidates: DraftHead[] = [];
+    for (const head of this.rows.values()) {
+      if (head.pendingSince !== null && head.pendingSince.getTime() <= cutoff) {
+        candidates.push(cloneDraftHead(head));
+      }
+      if (candidates.length >= limit) break;
+    }
+    return candidates;
+  }
+
+  async deleteSessionHeads(sessionId: string): Promise<void> {
+    for (const [key, head] of this.rows) {
+      if (head.sessionId === sessionId) this.rows.delete(key);
+    }
+  }
+}
+
+function cloneDraft(draft: CharacterSheetDraft): CharacterSheetDraft {
+  return structuredClone(draft);
+}
+
+export class FakeCharacterSheetDraftStore implements CharacterSheetDraftStore {
+  readonly snapshots = new Map<string, CharacterSheetDraft>();
+  failOnPutDraft = false;
+
+  private versionKey(
+    identity: CharacterSheetDraftIdentity,
+    version: number,
+  ): string {
+    return `${identity.sessionId}:${identity.draftId}:v${version}`;
+  }
+
+  private allVersionsKey(identity: CharacterSheetDraftIdentity): string {
+    return `${identity.sessionId}:${identity.draftId}`;
+  }
+
+  async putDraft(draft: CharacterSheetDraft): Promise<void> {
+    if (this.failOnPutDraft) {
+      throw new Error("draft snapshot write failed");
+    }
+    const identity = { sessionId: draft.sessionId, draftId: draft.draftId };
+    this.snapshots.set(
+      this.versionKey(identity, draft.version),
+      cloneDraft(draft),
+    );
+  }
+
+  async getDraftVersion(
+    identity: CharacterSheetDraftIdentity,
+    version: number,
+  ): Promise<CharacterSheetDraft | null> {
+    const draft = this.snapshots.get(this.versionKey(identity, version));
+    return draft === undefined ? null : cloneDraft(draft);
+  }
+
+  async getLatestDraft(
+    identity: CharacterSheetDraftIdentity,
+  ): Promise<CharacterSheetDraft | null> {
+    const versions = await this.listDraftVersions(identity);
+    if (versions.length === 0) return null;
+    const latest = versions[versions.length - 1];
+    return this.getDraftVersion(identity, latest!);
+  }
+
+  async listDraftVersions(
+    identity: CharacterSheetDraftIdentity,
+  ): Promise<number[]> {
+    const versions: number[] = [];
+    const prefix = `${identity.sessionId}:${identity.draftId}:v`;
+    for (const key of this.snapshots.keys()) {
+      if (!key.startsWith(prefix)) continue;
+      const versionStr = key.slice(prefix.length);
+      const version = Number.parseInt(versionStr, 10);
+      if (Number.isFinite(version)) versions.push(version);
+    }
+    return versions.sort((a, b) => a - b);
+  }
+
+  async deleteDraft(identity: CharacterSheetDraftIdentity): Promise<void> {
+    const prefix = this.allVersionsKey(identity) + ":";
+    for (const key of [...this.snapshots.keys()]) {
+      if (key.startsWith(prefix)) this.snapshots.delete(key);
+    }
+  }
 }
