@@ -29,6 +29,13 @@
       "when": 1789288050379,
       "tag": "0003_illegal_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789374418337,
+      "tag": "0004_useful_luckman",
+      "breakpoints": true
     }
   ]
 }

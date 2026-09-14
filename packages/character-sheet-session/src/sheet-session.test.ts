@@ -233,6 +233,8 @@ describe("run repository contract (reference implementation)", () => {
       analysisId: null,
       rulesAnalysisRunId: null,
       ingestionId: null,
+      draftId: null,
+      draftVersion: null,
       mode: "pc",
       status: "PENDING",
       failureCode: null,

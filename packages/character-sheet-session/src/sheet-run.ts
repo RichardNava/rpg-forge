@@ -28,7 +28,10 @@ export type SheetRunFailureCode = (typeof SHEET_RUN_FAILURE_CODES)[number];
 /**
  * Operational record for a final character-sheet generation run. GUI-only runs
  * accept all three rulebook identities as null; rulebook-backed runs reference
- * the analysis, its run and the ingestion that produced the RulesContext. D1
+ * the analysis, its run and the ingestion that produced the RulesContext.
+ * Draft-backed finalization additionally carries the exact
+ * `(draftId, draftVersion)` the run was generated from as operational
+ * provenance: it never stores draft content, only the narrow reference. D1
  * stores neither spec JSON nor PDF bytes: that content is temporary R2
  * territory (14.7B) keyed by sessionId and runId.
  */
@@ -38,6 +41,8 @@ export interface SheetGenerationRun {
   analysisId: string | null;
   rulesAnalysisRunId: string | null;
   ingestionId: string | null;
+  draftId: string | null;
+  draftVersion: number | null;
   mode: SheetRunMode;
   status: SheetRunStatus;
   failureCode: SheetRunFailureCode | null;

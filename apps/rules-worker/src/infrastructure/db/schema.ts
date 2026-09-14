@@ -15,6 +15,7 @@ import {
 import {
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -148,6 +149,8 @@ export const sheetGenerationRun = sqliteTable(
     analysisId: text("analysis_id"),
     rulesAnalysisRunId: text("rules_analysis_run_id"),
     ingestionId: text("ingestion_id"),
+    draftId: text("draft_id"),
+    draftVersion: integer("draft_version"),
     mode: text("mode", { enum: SHEET_RUN_MODES }).notNull(),
     status: text("status", { enum: SHEET_RUN_STATUSES }).notNull(),
     failureCode: text("failure_code", { enum: SHEET_RUN_FAILURE_CODES }),
@@ -172,3 +175,34 @@ export const sheetGenerationRun = sqliteTable(
 );
 
 export type SheetGenerationRunRow = typeof sheetGenerationRun.$inferSelect;
+
+/**
+ * D1 operational coordination row for draft-version mutation. Stores zero draft
+ * content: only the committed version and, while a mutation is in flight, the
+ * claimed next version + its claim id. The PK is the `(sessionId, draftId)`
+ * pair; `pending_since` is the bounded staleness anchor for stale-claim
+ * recovery.
+ */
+export const sheetDraftHead = sqliteTable(
+  "sheet_draft_heads",
+  {
+    sessionId: text("session_id").notNull(),
+    draftId: text("draft_id").notNull(),
+    currentVersion: integer("current_version").notNull(),
+    pendingVersion: integer("pending_version"),
+    pendingClaimId: text("pending_claim_id"),
+    pendingSince: integer("pending_since", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.draftId] }),
+    index("sheet_draft_heads_session_idx").on(table.sessionId),
+    index("sheet_draft_heads_pending_idx").on(
+      table.pendingVersion,
+      table.pendingSince,
+    ),
+  ],
+);
+
+export type SheetDraftHeadRow = typeof sheetDraftHead.$inferSelect;

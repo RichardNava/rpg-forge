@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createD1SheetRunRepository } from "./sheet-run-repository.js";
 
 const MIGRATION_DDL =
-  'CREATE TABLE `sheet_generation_runs` (`run_id` text PRIMARY KEY NOT NULL, `session_id` text NOT NULL, `analysis_id` text, `rules_analysis_run_id` text, `ingestion_id` text, `mode` text NOT NULL, `status` text NOT NULL, `failure_code` text, `is_current` integer NOT NULL, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `expires_at` integer NOT NULL); CREATE INDEX `sheet_generation_runs_current_idx` ON `sheet_generation_runs` (`session_id`,`is_current`); CREATE INDEX `sheet_generation_runs_cleanup_idx` ON `sheet_generation_runs` (`status`,`expires_at`); CREATE UNIQUE INDEX `sheet_generation_runs_single_current_idx` ON `sheet_generation_runs` (`session_id`) WHERE "sheet_generation_runs"."is_current" = 1; CREATE TABLE `sheet_sessions` (`session_id` text PRIMARY KEY NOT NULL, `token_hash` text NOT NULL, `status` text NOT NULL, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `expires_at` integer NOT NULL); CREATE INDEX `sheet_sessions_cleanup_idx` ON `sheet_sessions` (`status`,`expires_at`);';
+  'CREATE TABLE `sheet_generation_runs` (`run_id` text PRIMARY KEY NOT NULL, `session_id` text NOT NULL, `analysis_id` text, `rules_analysis_run_id` text, `ingestion_id` text, `draft_id` text, `draft_version` integer, `mode` text NOT NULL, `status` text NOT NULL, `failure_code` text, `is_current` integer NOT NULL, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `expires_at` integer NOT NULL); CREATE INDEX `sheet_generation_runs_current_idx` ON `sheet_generation_runs` (`session_id`,`is_current`); CREATE INDEX `sheet_generation_runs_cleanup_idx` ON `sheet_generation_runs` (`status`,`expires_at`); CREATE UNIQUE INDEX `sheet_generation_runs_single_current_idx` ON `sheet_generation_runs` (`session_id`) WHERE "sheet_generation_runs"."is_current" = 1; CREATE TABLE `sheet_sessions` (`session_id` text PRIMARY KEY NOT NULL, `token_hash` text NOT NULL, `status` text NOT NULL, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `expires_at` integer NOT NULL); CREATE INDEX `sheet_sessions_cleanup_idx` ON `sheet_sessions` (`status`,`expires_at`);';
 
 function fixedClock(iso: string) {
   return { now: () => new Date(iso) };
@@ -22,6 +22,8 @@ function makeRun(
     analysisId: null,
     rulesAnalysisRunId: null,
     ingestionId: null,
+    draftId: null,
+    draftVersion: null,
     mode: "pc",
     status: "PENDING",
     failureCode: null,
@@ -53,11 +55,29 @@ describe("D1 sheet-run repository", () => {
     expect(found!.analysisId).toBeNull();
     expect(found!.rulesAnalysisRunId).toBeNull();
     expect(found!.ingestionId).toBeNull();
+    expect(found!.draftId).toBeNull();
+    expect(found!.draftVersion).toBeNull();
     expect(found!.expiresAt.getTime()).toBe(SESSION_EXPIRY.getTime());
     const current = await repository.getCurrentForSession(SESSION_ID);
     expect(current!.runId).toBe(run.runId);
     expect(current!.status).toBe("PENDING");
     expect(current!.isCurrent).toBe(true);
+  });
+
+  it("round-trips draft-backed provenance (draftId + draftVersion)", async () => {
+    const repository = createD1SheetRunRepository(db, {
+      clock: fixedClock("2026-09-13T09:00:00.000Z"),
+    });
+    const draftRun = makeRun({
+      draftId: "draft-0001",
+      draftVersion: 3,
+    });
+    const created = await repository.createCurrent(draftRun);
+    expect(created.kind).toBe("created_current");
+    const found = await repository.getById(draftRun.runId);
+    expect(found!.draftId).toBe("draft-0001");
+    expect(found!.draftVersion).toBe(3);
+    expect(found!.isCurrent).toBe(true);
   });
 
   it("returns null for an unknown run id", async () => {

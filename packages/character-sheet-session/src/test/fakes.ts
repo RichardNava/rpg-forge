@@ -13,6 +13,17 @@ import type {
   SheetRunCreationResult,
   SheetRunFailureCode,
 } from "../sheet-run.js";
+import type {
+  CreateDraftHeadResult,
+  DraftHead,
+  DraftHeadClaimResult,
+  DraftHeadCommitResult,
+  DraftHeadIdentity,
+  DraftHeadReleaseResult,
+  DraftHeadStableView,
+} from "../draft-head.js";
+import { toDraftHeadStableView } from "../draft-head.js";
+import type { DraftHeadRepositoryPort } from "../draft-head-repository.js";
 
 export class FakeClock implements Clock {
   private current: Date;
@@ -257,5 +268,181 @@ export class InMemorySheetRunRepository implements SheetRunRepositoryPort {
       }
     }
     return candidates;
+  }
+}
+
+function cloneHead(head: DraftHead): DraftHead {
+  return {
+    ...head,
+    ...(head.pendingSince === null
+      ? {}
+      : { pendingSince: new Date(head.pendingSince.getTime()) }),
+    createdAt: new Date(head.createdAt.getTime()),
+    updatedAt: new Date(head.updatedAt.getTime()),
+  };
+}
+
+/**
+ * In-memory reference implementation of the draft-head port. It mirrors the
+ * guarded-write semantics of the real D1 adapter so the node unit suites pin
+ * the same contract the workerd adapter proves against real SQL.
+ */
+export class InMemoryDraftHeadRepository implements DraftHeadRepositoryPort {
+  readonly rows = new Map<string, DraftHead>();
+
+  private key(identity: DraftHeadIdentity): string {
+    return `${identity.sessionId}:${identity.draftId}`;
+  }
+
+  async create(identity: DraftHeadIdentity): Promise<CreateDraftHeadResult> {
+    const existing = this.rows.get(this.key(identity));
+    if (existing !== undefined) {
+      return { kind: "already_exists", head: cloneHead(existing) };
+    }
+    const now = new Date();
+    const head: DraftHead = {
+      sessionId: identity.sessionId,
+      draftId: identity.draftId,
+      currentVersion: 1,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.rows.set(this.key(identity), head);
+    return { kind: "created", head: cloneHead(head) };
+  }
+
+  async getHead(identity: DraftHeadIdentity): Promise<DraftHead | null> {
+    const head = this.rows.get(this.key(identity));
+    return head === undefined ? null : cloneHead(head);
+  }
+
+  async getStable(
+    identity: DraftHeadIdentity,
+  ): Promise<DraftHeadStableView | null> {
+    const head = this.rows.get(this.key(identity));
+    return head === undefined ? null : toDraftHeadStableView(head);
+  }
+
+  async claim(
+    identity: DraftHeadIdentity,
+    expectedVersion: number,
+    claimId: string,
+    claimsAt: Date,
+  ): Promise<DraftHeadClaimResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) {
+      return { kind: "not_found" };
+    }
+    if (head.pendingVersion !== null) {
+      return { kind: "already_pending", head: cloneHead(head) };
+    }
+    if (head.currentVersion !== expectedVersion) {
+      return { kind: "version_conflict", head: cloneHead(head) };
+    }
+    const claimed = {
+      ...head,
+      pendingVersion: expectedVersion + 1,
+      pendingClaimId: claimId,
+      pendingSince: claimsAt,
+      updatedAt: claimsAt,
+    };
+    this.rows.set(this.key(identity), claimed);
+    return {
+      kind: "claimed",
+      head: cloneHead(claimed),
+      claimedVersion: expectedVersion + 1,
+    };
+  }
+
+  async commit(
+    identity: DraftHeadIdentity,
+    claimId: string,
+    expectedCurrentVersion: number,
+    committedAt: Date,
+  ): Promise<DraftHeadCommitResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) {
+      return { kind: "not_found" };
+    }
+    const nextVersion = expectedCurrentVersion + 1;
+    const ownsClaim =
+      head.pendingClaimId === claimId &&
+      head.pendingVersion === nextVersion &&
+      head.currentVersion === expectedCurrentVersion;
+    if (!ownsClaim) {
+      if (
+        head.pendingClaimId !== claimId ||
+        head.pendingVersion !== nextVersion
+      ) {
+        return { kind: "wrong_claim", head: cloneHead(head) };
+      }
+      return { kind: "version_conflict", head: cloneHead(head) };
+    }
+    const committed = {
+      ...head,
+      currentVersion: nextVersion,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      updatedAt: committedAt,
+    };
+    this.rows.set(this.key(identity), committed);
+    return { kind: "committed", head: cloneHead(committed) };
+  }
+
+  async release(
+    identity: DraftHeadIdentity,
+    claimId: string,
+    versionToRelease: number,
+    releasedAt: Date,
+  ): Promise<DraftHeadReleaseResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) {
+      return { kind: "not_found" };
+    }
+    if (
+      head.pendingClaimId !== claimId ||
+      head.pendingVersion !== versionToRelease
+    ) {
+      return { kind: "wrong_claim", head: cloneHead(head) };
+    }
+    const released = {
+      ...head,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      updatedAt: releasedAt,
+    };
+    this.rows.set(this.key(identity), released);
+    return { kind: "released", head: cloneHead(released) };
+  }
+
+  async findStalePending(
+    now: Date,
+    staleAfterMs: number,
+    limit: number,
+  ): Promise<DraftHead[]> {
+    const cutoff = now.getTime() - staleAfterMs;
+    const candidates: DraftHead[] = [];
+    for (const head of this.rows.values()) {
+      if (head.pendingSince !== null && head.pendingSince.getTime() <= cutoff) {
+        candidates.push(cloneHead(head));
+      }
+      if (candidates.length >= limit) {
+        break;
+      }
+    }
+    return candidates;
+  }
+
+  async deleteSessionHeads(sessionId: string): Promise<void> {
+    for (const [key, head] of this.rows) {
+      if (head.sessionId === sessionId) {
+        this.rows.delete(key);
+      }
+    }
   }
 }
