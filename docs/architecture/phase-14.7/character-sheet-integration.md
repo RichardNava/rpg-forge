@@ -1,10 +1,11 @@
 # Phase 14.7 Character-Sheet Integration — Generation Boundaries and Sheet Sessions
 
 **Status:** Implemented (14.7A + 14.7B + 14.7C template-backed generation, 14.7E
-editable authoring surface). The phase-14.7 slices are spike/terminal evaluation
-landmarks proven by committed automated suites; they are not yet product-facing
-UI features.
-**Date:** 2026-09-14
+editable authoring surface, 14.7G Character Workshop UI). The phase-14.7
+slices are proven by committed automated suites; 14.7G adds the first
+product-facing authoring UI driven by an in-memory local backend, with the
+server-wired (Turnstile + rules-worker) path remaining a configuration switch.
+**Date:** 2026-09-15
 
 ## Purpose
 
@@ -17,13 +18,15 @@ template-backed path: a blank sheet template can be extracted from a source
 sheet and used as the authority for which fields a generated sheet contains.
 14.7E adds the **editable authoring surface**: generated output stays editable
 before export through versioned, temporary draft snapshots (domain in
-`@repo/character-sheet-draft`, R2 adapter in rules-worker). The web
-rehydration store interfaces that will drive these drafts from the UI remain
-deferred to a dedicated later slice.
+`@repo/character-sheet-draft`, R2 adapter in rules-worker). 14.7G adds the
+**Character Workshop UI**: the web rehydration store interfaces that drive
+drafts from the UI, a React store binding, schema-driven field editors, a live
+preview, and the confirm-to-read-only flow — backed in development by an
+in-memory local backend that runs the real draft-domain rules.
 
 This document describes the **actual committed architecture** after 14.7A,
-14.7B, 14.7C and 14.7E. Planned slices are labeled explicitly as deferred and
-are never described as implemented.
+14.7B, 14.7C, 14.7E and 14.7G. Planned slices are labeled explicitly as
+deferred and are never described as implemented.
 
 Slice summary:
 
@@ -53,17 +56,29 @@ Slice summary:
   deterministic reroll of read-locked fields, versioned immutable snapshots,
   R2 keys under the sheet-session tenant, the `CharacterSheetDraftStore` port)
   plus the `createR2CharacterSheetDraftStore` adapter in rules-worker. Web
-  rehydration store interfaces and the glance-edit UI are deferred to a
-  dedicated later slice.
+  rehydration store interfaces and the glance-edit UI are delivered in 14.7G.
+- **14.7G** — Character Workshop UI: the web rehydration surface
+  (`SheetApiClientPort` transient session client, `SheetStore` lifecycle with
+  domain-level mutation outcomes, `useSheetStore` React binding), a
+  forge/cartography-themed workshop UI (creation-mode landing, toolbar,
+  sidebar field roster, schema-driven field editors, live preview via
+  `projectDraftToSpec`, confirm → read-only exported state), and the
+  rules-worker proxy confirm whitelist. In development the store is driven by
+  an in-memory local backend (`createLocalSheetBackend`) that implements the
+  real draft-domain rules; `NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote` opts
+  into the `SheetApiClient` path (Turnstile verification remains to be wired,
+  so remote is not the default).
 
-By design, Phase 14.7 adds **no** HTTP routes, **no** production AI providers,
-**no** Workflow, and **no** UI. 14.7E adds no D1 tables and no new R2 bindings:
-drafts share the existing `SHEET_ARTIFACTS` bucket and sit under the same
-session tenant so the 14.7B session sweep already covers them.
+By design, Phases 14.7A–14.7E add **no** HTTP routes, **no** production AI
+providers, **no** Workflow, and **no** UI (14.7E adds no D1 tables and no new
+R2 bindings: drafts share the existing `SHEET_ARTIFACTS` bucket and sit under
+the same session tenant so the 14.7B session sweep already covers them). 14.7G
+delivers the first web UI slice and a `/character-sheets` route, still with no
+D1 tables, no new R2 bindings, and no production AI providers.
 
 ## Boundaries
 
-Implemented through 14.7E:
+Implemented through 14.7G:
 
 - domain contracts
 - GUI-only final construction
@@ -74,16 +89,22 @@ Implemented through 14.7E:
 - temporary R2 artifact storage (spec + PDF per run, total prefix cleanup)
 - editable authoring surface (draft domain + R2 draft store adapter; versioned
   snapshots under the sheet-session tenant)
+- Character Workshop UI (web rehydration store + React binding + schema-driven
+  editors, preview, confirm flow) driven by an in-memory local backend
 
 Deferred:
 
-- web rehydration store interfaces and glance-edit UI — dedicated later slice
+- server-wired Workshop path — Turnstile verification widget and the production
+  `SheetApiClient` route (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote` is
+  implemented client-side but verifies against rules-worker only after the
+  Turnstile secret is configured); the local backend is the default
 - production multimodal template extractor adapter (blocked: no vision model
   is committed) — the only remaining 14.7C item
 - production `RulebookFieldDerivationPort` adapter — superseded for the
   template-backed flow; kept as a legacy port
 - HTTP orchestration — 14.7D
-- web UI / preview / E2E — later 14.7 slices
+- PDF export/download and PC/NPC mode selection in the workshop UI — future
+  14.7 slices
 
 ## Authoritative production pipeline
 
@@ -127,9 +148,10 @@ future web rehydration     (store interfaces + glance-edit UI, deferred)
 
 Implemented today: domain contracts, GUI-only and rulebook-capable final
 construction, the deterministic PDF renderer, sheet session/run persistence,
-temporary R2 artifact storage, and the editable draft domain + R2 draft store
-adapter. The web authoring UI, HTTP orchestration, glance-edit UI and
-rehydration store interfaces are deferred.
+temporary R2 artifact storage, the editable draft domain + R2 draft store
+adapter, and the Character Workshop UI (web rehydration store + React binding +
+schema-driven editors) driven by an in-memory local backend. The server-wired
+Turnstile path, HTTP orchestration, and PDF export/download remain deferred.
 
 ## GUI-only is first-class
 
@@ -535,10 +557,13 @@ Verified suites (all green in the current Phase 14.7E working tree):
 
 ## Deferred work
 
-- **Web rehydration slice** — the glance-edit UI and rehydration store
-  interfaces that drive drafts from the web app, plus any intermediate widgets.
-  The 14.7E domain (`@repo/character-sheet-draft`) and the R2 draft adapter are
-  their foundation.
+- **Server-wired Workshop path** — Turnstile verification widget and the
+  production `SheetApiClient` route to rules-worker. The client-side switch
+  exists (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote`), but rules-worker fails
+  closed (`403 HUMAN_VERIFICATION_REQUIRED`) without a configured Turnstile
+  secret, so development defaults to the in-memory local backend
+  (`createLocalSheetBackend`) which runs the same draft-domain rules. Also
+  deferred: PDF export/download and PC/NPC mode selection in the workshop UI.
 - **14.7C remainder** — production multimodal template extractor. The port
   and reference extractor are implemented, but no production adapter can be
   written until a vision model is committed: only text and embedding models
@@ -551,7 +576,6 @@ Verified suites (all green in the current Phase 14.7E working tree):
 - **14.7D** — HTTP orchestration: session creation/authorization, run
   management, ownership validation, artifact preview/download. Not present
   today.
-- **Later 14.7 slices** — web UI, preview, E2E.
 
 ## 14.7B delivered slice
 
@@ -654,6 +678,73 @@ Authoring-semantics highlights:
   suite), and `deleteDraft` cleans up a single abandoned draft.
 - **No D1, no new bindings.** Drafts add zero D1 tables and zero migrations,
   and reuse the local-only `SHEET_ARTIFACTS` binding.
+
+## 14.7G delivered slice
+
+Delivered in 14.7G:
+
+```text
+web store contract                       (@repo/character-sheet-schema client port)
+  → createSheetStore                      (web transient session store; real domain fns)
+  → useSheetStore                         (React binding; smallest "use client" boundary)
+  → createLocalSheetBackend               (in-memory SheetApiClientPort: default dev backend)
+  → SheetApiClient                        (HTTP client; NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote)
+  → rules-worker confirm whitelist        (evidence-free restricted config for the confirm route)
+  → Character Workshop UI                 (/character-sheets route)
+      ├─ creation-mode landing           (blank draft / loaded example, dev-badged)
+      ├─ workspace toolbar               (brand, sheet-title input, save-status pill)
+      ├─ sidebar field roster            (n/192, add-field)
+      ├─ schema-driven FieldEditor       (text/number/textarea/checkbox/choice, locked-aware)
+      ├─ live preview                    (projectDraftToSpec validation + surface render)
+      └─ confirm → read-only exported    (finalizeDraft; single version bump; start over)
+```
+
+Web-surface highlights:
+
+- **Store lifecycle.** `createSheetStore` wraps `SheetApiClientPort` in a
+  transient session store: backend selection by environment
+  (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND`, default `"local"`; `"remote"` →
+  `SheetApiClient`). `startSession` → `createDraft` → mutation/reroll/confirm;
+  `applyMutation` returns a typed `SheetStoreMutationOutcome`
+  (`ok | rejected | not_ready | inflight | error`) so UI surfaces domain
+  rejections verbatim. Confirmed drafts are read-only forever; "Start over"
+  resets the store.
+- **No double bump.** `applyDraftMutation` does not bump the draft version;
+  the commit path is `validateDraft(bumpDraftVersion(mutated))`. `finalizeDraft`
+  already bumps, so the confirm path is `confirmDraft` = `validateDraft(finalizeDraft(current))`
+  with no extra bump (regression pinned by a store test).
+- **Schema-driven editors.** `FieldEditor` renders only the five
+  `DraftField.type` primitives; no game-system components or hardcoded labels.
+  Locked/confirmed fields are read-only. `AddFieldDialog` mirrors the domain
+  `add_field` schema (key slugification, `type`, bounds/options) and surfaces
+  client + domain validation.
+- **Local dev backend.** rules-worker fails closed (`403
+  HUMAN_VERIFICATION_REQUIRED`) without a Turnstile secret, so development uses
+  `createLocalSheetBackend` — an in-memory `SheetApiClientPort` running the
+  real domain rules (`applyDraftMutation`, `finalizeDraft`,
+  `rerollLockedDraftValues`, `validateDraft`, `bumpDraftVersion`,
+  `initialDraftVersion`) — keeping the store/UI indistinguishable from the
+  server path. `startSession` uses a nonce token (`"local-turnstile-bypass"`)
+  in local mode only. Fixtures (`createBlankDraft`, `createExampleDraft`)
+  are dev-only and never imported by production flows.
+- **Theming.** Forge/cartography theme as a scoped `.character-workshop` token
+  block in `globals.css` (wood/parchment/leather/ink/metal), mirroring the
+  `.dice-roller` convention; no design-system over-engineering.
+- **No persistence impact.** 14.7G adds no D1 tables, no migrations, no new R2
+  bindings, and no production AI providers. Confirmed drafts without
+  export/download remain an in-memory terminal state.
+
+Verified suites added in 14.7G (web, all green):
+
+- store suite: `sheet-store.test.ts` — lifecycle, mutation outcomes, single
+  version bump on confirm, start-over reset
+- API client: `sheet-api-client.test.ts` — payload-shape fixes (`confirmed`,
+  `as const` status)
+- workshop UI: `CharacterWorkshop.test.tsx` — full manual loop
+  (create → rename → add number field → value → confirm → read-only → start
+  over) and dialog-side domain rejection
+- local backend: `local-sheet-backend.test.ts` — port contract with real rules
+- pre-existing test-file type fixes listed in the commit's diff
 
 ## Related documents
 

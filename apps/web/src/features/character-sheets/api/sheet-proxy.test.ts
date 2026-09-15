@@ -80,6 +80,18 @@ describe("resolveCharacterSheetProxyPath", () => {
       kind: "ok",
       upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/drafts/${DRAFT_ID}/reroll`,
     });
+    expect(
+      resolveCharacterSheetProxyPath("POST", [
+        "sessions",
+        SESSION_ID,
+        "drafts",
+        DRAFT_ID,
+        "confirm",
+      ]),
+    ).toMatchObject({
+      kind: "ok",
+      upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/drafts/${DRAFT_ID}/confirm`,
+    });
   });
 
   it("rejects unsafe identity segments", () => {

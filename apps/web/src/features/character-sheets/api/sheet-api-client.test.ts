@@ -41,6 +41,7 @@ function makeDraft(
     ],
     values: { character_name: "Aria Stone", strength: 12 },
     source: { sourceSheetId: "sheet.0001", sourceRunId: null },
+    confirmed: false,
     ...overrides,
   };
 }
@@ -209,6 +210,25 @@ describe("SheetApiClient", () => {
     );
     expect(result.draft.version).toBe(4);
     expect(result.rerolledKeys).toEqual(["strength"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirms a draft and returns the read-only snapshot", async () => {
+    const confirmed = makeDraft({ version: 5, confirmed: true });
+    const { client, fetchImpl } = makeClient(async (input, init) => {
+      expect(String(input)).toBe(
+        `${SESSION_URL}/sessions/${SESSION_ID}/drafts/${DRAFT_ID}/confirm`,
+      );
+      expect(init?.method).toBe("POST");
+      expect(new Headers(init?.headers).get("authorization")).toBe(
+        "Bearer token.123",
+      );
+      return jsonResponse(200, confirmed);
+    });
+
+    const result = await client.confirmDraft(SESSION_ID, "token.123", DRAFT_ID);
+    expect(result.confirmed).toBe(true);
+    expect(result.version).toBe(5);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 

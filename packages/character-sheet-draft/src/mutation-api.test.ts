@@ -160,4 +160,136 @@ describe("draft mutation api", () => {
     });
     expect(() => validateDraft(next)).not.toThrow();
   });
+
+  it("adds a field to the surface", () => {
+    const draft = makeDraft();
+    const next = applyDraftMutation(draft, {
+      op: "add_field",
+      field: {
+        key: "dexterity",
+        label: "Dexterity",
+        type: "number",
+        min: 1,
+        max: 20,
+        locked: false,
+      },
+    });
+    expect(next.fields).toHaveLength(draft.fields.length + 1);
+    expect(next.fields.some((field) => field.key === "dexterity")).toBe(true);
+    expect(() => validateDraft(next)).not.toThrow();
+  });
+
+  it("adds a choice field with declared options", () => {
+    const draft = makeDraft();
+    const next = applyDraftMutation(draft, {
+      op: "add_field",
+      field: {
+        key: "background",
+        label: "Background",
+        type: "choice",
+        options: ["scholar", "soldier", "merchant"],
+        locked: false,
+      },
+    });
+    expect(next.fields.some((field) => field.key === "background")).toBe(true);
+    expect(() => validateDraft(next)).not.toThrow();
+  });
+
+  it("rejects adding a field with an existing key", () => {
+    try {
+      applyDraftMutation(makeDraft(), {
+        op: "add_field",
+        field: {
+          key: "strength",
+          label: "Strength",
+          type: "number",
+          locked: false,
+        },
+      });
+      throw new Error("unreachable");
+    } catch (error) {
+      expect((error as DraftError).code).toBe("invalid_mutation");
+    }
+  });
+
+  it("rejects a structurally invalid field on add", () => {
+    try {
+      applyDraftMutation(makeDraft(), {
+        op: "add_field",
+        field: {
+          key: "bad_choice",
+          label: "Bad Choice",
+          type: "choice",
+          locked: false,
+        },
+      });
+      throw new Error("unreachable");
+    } catch (error) {
+      expect((error as DraftError).code).toBe("invalid_mutation");
+    }
+  });
+
+  it("removes a field and its value", () => {
+    const draft = makeDraft();
+    const next = applyDraftMutation(draft, {
+      op: "remove_field",
+      key: "veteran",
+    });
+    expect(next.fields.some((field) => field.key === "veteran")).toBe(false);
+    expect(next.values.veteran).toBeUndefined();
+    expect(() => validateDraft(next)).not.toThrow();
+  });
+
+  it("removing the character_name field nulls the mirrored name", () => {
+    const draft = makeDraft();
+    const next = applyDraftMutation(draft, {
+      op: "remove_field",
+      key: "character_name",
+    });
+    expect(next.fields.some((field) => field.key === "character_name")).toBe(
+      false,
+    );
+    expect(next.characterName).toBeNull();
+    expect(() => validateDraft(next)).not.toThrow();
+  });
+
+  it("refuses to remove the last remaining field", () => {
+    const draft = applyDraftMutation(makeDraft(), {
+      op: "remove_field",
+      key: "veteran",
+    });
+    const nearlyEmpty = applyDraftMutation(draft, {
+      op: "remove_field",
+      key: "weapon",
+    });
+    const stripped = applyDraftMutation(nearlyEmpty, {
+      op: "remove_field",
+      key: "homeland",
+    });
+    const stripped2 = applyDraftMutation(stripped, {
+      op: "remove_field",
+      key: "character_name",
+    });
+    try {
+      applyDraftMutation(stripped2, {
+        op: "remove_field",
+        key: "strength",
+      });
+      throw new Error("unreachable");
+    } catch (error) {
+      expect((error as DraftError).code).toBe("surface_out_of_bounds");
+    }
+  });
+
+  it("rejects removing an unknown key", () => {
+    try {
+      applyDraftMutation(makeDraft(), {
+        op: "remove_field",
+        key: "ghost",
+      });
+      throw new Error("unreachable");
+    } catch (error) {
+      expect((error as DraftError).code).toBe("surface_out_of_bounds");
+    }
+  });
 });

@@ -11,6 +11,7 @@ import type { SheetApiClientPort } from "../api/sheet-api-client";
 import {
   INITIAL_SHEET_STORE_STATE,
   type SheetStore,
+  type SheetStoreConfirmOutcome,
   type SheetStoreListener,
   type SheetStoreMutationOutcome,
   type SheetStoreRerollOutcome,
@@ -299,6 +300,46 @@ export function createSheetStore(options: SheetStoreOptions): SheetStore {
           draft: result.draft,
           rerolledKeys: result.rerolledKeys,
         };
+      } catch (error) {
+        const sheetError = toSheetApiError(error);
+        setState({ saveStatus: "error", error: sheetError });
+        await reconcile();
+        return { kind: "error", error: sheetError };
+      }
+    },
+
+    async confirm(): Promise<SheetStoreConfirmOutcome> {
+      if (
+        !hasSession() ||
+        state.draft === null ||
+        state.sessionId === null ||
+        state.accessToken === null
+      ) {
+        return { kind: "not_ready" };
+      }
+      if (state.saveStatus === "saving") {
+        return { kind: "inflight" };
+      }
+
+      const { sessionId, accessToken, draft } = state;
+      setState({
+        saveStatus: "saving",
+        error: null,
+      });
+
+      try {
+        const confirmed = await options.api.confirmDraft(
+          sessionId,
+          accessToken,
+          draft.draftId,
+        );
+        setState({
+          draft: confirmed,
+          saveStatus: "saved",
+          savedVersion: confirmed.version,
+          error: null,
+        });
+        return { kind: "ok", draft: confirmed };
       } catch (error) {
         const sheetError = toSheetApiError(error);
         setState({ saveStatus: "error", error: sheetError });

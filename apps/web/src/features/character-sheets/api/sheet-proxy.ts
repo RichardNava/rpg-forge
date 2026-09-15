@@ -91,6 +91,20 @@ export function resolveCharacterSheetProxyPath(
     };
   }
 
+  if (
+    method === "POST" &&
+    first === "sessions" &&
+    second !== undefined &&
+    third === "drafts" &&
+    fourth !== undefined &&
+    fifth === "confirm"
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/drafts/${fourth}/confirm`,
+    };
+  }
+
   return { kind: "route_not_found" };
 }
 

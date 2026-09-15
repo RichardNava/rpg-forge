@@ -62,6 +62,11 @@ export interface SheetApiClientPort {
     draftId: string,
     seed: string,
   ): Promise<SheetDraftRerollResponse>;
+  confirmDraft(
+    sessionId: string,
+    accessToken: string,
+    draftId: string,
+  ): Promise<CharacterSheetDraft>;
 }
 
 export class SheetApiClient implements SheetApiClientPort {
@@ -162,6 +167,19 @@ export class SheetApiClient implements SheetApiClientPort {
     return parseJsonBody(response, SheetDraftRerollResponseSchema);
   }
 
+  async confirmDraft(
+    sessionId: string,
+    accessToken: string,
+    draftId: string,
+  ): Promise<CharacterSheetDraft> {
+    const response = await this.request({
+      method: "POST",
+      url: this.confirmUrl(sessionId, draftId),
+      accessToken,
+    });
+    return parseJsonBody(response, CharacterSheetDraftSchema);
+  }
+
   private request(input: {
     method: string;
     url: string;
@@ -223,6 +241,12 @@ export class SheetApiClient implements SheetApiClientPort {
     assertIdentitySegment(sessionId, "sessionId");
     assertIdentitySegment(draftId, "draftId");
     return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/reroll`;
+  }
+
+  private confirmUrl(sessionId: string, draftId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    assertIdentitySegment(draftId, "draftId");
+    return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/confirm`;
   }
 }
 

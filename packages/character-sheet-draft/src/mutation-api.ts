@@ -4,10 +4,37 @@ import type {
   DraftField,
   DraftValue,
 } from "./draft-schema";
-import { DraftValueSchema, MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
+import {
+  DraftFieldSchema,
+  DraftValueSchema,
+  MAX_DRAFT_FIELD_KEY_CHARS,
+  MAX_DRAFT_SURFACE_FIELDS,
+} from "./draft-schema";
 import { draftError } from "./errors";
 import { assertDraftEditable } from "./finalize";
 import { assertDraftFieldExists } from "./guided-edit";
+
+export const DraftAddFieldSchema = z.strictObject({
+  key: z
+    .string()
+    .min(1)
+    .max(MAX_DRAFT_FIELD_KEY_CHARS)
+    .regex(
+      /^[A-Za-z0-9][A-Za-z0-9._:-]*$/,
+      "Field keys must use safe canonical keys.",
+    ),
+  label: z.string().min(1).max(256).regex(/\S/),
+  type: z.enum(["text", "number", "textarea", "checkbox", "choice"]),
+  locked: z.boolean().default(false),
+  options: z
+    .array(z.string().min(1).max(128).regex(/\S/))
+    .min(1)
+    .max(24)
+    .optional(),
+  min: z.number().finite().optional(),
+  max: z.number().finite().optional(),
+});
+export type DraftAddField = z.infer<typeof DraftAddFieldSchema>;
 
 export const DraftMutationSchema = z.discriminatedUnion("op", [
   z.strictObject({
@@ -27,6 +54,14 @@ export const DraftMutationSchema = z.discriminatedUnion("op", [
     op: z.literal("unlock_field"),
     key: z.string().min(1).max(MAX_DRAFT_FIELD_KEY_CHARS),
   }),
+  z.strictObject({
+    op: z.literal("add_field"),
+    field: DraftAddFieldSchema,
+  }),
+  z.strictObject({
+    op: z.literal("remove_field"),
+    key: z.string().min(1).max(MAX_DRAFT_FIELD_KEY_CHARS),
+  }),
 ]);
 export type DraftMutation = z.infer<typeof DraftMutationSchema>;
 
@@ -42,10 +77,10 @@ export function applyDraftMutation(
 ): CharacterSheetDraft {
   assertDraftEditable(draft);
   const mutation = parseDraftMutation(mutationInput);
-  const field = assertDraftFieldExists(draft, mutation.key);
 
   switch (mutation.op) {
     case "set_value": {
+      const field = assertDraftFieldExists(draft, mutation.key);
       if (field.locked) {
         throw draftError(
           "field_read_locked",
@@ -65,6 +100,7 @@ export function applyDraftMutation(
       };
     }
     case "clear_value": {
+      const field = assertDraftFieldExists(draft, mutation.key);
       if (field.locked) {
         throw draftError(
           "field_read_locked",
@@ -80,20 +116,65 @@ export function applyDraftMutation(
           field.key === "character_name" ? null : draft.characterName,
       };
     }
-    case "lock_field":
+    case "lock_field": {
+      const field = assertDraftFieldExists(draft, mutation.key);
       return {
         ...draft,
         fields: draft.fields.map((entry) =>
           entry.key === field.key ? { ...entry, locked: true } : entry,
         ),
       };
-    case "unlock_field":
+    }
+    case "unlock_field": {
+      const field = assertDraftFieldExists(draft, mutation.key);
       return {
         ...draft,
         fields: draft.fields.map((entry) =>
           entry.key === field.key ? { ...entry, locked: false } : entry,
         ),
       };
+    }
+    case "add_field": {
+      const existing = draft.fields.some(
+        (entry) => entry.key === mutation.field.key,
+      );
+      if (existing) {
+        throw draftError(
+          "invalid_mutation",
+          `Draft field "${mutation.field.key}" already exists.`,
+        );
+      }
+      if (draft.fields.length >= MAX_DRAFT_SURFACE_FIELDS) {
+        throw draftError(
+          "surface_out_of_bounds",
+          `A draft surface may contain at most ${MAX_DRAFT_SURFACE_FIELDS} fields.`,
+        );
+      }
+      const field = validateAddField(mutation.field);
+      return {
+        ...draft,
+        fields: [...draft.fields, field],
+      };
+    }
+    case "remove_field": {
+      const field = assertDraftFieldExists(draft, mutation.key);
+      if (draft.fields.length <= 1) {
+        throw draftError(
+          "surface_out_of_bounds",
+          "A draft must retain at least one field.",
+        );
+      }
+      const fields = draft.fields.filter((entry) => entry.key !== field.key);
+      const values = { ...draft.values };
+      delete values[field.key];
+      return {
+        ...draft,
+        fields,
+        values,
+        characterName:
+          field.key === "character_name" ? null : draft.characterName,
+      };
+    }
   }
 }
 
@@ -106,6 +187,20 @@ function parseDraftMutation(input: unknown): DraftMutation {
       first === undefined
         ? "The mutation is invalid."
         : `The mutation is invalid: ${first.message}`,
+    );
+  }
+  return result.data;
+}
+
+function validateAddField(input: DraftAddField): DraftField {
+  const result = DraftFieldSchema.safeParse(input);
+  if (!result.success) {
+    const first = result.error.issues[0];
+    throw draftError(
+      "invalid_mutation",
+      first === undefined
+        ? "The new field is invalid."
+        : `The new field is invalid: ${first.message}`,
     );
   }
   return result.data;
