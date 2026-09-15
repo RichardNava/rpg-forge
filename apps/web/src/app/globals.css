@@ -224,6 +224,89 @@
   color: #f2e3bd;
 }
 
+.character-workshop__identity-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-metal-dark) 45%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(
+    in srgb,
+    var(--workshop-wood-panel) 88%,
+    var(--workshop-wood)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 8%),
+    0 6px 16px rgb(0 0 0 / 28%);
+  color: #e8d9b8;
+}
+
+.character-workshop__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.character-workshop__identity-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.character-workshop__identity-label {
+  font-family: var(--font-dice-display), var(--font-geist-sans), serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #e8d9b8 75%, transparent);
+}
+
+.character-workshop__identity-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--workshop-metal-dark) 45%, transparent);
+}
+
+.character-workshop__identity-option {
+  font: inherit;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  color: #e8d9b8;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.character-workshop__identity-option:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--workshop-metal-dark) 55%, transparent);
+}
+
+.character-workshop__identity-option--selected {
+  background: linear-gradient(
+    165deg,
+    var(--workshop-metal),
+    var(--workshop-metal-dark)
+  );
+  border-color: color-mix(in srgb, var(--workshop-metal-dark) 60%, transparent);
+  color: #f6ecd2;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 22%);
+}
+
+.character-workshop__identity-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .character-workshop__layout {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);

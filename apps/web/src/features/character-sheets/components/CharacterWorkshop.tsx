@@ -26,6 +26,8 @@ import { SheetPreview } from "./SheetPreview";
 import { AddFieldDialog } from "./AddFieldDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
+import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
+import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
 
 const BACKEND_MODE = (
   process.env.NEXT_PUBLIC_CHARACTER_SHEET_BACKEND ?? "local"
@@ -238,6 +240,13 @@ export function CharacterWorkshop() {
     setPending(false);
   }, [store]);
 
+  const handleWorkshopPreferences = useCallback(
+    (patch: WorkshopIdentityPatch) => {
+      store.setWorkshopPreferences(patch);
+    },
+    [store],
+  );
+
   return (
     <div className="character-workshop__workspace">
       {screen === "landing" && (
@@ -272,6 +281,18 @@ export function CharacterWorkshop() {
             onConfirm={() => setModal("confirm")}
             onRestart={handleRestart}
           />
+          <div className="character-workshop__identity-bar">
+            <WorkshopIdentitySelector
+              characterType={state.workshop.characterType}
+              threatLevel={state.workshop.threatLevel}
+              disabled={
+                draft.confirmed ||
+                pending ||
+                state.saveStatus === "saving"
+              }
+              onChange={handleWorkshopPreferences}
+            />
+          </div>
           {transientError !== null && (
             <p className="character-workshop__alert" role="alert">
               {transientError}

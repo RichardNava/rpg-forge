@@ -271,3 +271,56 @@ describe("createSheetStore", () => {
     expect(state.sessionId).toBeNull();
   });
 });
+
+describe("character-sheet workshop preferences", () => {
+  it("starts with a player-character default and no threat level", () => {
+    const store = createSheetStore({ api: makeApiClient() });
+    expect(store.getState().workshop).toEqual({
+      characterType: "pc",
+      threatLevel: null,
+    });
+  });
+
+  it("seeds the identity from the hydrated draft mode", async () => {
+    const api = makeApiClient({
+      getDraft: vi.fn(async () => makeDraft({ mode: "npc" })),
+    });
+    const store = createSheetStore({ api });
+    store.attachSession(SESSION_ID, "token.123");
+    await store.hydrate(DRAFT_ID);
+    expect(store.getState().workshop.characterType).toBe("npc");
+    expect(store.getState().workshop.threatLevel).toBeNull();
+  });
+
+  it("seeds the identity from the created draft mode", async () => {
+    const store = createSheetStore({ api: makeApiClient() });
+    store.attachSession(SESSION_ID, "token.123");
+    await store.createDraft(makeDraft({ mode: "npc" }));
+    expect(store.getState().workshop.characterType).toBe("npc");
+  });
+
+  it("updates preferences through a partial patch", () => {
+    const store = createSheetStore({ api: makeApiClient() });
+    store.setWorkshopPreferences({ characterType: "npc" });
+    expect(store.getState().workshop.characterType).toBe("npc");
+    store.setWorkshopPreferences({ threatLevel: "elite" });
+    expect(store.getState().workshop.threatLevel).toBe("elite");
+    store.setWorkshopPreferences({ characterType: "pc", threatLevel: null });
+    expect(store.getState().workshop).toEqual({
+      characterType: "pc",
+      threatLevel: null,
+    });
+  });
+
+  it("does not leak preferences across a reset", async () => {
+    const store = createSheetStore({ api: makeApiClient() });
+    store.attachSession(SESSION_ID, "token.123");
+    await store.hydrate(DRAFT_ID);
+    store.setWorkshopPreferences({ characterType: "npc", threatLevel: "boss" });
+    store.reset();
+    expect(store.getState().workshop).toEqual({
+      characterType: "pc",
+      threatLevel: null,
+    });
+  });
+});

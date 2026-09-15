@@ -16,6 +16,7 @@ import {
   type SheetStoreMutationOutcome,
   type SheetStoreRerollOutcome,
   type SheetStoreState,
+  type WorkshopPreferences,
 } from "./sheet-store-types";
 
 export interface SheetStoreOptions {
@@ -63,6 +64,10 @@ export function createSheetStore(options: SheetStoreOptions): SheetStore {
       "INTERNAL_ERROR",
       "The character-sheet store failed unexpectedly.",
     );
+  }
+
+  function workshopForDraft(mode: CharacterSheetDraft["mode"]): WorkshopPreferences {
+    return { characterType: mode, threatLevel: null };
   }
 
   async function reconcile(): Promise<void> {
@@ -149,6 +154,7 @@ export function createSheetStore(options: SheetStoreOptions): SheetStore {
           draft,
           saveStatus: "idle",
           savedVersion: draft.version,
+          workshop: workshopForDraft(draft.mode),
           rerolledKeys: null,
           error: null,
         });
@@ -192,6 +198,7 @@ export function createSheetStore(options: SheetStoreOptions): SheetStore {
           draft,
           saveStatus: "saved",
           savedVersion: draft.version,
+          workshop: workshopForDraft(draft.mode),
           rerolledKeys: null,
           error: null,
         });
@@ -200,6 +207,10 @@ export function createSheetStore(options: SheetStoreOptions): SheetStore {
         setState({ phase: "error", error: sheetError });
         throw sheetError;
       }
+    },
+
+    setWorkshopPreferences(patch: Partial<WorkshopPreferences>): void {
+      setState({ workshop: { ...state.workshop, ...patch } });
     },
 
     async applyMutation(
