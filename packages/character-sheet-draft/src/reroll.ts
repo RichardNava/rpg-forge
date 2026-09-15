@@ -8,6 +8,7 @@ import {
   stableDraftSeed,
   type SeededRandom,
 } from "./reroll-random";
+import { assertDraftEditable } from "./finalize";
 
 export interface DraftRerollResult {
   draft: CharacterSheetDraft;
@@ -27,6 +28,7 @@ export function rerollLockedDraftValues(
   draft: CharacterSheetDraft,
   seed: string,
 ): DraftRerollResult {
+  assertDraftEditable(draft);
   const random = createSeededRandom(stableDraftSeed(seed));
   const values = { ...draft.values };
   const rerolledKeys: string[] = [];

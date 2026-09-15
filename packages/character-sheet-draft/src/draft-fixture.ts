@@ -16,6 +16,7 @@ export function makeDraft(
     sessionId: "session.abc123",
     baseVersion: 1,
     version: 1,
+    confirmed: false,
     mode: "pc",
     characterName: "Aria Stone",
     rulesContextId: null,

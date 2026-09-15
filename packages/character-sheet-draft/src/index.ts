@@ -8,6 +8,7 @@ export * from "./guided-edit";
 export * from "./in-flight-processing";
 export * from "./mutation-api";
 export * from "./reroll";
+export * from "./finalize";
 export * from "./keys";
 export * from "./draft-store";
 export * from "./preview/index";

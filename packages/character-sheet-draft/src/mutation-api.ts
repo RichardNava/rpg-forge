@@ -6,6 +6,7 @@ import type {
 } from "./draft-schema";
 import { DraftValueSchema, MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
 import { draftError } from "./errors";
+import { assertDraftEditable } from "./finalize";
 import { assertDraftFieldExists } from "./guided-edit";
 
 export const DraftMutationSchema = z.discriminatedUnion("op", [
@@ -39,6 +40,7 @@ export function applyDraftMutation(
   draft: CharacterSheetDraft,
   mutationInput: unknown,
 ): CharacterSheetDraft {
+  assertDraftEditable(draft);
   const mutation = parseDraftMutation(mutationInput);
   const field = assertDraftFieldExists(draft, mutation.key);
 

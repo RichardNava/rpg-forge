@@ -146,6 +146,7 @@ export const CharacterSheetDraftSchema = z
         }
       }),
     source: DraftSourceSchema,
+    confirmed: z.boolean().default(false),
   })
   .superRefine((draft, context) => {
     const keys = draft.fields.map((field) => field.key);

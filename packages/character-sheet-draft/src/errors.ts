@@ -10,6 +10,7 @@ export const DRAFT_ERROR_CODES = [
   "session_expired",
   "surface_out_of_bounds",
   "draft_inflight",
+  "draft_confirmed",
   "projection_invalid",
   "writeback_invalid",
 ] as const;
