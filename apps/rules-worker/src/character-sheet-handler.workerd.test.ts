@@ -79,6 +79,7 @@ function makeDraft(sessionId: string, draftId: string): CharacterSheetDraft {
       weapon: "sword",
     },
     source: { sourceSheetId: "sheet.0001", sourceRunId: null },
+    confirmed: false,
   };
 }
 

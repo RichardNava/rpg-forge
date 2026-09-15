@@ -7,9 +7,10 @@ import {
 import {
   applyDraftMutation,
   rerollLockedDraftValues,
+  finalizeDraft,
   bumpDraftVersion,
-  validateDraft,
   DraftError,
+  validateDraft,
   type CharacterSheetDraft,
   type CharacterSheetDraftIdentity,
 } from "@repo/character-sheet-draft";
@@ -37,6 +38,8 @@ const SHEET_DRAFT_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)$/;
 const SHEET_DRAFT_REROLL_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/reroll$/;
+const SHEET_DRAFT_CONFIRM_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/confirm$/;
 
 function toPublicSheetSession(session: SheetSession): SheetSessionView {
   return {
@@ -113,6 +116,15 @@ export async function handleCharacterSheetRequest(
     const draftId = draftRerollMatch[2] ?? "";
     if (method === "POST") {
       return handleRerollDraft(sessionId, draftId, request, deps);
+    }
+  }
+
+  const draftConfirmMatch = SHEET_DRAFT_CONFIRM_PATH_PATTERN.exec(path);
+  if (draftConfirmMatch !== null) {
+    const sessionId = draftConfirmMatch[1] ?? "";
+    const draftId = draftConfirmMatch[2] ?? "";
+    if (method === "POST") {
+      return handleConfirmDraft(sessionId, draftId, request, deps);
     }
   }
 
@@ -495,6 +507,63 @@ async function handleRerollDraft(
   });
 }
 
+async function handleConfirmDraft(
+  sessionId: string,
+  draftId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+
+  if (deps.sheetDraftStore === undefined) {
+    return draftStorageUnavailable();
+  }
+
+  const headIdentity: DraftHeadIdentity = {
+    sessionId: auth.sessionId,
+    draftId,
+  };
+  const draftIdentity: CharacterSheetDraftIdentity = {
+    sessionId: auth.sessionId,
+    draftId,
+  };
+
+  const head = await deps.sheetDraftHeadRepository.getHead(headIdentity);
+  if (head === null) {
+    return errorResponse("SHEET_DRAFT_NOT_FOUND");
+  }
+
+  const headDraft = await deps.sheetDraftStore.getDraftVersion(
+    draftIdentity,
+    head.currentVersion,
+  );
+  if (headDraft === null) {
+    return errorResponse("SHEET_DRAFT_NOT_FOUND");
+  }
+
+  let confirmedDraft: CharacterSheetDraft;
+  try {
+    confirmedDraft = finalizeDraft(headDraft);
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+
+  const committed = await claimCommitDraft(
+    { headIdentity, head, nextVersion: confirmedDraft },
+    deps,
+  );
+  if (committed.kind === "error") {
+    return committed.response;
+  }
+
+  return jsonResponse(200, {
+    draft: committed.draft,
+  });
+}
+
 type ClaimCommitOutcome =
   | { kind: "ok"; draft: CharacterSheetDraft }
   | { kind: "error"; response: Response };
@@ -628,6 +697,8 @@ function draftErrorToResponse(error: unknown): Response {
           "SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS",
           error.message,
         );
+      case "draft_confirmed":
+        return errorResponse("SHEET_DRAFT_CONFIRMED");
       case "draft_inflight":
         return errorResponse("SHEET_DRAFT_INFLIGHT");
       case "draft_session_mismatch":

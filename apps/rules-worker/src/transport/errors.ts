@@ -40,6 +40,7 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   SHEET_DRAFT_ALREADY_EXISTS: 409,
   SHEET_DRAFT_VERSION_CONFLICT: 409,
   SHEET_DRAFT_INFLIGHT: 409,
+  SHEET_DRAFT_CONFIRMED: 409,
   SHEET_DRAFT_MUTATION_INVALID: 422,
   SHEET_DRAFT_FIELD_READ_LOCKED: 422,
   SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS: 422,
@@ -108,6 +109,8 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "The draft version has changed; retry against the current version.",
   SHEET_DRAFT_INFLIGHT:
     "The draft is mid-save; retry after the current save completes.",
+  SHEET_DRAFT_CONFIRMED:
+    "The draft is already confirmed and is read-only.",
   SHEET_DRAFT_MUTATION_INVALID: "The draft mutation is invalid.",
   SHEET_DRAFT_FIELD_READ_LOCKED:
     "The field is read-locked; unlock it before editing.",

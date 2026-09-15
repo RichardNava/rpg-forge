@@ -98,6 +98,7 @@ function makeValidDraft(
     ],
     values: { character_name: "Aria Stone" },
     source: { sourceSheetId: "sheet.0001", sourceRunId: null },
+    confirmed: false,
   } as CharacterSheetDraft;
 }
 

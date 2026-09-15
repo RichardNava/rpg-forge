@@ -137,6 +137,7 @@ function makeDraft(
       veteran: true,
     },
     source: { sourceSheetId: "sheet.0001", sourceRunId: null },
+    confirmed: false,
   };
 }
 
