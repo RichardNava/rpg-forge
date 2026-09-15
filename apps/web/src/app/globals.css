@@ -550,6 +550,14 @@
   gap: 0.5rem;
 }
 
+.character-workshop__landing-eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--workshop-metal);
+}
+
 .character-workshop__landing-title {
   font-family: var(--font-dice-display), var(--font-geist-sans), serif;
   font-size: clamp(1.6rem, 4vw, 2.4rem);
@@ -598,6 +606,16 @@
 .character-workshop__landing-choice:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+.character-workshop__landing-choice--disabled:hover {
+  filter: none;
+}
+.character-workshop__landing-choice--disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+.character-workshop__landing-choice--disabled .character-workshop__landing-choice-cta {
+  color: var(--workshop-muted);
 }
 
 .character-workshop__landing-choice-title {
@@ -692,6 +710,73 @@
   color: var(--workshop-danger);
   padding: 0.6rem 0.85rem;
   font-size: 0.9rem;
+}
+
+.character-workshop__dev-link {
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--workshop-muted) 75%, transparent);
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.character-workshop__dev-link:hover {
+  color: var(--workshop-metal);
+}
+.character-workshop__dev-link:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.character-workshop__upload-copy {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--workshop-ink-soft);
+}
+
+.character-workshop__upload-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  padding: 1rem;
+  border: 1px dashed
+    color-mix(in srgb, var(--workshop-metal-dark) 60%, transparent);
+  border-radius: 0.5rem;
+  background: rgb(255 252 242 / 40%);
+  cursor: pointer;
+}
+.character-workshop__upload-picker input[type="file"] {
+  display: none;
+}
+
+.character-workshop__upload-file {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-parchment-edge) 55%, transparent);
+  border-radius: 0.4rem;
+  background: rgb(255 252 242 / 55%);
+  padding: 0.5rem 0.7rem;
+}
+.character-workshop__upload-file-name {
+  overflow-wrap: anywhere;
+  color: var(--workshop-ink);
+}
+.character-workshop__upload-file-size {
+  color: var(--workshop-muted);
+  white-space: nowrap;
+}
+
+.character-workshop__upload-progress {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--workshop-metal-dark);
 }
 
 .dice-roller__workspace {

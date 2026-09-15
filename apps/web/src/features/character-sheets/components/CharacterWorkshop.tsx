@@ -11,6 +11,11 @@ import { SheetApiClient } from "../api/sheet-api-client";
 import type { SheetApiClientPort } from "../api/sheet-api-client";
 import { createLocalSheetBackend } from "../lib/local-sheet-backend";
 import { createBlankDraft, createExampleDraft } from "../lib/dev-fixture";
+import { createLocalSheetDocumentExtractionService } from "../extraction/local-extraction-service";
+import type {
+  SheetDocumentExtractionService,
+  SheetDocumentFileDescriptor,
+} from "../extraction/extraction-service";
 import { createSheetStore } from "../state/sheet-store";
 import type { SheetStore } from "../state/sheet-store-types";
 import { useSheetStore } from "../hooks/use-sheet-store";
@@ -20,6 +25,7 @@ import { WorkshopSidebar } from "./WorkshopSidebar";
 import { SheetPreview } from "./SheetPreview";
 import { AddFieldDialog } from "./AddFieldDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { UploadSheetDialog } from "./UploadSheetDialog";
 
 const BACKEND_MODE = (
   process.env.NEXT_PUBLIC_CHARACTER_SHEET_BACKEND ?? "local"
@@ -34,26 +40,40 @@ function createWorkshopBackend(): SheetApiClientPort {
   return createLocalSheetBackend();
 }
 
+/**
+ * Placeholder extraction adapter. It derives a draft from the file name only;
+ * the real multimodal extraction backend will implement the same port later.
+ */
+const SHEET_EXTRACTION: SheetDocumentExtractionService =
+  createLocalSheetDocumentExtractionService();
+
 const LANDING_CHOICES = [
+  {
+    id: "upload",
+    title: "Upload existing sheet",
+    description:
+      "Extract fields automatically from a PDF, PNG or JPG document.",
+    cta: "Choose a file",
+  },
   {
     id: "manual",
     title: "Create manually",
-    description:
-      "Build a blank character sheet from scratch: add fields of any supported type, fill them in, and watch the preview update live.",
+    description: "Build a character sheet from scratch.",
     cta: "Open the workshop",
   },
   {
-    id: "example",
-    title: "Load an example",
-    badge: "Dev",
+    id: "generate-ai",
+    title: "Generate with AI",
     description:
-      "Start from a pre-filled example sheet that exercises text, number, textarea, checkbox and choice fields.",
-    cta: "Explore the editor",
+      "Create a new character concept. AI generation arrives in a later phase.",
+    cta: "Coming soon",
+    badge: "Soon",
+    disabled: true,
   },
 ];
 
 type WorkshopScreen = "landing" | "editing" | "exported";
-type WorkshopModal = "none" | "add-field" | "confirm";
+type WorkshopModal = "none" | "add-field" | "confirm" | "upload";
 
 export function CharacterWorkshop() {
   const [store] = useState<SheetStore>(() =>
@@ -92,12 +112,40 @@ export function CharacterWorkshop() {
     [store],
   );
 
+  const beginUploadedDraft = useCallback(
+    async (file: SheetDocumentFileDescriptor): Promise<string | null> => {
+      setPending(true);
+      setTransientError(null);
+      try {
+        await store.startSession("local-turnstile-bypass");
+        const sessionId = store.getState().sessionId;
+        if (sessionId === null) {
+          throw new Error("The session was not created.");
+        }
+        const draft = await SHEET_EXTRACTION.extractSheetDocument({
+          sessionId,
+          file,
+        });
+        await store.createDraft(draft);
+        setScreen("editing");
+        return null;
+      } catch (error) {
+        return error instanceof Error
+          ? error.message
+          : "The document could not be extracted.";
+      } finally {
+        setPending(false);
+      }
+    },
+    [store],
+  );
+
   const handleChoose = useCallback(
     (id: string) => {
       if (id === "manual") {
         void beginDraft(createBlankDraft);
-      } else if (id === "example") {
-        void beginDraft(createExampleDraft);
+      } else if (id === "upload") {
+        setModal("upload");
       }
     },
     [beginDraft],
@@ -194,13 +242,23 @@ export function CharacterWorkshop() {
     <div className="character-workshop__workspace">
       {screen === "landing" && (
         <CreationModeSelector
-          title="RPG Forge — Character sheets"
-          subtitle="Shape parchment into a character sheet. Everything stays in your browser until you export it; confirming locks the sheet as read-only."
+          eyebrow="RPG Forge — Character Workshop"
+          title="How do you want to create your character?"
+          subtitle="Turn a document or a blank sheet into a character sheet. Everything stays in your browser until you export it; confirming locks the sheet as read-only."
           choices={LANDING_CHOICES}
           busy={pending}
           error={transientError ?? state.error?.message ?? null}
           onChoose={handleChoose}
-        />
+        >
+          <button
+            type="button"
+            className="character-workshop__dev-link"
+            onClick={() => void beginDraft(createExampleDraft)}
+            disabled={pending}
+          >
+            Developer: load a test example
+          </button>
+        </CreationModeSelector>
       )}
 
       {screen === "editing" && draft !== null && (
@@ -262,6 +320,14 @@ export function CharacterWorkshop() {
         </>
       )}
 
+      <UploadSheetDialog
+        key={modal === "upload" ? "open" : "closed"}
+        open={modal === "upload"}
+        busy={pending}
+        error={transientError}
+        onClose={() => setModal("none")}
+        onSubmit={beginUploadedDraft}
+      />
       <AddFieldDialog
         open={modal === "add-field"}
         onClose={() => setModal("none")}

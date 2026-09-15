@@ -19,12 +19,20 @@ describe("CharacterWorkshop", () => {
   it("walks the manual creation loop: create, edit, add field, confirm, read-only", async () => {
     render(<CharacterWorkshop />);
 
-    // Landing screen offers both creation modes.
+    // Landing screen opens with the three creation paths.
     expect(
-      screen.getByRole("heading", { name: /RPG Forge — Character sheets/i }),
+      screen.getByRole("heading", {
+        name: /How do you want to create your character\?/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Upload existing sheet/i }),
     ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: /Create manually/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Generate with AI/i }),
     ).toBeTruthy();
 
     // Choose manual creation.
@@ -97,9 +105,48 @@ describe("CharacterWorkshop", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start a new sheet" }));
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: /RPG Forge — Character sheets/i }),
+        screen.getByRole("heading", {
+          name: /How do you want to create your character\?/i,
+        }),
       ).toBeTruthy();
     });
+  });
+
+  it("shows the AI generation path as coming soon", () => {
+    render(<CharacterWorkshop />);
+    const aiChoice = screen.getByRole("button", { name: /Generate with AI/i });
+    expect(aiChoice).toBeTruthy();
+    expect(screen.getByText("Soon")).toBeTruthy();
+  });
+
+  it("opens the upload dialog and rejects unsupported documents", async () => {
+    render(<CharacterWorkshop />);
+    fireEvent.click(screen.getByRole("button", { name: /Upload existing sheet/i }));
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Upload an existing sheet",
+    });
+
+    const fileInput = within(dialog).getByLabelText("Sheet document");
+    const textFile = new File(["notes"], "notes.txt", {
+      type: "text/plain",
+    });
+    fireEvent.change(fileInput, { target: { files: [textFile] } });
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole("alert")).toBeTruthy();
+    });
+    expect(within(dialog).getByText(/PDF, PNG and JPG/i)).toBeTruthy();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Extract fields" }),
+    );
+    expect(screen.getByRole("dialog", { name: "Upload an existing sheet" })).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", {
+        name: /How do you want to create your character\?/i,
+      }),
+    ).toBeTruthy();
   });
 
   it("shows domain-level rejection inside the add-field dialog", async () => {

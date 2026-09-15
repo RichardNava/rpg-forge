@@ -6,9 +6,11 @@ export interface CreationChoice {
   description: string;
   cta: string;
   badge?: string;
+  disabled?: boolean;
 }
 
 interface CreationModeSelectorProps {
+  eyebrow?: string;
   title: string;
   subtitle: string;
   choices: CreationChoice[];
@@ -19,6 +21,7 @@ interface CreationModeSelectorProps {
 }
 
 export function CreationModeSelector({
+  eyebrow,
   title,
   subtitle,
   choices,
@@ -30,6 +33,9 @@ export function CreationModeSelector({
   return (
     <div className="character-workshop__landing">
       <div className="character-workshop__landing-heading">
+        {eyebrow !== undefined && (
+          <p className="character-workshop__landing-eyebrow">{eyebrow}</p>
+        )}
         <h1 className="character-workshop__landing-title">{title}</h1>
         <p className="character-workshop__landing-subtitle">{subtitle}</p>
       </div>
@@ -38,9 +44,13 @@ export function CreationModeSelector({
           <button
             key={choice.id}
             type="button"
-            className="character-workshop__landing-choice"
+            className={
+              choice.disabled === true
+                ? "character-workshop__landing-choice character-workshop__landing-choice--disabled"
+                : "character-workshop__landing-choice"
+            }
             onClick={() => onChoose(choice.id)}
-            disabled={busy}
+            disabled={busy || choice.disabled === true}
           >
             <span className="character-workshop__landing-choice-title">
               {choice.title}
