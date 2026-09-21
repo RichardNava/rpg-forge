@@ -18,10 +18,12 @@ import { createR2ChunkSource } from "./infrastructure/r2-chunk-source.js";
 import { createR2RulebookFileHash } from "./infrastructure/r2-rulebook-file-hash.js";
 import { createR2RuleArtifacts } from "./infrastructure/r2-rule-artifacts.js";
 import { createR2CharacterSheetDraftStore } from "./infrastructure/r2-character-sheet-drafts.js";
+import { createR2CharacterSheetArtifactStore } from "./infrastructure/r2-character-sheet-artifacts.js";
 import { createRulebookResourceCleaner } from "./infrastructure/rulebook-cleaner.js";
 import { createCloudflareRulebookWorkflowPort } from "./infrastructure/rulebook-workflow.js";
 import { createCloudflareRulesAnalysisWorkflowPort } from "./infrastructure/rules-analysis-workflow.js";
 import { createTurnstileHumanVerification } from "./infrastructure/turnstile.js";
+import { createCloudflareSheetVisualExtraction } from "./infrastructure/sheet-visual-extraction.js";
 import {
   VectorIndexUnavailableError,
   createVectorizeIndex,
@@ -68,6 +70,18 @@ export function createAppDeps(env: Env): AppDeps {
     env.SHEET_ARTIFACTS === undefined
       ? undefined
       : createR2CharacterSheetDraftStore(env.SHEET_ARTIFACTS);
+  const sheetArtifactStore =
+    env.SHEET_ARTIFACTS === undefined
+      ? undefined
+      : createR2CharacterSheetArtifactStore(env.SHEET_ARTIFACTS);
+  const sheetVisualExtraction =
+    env.AI === undefined || env.SHEET_VISION_MODEL === undefined
+      ? undefined
+      : createCloudflareSheetVisualExtraction(env.AI, env.SHEET_VISION_MODEL, {
+          debugRawResponse:
+            env.RATE_LIMIT_MODE === "local" &&
+            env.SHEET_VISION_DEBUG_RAW_RESPONSE === "true",
+        });
 
   return {
     crypto: webCrypto,
@@ -101,6 +115,9 @@ export function createAppDeps(env: Env): AppDeps {
     sheetSessionRepository,
     sheetDraftHeadRepository,
     ...(sheetDraftStore === undefined ? {} : { sheetDraftStore }),
+    ...(sheetArtifactStore === undefined ? {} : { sheetArtifactStore }),
+    ...(sheetVisualExtraction === undefined ? {} : { sheetVisualExtraction }),
+    debugSheetDrafts: env.SHEET_DRAFT_DEBUG === "true",
   };
 }
 

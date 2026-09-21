@@ -13,6 +13,9 @@ export const MAX_DRAFT_TEXT_VALUE_CHARS = 2_000;
 export const MAX_DRAFT_CHOICE_OPTIONS = 24;
 export const MAX_DRAFT_CHOICE_OPTION_CHARS = 128;
 export const MAX_DRAFT_SOURCE_ID_CHARS = 128;
+export const MAX_DRAFT_SECTIONS = 48;
+export const MAX_DRAFT_SECTION_DEPTH = 12;
+export const MAX_DRAFT_LIST_ITEMS = 100;
 
 /**
  * Draft keys are always generation canonical keys, which are also safe field
@@ -42,6 +45,7 @@ export const DraftFieldTypeSchema = z.enum([
   "textarea",
   "checkbox",
   "choice",
+  "list",
 ]);
 export type DraftFieldType = z.infer<typeof DraftFieldTypeSchema>;
 
@@ -50,6 +54,10 @@ export const DraftValueSchema = z.union([
   z.number().finite(),
   z.boolean(),
   z.null(),
+  z
+    .array(z.string().min(1).max(MAX_DRAFT_TEXT_VALUE_CHARS))
+    .min(1)
+    .max(MAX_DRAFT_LIST_ITEMS),
 ]);
 export type DraftValue = z.infer<typeof DraftValueSchema>;
 
@@ -111,6 +119,24 @@ export const DraftFieldSchema = z
   });
 export type DraftField = z.infer<typeof DraftFieldSchema>;
 
+/** A system-agnostic visual grouping. Parent links preserve arbitrary sheet hierarchy. */
+export const DraftSectionSchema = z.strictObject({
+  key: z.string().min(1).max(MAX_DRAFT_FIELD_KEY_CHARS).regex(draftKeyPattern),
+  title: z.string().min(1).max(MAX_DRAFT_FIELD_LABEL_CHARS).regex(/\S/),
+  parentKey: z
+    .string()
+    .min(1)
+    .max(MAX_DRAFT_FIELD_KEY_CHARS)
+    .regex(draftKeyPattern)
+    .optional(),
+  fieldKeys: z
+    .array(
+      z.string().min(1).max(MAX_DRAFT_FIELD_KEY_CHARS).regex(draftKeyPattern),
+    )
+    .max(MAX_DRAFT_SURFACE_FIELDS),
+});
+export type DraftSection = z.infer<typeof DraftSectionSchema>;
+
 export const DraftSourceSchema = z.strictObject({
   sourceSheetId: z.string().max(MAX_DRAFT_SOURCE_ID_CHARS).nullable(),
   sourceRunId: z.string().max(MAX_DRAFT_SOURCE_ID_CHARS).nullable(),
@@ -135,6 +161,7 @@ export const CharacterSheetDraftSchema = z
     characterName: z.string().max(256).nullable(),
     rulesContextId: z.string().max(128).nullable(),
     fields: z.array(DraftFieldSchema).min(1).max(MAX_DRAFT_SURFACE_FIELDS),
+    sections: z.array(DraftSectionSchema).max(MAX_DRAFT_SECTIONS).optional(),
     values: z
       .record(z.string(), DraftValueSchema)
       .superRefine((value, context) => {
@@ -157,6 +184,54 @@ export const CharacterSheetDraftSchema = z
       });
     }
     const fieldKeys = new Set(keys);
+    const sections = draft.sections ?? [];
+    const sectionKeys = new Set(sections.map((section) => section.key));
+    if (sectionKeys.size !== sections.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Draft section keys must be unique.",
+      });
+    }
+    const assignedFields = new Set<string>();
+    for (const section of sections) {
+      if (
+        section.parentKey !== undefined &&
+        !sectionKeys.has(section.parentKey)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Draft section "${section.key}" references an unknown parent.`,
+        });
+      }
+      for (const fieldKey of section.fieldKeys) {
+        if (!fieldKeys.has(fieldKey) || assignedFields.has(fieldKey)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Draft section "${section.key}" has an invalid field membership.`,
+          });
+        }
+        assignedFields.add(fieldKey);
+      }
+    }
+    for (const section of sections) {
+      const visited = new Set<string>([section.key]);
+      let parentKey = section.parentKey;
+      let depth = 0;
+      while (parentKey !== undefined) {
+        if (visited.has(parentKey) || depth >= MAX_DRAFT_SECTION_DEPTH) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Draft section "${section.key}" has an invalid parent hierarchy.`,
+          });
+          break;
+        }
+        visited.add(parentKey);
+        parentKey = sections.find(
+          (candidate) => candidate.key === parentKey,
+        )?.parentKey;
+        depth += 1;
+      }
+    }
     for (const entry of Object.keys(draft.values)) {
       if (!fieldKeys.has(entry)) {
         context.addIssue({

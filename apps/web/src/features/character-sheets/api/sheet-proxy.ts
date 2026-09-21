@@ -54,6 +54,19 @@ export function resolveCharacterSheetProxyPath(
     method === "POST" &&
     first === "sessions" &&
     second !== undefined &&
+    third === "extraction" &&
+    fourth === undefined
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/extraction`,
+    };
+  }
+
+  if (
+    method === "POST" &&
+    first === "sessions" &&
+    second !== undefined &&
     third === "drafts" &&
     fourth === undefined
   ) {
@@ -113,7 +126,7 @@ export interface CharacterSheetProxyRequest {
   segments: string[];
   search: string;
   forwardedHeaders: Record<string, string>;
-  bodyText: string | null;
+  bodyText: BodyInit | null;
   upstreamBaseUrl: string;
 }
 

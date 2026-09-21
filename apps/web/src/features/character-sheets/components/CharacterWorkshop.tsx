@@ -12,6 +12,8 @@ import type { SheetApiClientPort } from "../api/sheet-api-client";
 import { createLocalSheetBackend } from "../lib/local-sheet-backend";
 import { createBlankDraft, createExampleDraft } from "../lib/dev-fixture";
 import { createLocalSheetDocumentExtractionService } from "../extraction/local-extraction-service";
+import { createRemoteSheetDocumentExtractionService } from "../extraction/remote-extraction-service";
+import { downloadConfirmedDraftPdf } from "../export/export-confirmed-draft-pdf";
 import type {
   SheetDocumentExtractionService,
   SheetDocumentFileDescriptor,
@@ -24,13 +26,15 @@ import { WorkshopToolbar } from "./WorkshopToolbar";
 import { WorkshopSidebar } from "./WorkshopSidebar";
 import { SheetPreview } from "./SheetPreview";
 import { AddFieldDialog } from "./AddFieldDialog";
+import { AddSectionDialog } from "./AddSectionDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
 
 const BACKEND_MODE = (
-  process.env.NEXT_PUBLIC_CHARACTER_SHEET_BACKEND ?? "local"
+  process.env.NEXT_PUBLIC_CHARACTER_SHEET_BACKEND ??
+  (process.env.NODE_ENV === "test" ? "local" : "remote")
 )
   .trim()
   .toLowerCase();
@@ -43,11 +47,13 @@ function createWorkshopBackend(): SheetApiClientPort {
 }
 
 /**
- * Placeholder extraction adapter. It derives a draft from the file name only;
- * the real multimodal extraction backend will implement the same port later.
+ * Production always uses the protected Worker endpoint. `local` is retained
+ * only for explicit isolated-development tests and never simulates OCR.
  */
 const SHEET_EXTRACTION: SheetDocumentExtractionService =
-  createLocalSheetDocumentExtractionService();
+  BACKEND_MODE === "remote"
+    ? createRemoteSheetDocumentExtractionService()
+    : createLocalSheetDocumentExtractionService();
 
 const LANDING_CHOICES = [
   {
@@ -75,7 +81,8 @@ const LANDING_CHOICES = [
 ];
 
 type WorkshopScreen = "landing" | "editing" | "exported";
-type WorkshopModal = "none" | "add-field" | "confirm" | "upload";
+type WorkshopModal =
+  "none" | "add-field" | "add-section" | "confirm" | "upload";
 
 export function CharacterWorkshop() {
   const [store] = useState<SheetStore>(() =>
@@ -121,11 +128,13 @@ export function CharacterWorkshop() {
       try {
         await store.startSession("local-turnstile-bypass");
         const sessionId = store.getState().sessionId;
-        if (sessionId === null) {
+        const accessToken = store.getState().accessToken;
+        if (sessionId === null || accessToken === null) {
           throw new Error("The session was not created.");
         }
         const draft = await SHEET_EXTRACTION.extractSheetDocument({
           sessionId,
+          accessToken,
           file,
         });
         await store.createDraft(draft);
@@ -199,6 +208,48 @@ export function CharacterWorkshop() {
     [applyMutation],
   );
 
+  const handleSetFieldLabel = useCallback(
+    (key: string, label: string) => {
+      void applyMutation({ op: "set_field_label", key, label });
+    },
+    [applyMutation],
+  );
+
+  const handleSetFieldType = useCallback(
+    (field: Extract<DraftMutation, { op: "set_field_type" }>["field"]) => {
+      void applyMutation({ op: "set_field_type", field });
+    },
+    [applyMutation],
+  );
+
+  const handleAddSection = useCallback(
+    (section: Extract<DraftMutation, { op: "add_section" }>["section"]) => {
+      void applyMutation({ op: "add_section", section });
+    },
+    [applyMutation],
+  );
+
+  const handleRenameSection = useCallback(
+    (key: string, title: string) => {
+      void applyMutation({ op: "rename_section", key, title });
+    },
+    [applyMutation],
+  );
+
+  const handleMoveField = useCallback(
+    (key: string, sectionKey: string | null) => {
+      void applyMutation({ op: "move_field", key, sectionKey });
+    },
+    [applyMutation],
+  );
+
+  const handleReparentSection = useCallback(
+    (key: string, parentKey: string | null) => {
+      void applyMutation({ op: "reparent_section", key, parentKey });
+    },
+    [applyMutation],
+  );
+
   const handleAddField = useCallback(
     async (field: DraftAddField): Promise<string | null> => {
       const outcome = await store.applyMutation({ op: "add_field", field });
@@ -239,6 +290,23 @@ export function CharacterWorkshop() {
     setTransientError(null);
     setPending(false);
   }, [store]);
+
+  const handleDownload = useCallback(async () => {
+    if (draft === null) return;
+    setPending(true);
+    setTransientError(null);
+    try {
+      await downloadConfirmedDraftPdf(draft);
+    } catch (error) {
+      setTransientError(
+        error instanceof Error
+          ? error.message
+          : "The PDF could not be created.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }, [draft]);
 
   const handleWorkshopPreferences = useCallback(
     (patch: WorkshopIdentityPatch) => {
@@ -286,9 +354,7 @@ export function CharacterWorkshop() {
               characterType={state.workshop.characterType}
               threatLevel={state.workshop.threatLevel}
               disabled={
-                draft.confirmed ||
-                pending ||
-                state.saveStatus === "saving"
+                draft.confirmed || pending || state.saveStatus === "saving"
               }
               onChange={handleWorkshopPreferences}
             />
@@ -298,23 +364,23 @@ export function CharacterWorkshop() {
               {transientError}
             </p>
           )}
-          <div className="character-workshop__layout">
-            <div className="character-workshop__sidebar-column">
-              <WorkshopSidebar
-                draft={draft}
-                callbacks={{
-                  onSetValue: handleSetValue,
-                  onClearValue: handleClearValue,
-                  onRemoveField: handleRemoveField,
-                  onAddField: () => setModal("add-field"),
-                }}
-                disabled={draft.confirmed}
-              />
-            </div>
-            <div className="character-workshop__preview-column">
-              <SheetPreview draft={draft} />
-            </div>
-          </div>
+          <WorkshopSidebar
+            draft={draft}
+            callbacks={{
+              onSetValue: handleSetValue,
+              onClearValue: handleClearValue,
+              onRemoveField: handleRemoveField,
+              onSetFieldLabel: handleSetFieldLabel,
+              onSetFieldType: handleSetFieldType,
+              onAddSection: handleAddSection,
+              onRenameSection: handleRenameSection,
+              onMoveField: handleMoveField,
+              onReparentSection: handleReparentSection,
+              onAddField: () => setModal("add-field"),
+              onOpenAddSection: () => setModal("add-section"),
+            }}
+            disabled={draft.confirmed}
+          />
         </>
       )}
 
@@ -330,6 +396,14 @@ export function CharacterWorkshop() {
             </div>
           </div>
           <div className="character-workshop__controls">
+            <button
+              type="button"
+              className="character-workshop__btn"
+              onClick={() => void handleDownload()}
+              disabled={pending}
+            >
+              Download PDF
+            </button>
             <button
               type="button"
               className="character-workshop__btn character-workshop__btn--ghost"
@@ -354,6 +428,12 @@ export function CharacterWorkshop() {
         onClose={() => setModal("none")}
         onSubmit={handleAddField}
         existingKeys={draft?.fields.map((field) => field.key) ?? []}
+      />
+      <AddSectionDialog
+        open={modal === "add-section"}
+        sections={draft?.sections ?? []}
+        onClose={() => setModal("none")}
+        onSubmit={handleAddSection}
       />
       <ConfirmDialog
         open={modal === "confirm"}

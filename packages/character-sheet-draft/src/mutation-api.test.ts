@@ -292,4 +292,58 @@ describe("draft mutation api", () => {
       expect((error as DraftError).code).toBe("surface_out_of_bounds");
     }
   });
+
+  it("edits labels, types and section membership without changing field keys", () => {
+    const draft = makeDraft();
+    const renamed = applyDraftMutation(draft, {
+      op: "set_field_label",
+      key: "strength",
+      label: "Fuerza",
+    });
+    const typed = applyDraftMutation(renamed, {
+      op: "set_field_type",
+      field: { key: "strength", type: "number", min: 0, max: 5 },
+    });
+    const sectioned = applyDraftMutation(typed, {
+      op: "add_section",
+      section: { key: "attributes", title: "Atributos", fieldKeys: [] },
+    });
+    const moved = applyDraftMutation(sectioned, {
+      op: "move_field",
+      key: "strength",
+      sectionKey: "attributes",
+    });
+    expect(
+      moved.fields.find((field) => field.key === "strength"),
+    ).toMatchObject({
+      label: "Fuerza",
+      type: "number",
+      min: 0,
+      max: 5,
+    });
+    expect(moved.sections).toEqual([
+      { key: "attributes", title: "Atributos", fieldKeys: ["strength"] },
+    ]);
+  });
+
+  it("reparents a section and restores it to the root", () => {
+    const draft = makeDraft({
+      sections: [
+        { key: "attributes", title: "Attributes", fieldKeys: [] },
+        { key: "physical", title: "Physical", fieldKeys: ["strength"] },
+      ],
+    });
+    const nested = applyDraftMutation(draft, {
+      op: "reparent_section",
+      key: "physical",
+      parentKey: "attributes",
+    });
+    expect(nested.sections?.[1]?.parentKey).toBe("attributes");
+    const root = applyDraftMutation(nested, {
+      op: "reparent_section",
+      key: "physical",
+      parentKey: null,
+    });
+    expect(root.sections?.[1]?.parentKey).toBeUndefined();
+  });
 });

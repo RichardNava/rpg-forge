@@ -18,9 +18,32 @@ export type CharacterTypePreference = "pc" | "npc";
 
 export type ThreatLevelPreference = "common" | "veteran" | "elite" | "boss";
 
+/**
+ * Visual style keys for sheet rendering. Must match the kebab-case regex in
+ * `packages/character-sheet-generation/src/authoring.ts` (`VisualStyleKeySchema`).
+ */
+export type VisualStyleKey =
+  | "medieval-fantasy"
+  | "dark-fantasy"
+  | "steampunk"
+  | "oriental-fantasy"
+  | "retrofuturistic"
+  | "classic-rpg";
+
+/**
+ * Portrait source for the character image.
+ */
+export type PortraitSource =
+  | { kind: "upload"; dataUrl: string }
+  | { kind: "url"; url: string }
+  | { kind: "ai"; prompt: string }
+  | { kind: "none" };
+
 export interface WorkshopPreferences {
   characterType: CharacterTypePreference;
   threatLevel: ThreatLevelPreference | null;
+  visualStyle: VisualStyleKey;
+  portrait: PortraitSource;
 }
 
 export interface SheetStoreState {
@@ -44,7 +67,12 @@ export const INITIAL_SHEET_STORE_STATE: SheetStoreState = {
   accessToken: null,
   draft: null,
   saveStatus: "idle",
-  workshop: { characterType: "pc", threatLevel: null },
+  workshop: {
+    characterType: "pc",
+    threatLevel: null,
+    visualStyle: "medieval-fantasy",
+    portrait: { kind: "none" },
+  },
   rerolledKeys: null,
   savedVersion: null,
   error: null,

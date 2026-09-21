@@ -50,6 +50,43 @@ export function projectDraftToSpec(
     }
   }
 
+  const draftSections = draft.sections ?? [];
+  const assignedKeys = new Set(
+    draftSections.flatMap((section) => section.fieldKeys),
+  );
+  const projectedSections = [
+    ...draftSections
+      .filter((section) => section.fieldKeys.length > 0)
+      .map((section, index) => ({
+        id: `draft.section.${section.key}`,
+        title: sectionTitle(draft, section.key),
+        layout: {
+          mode: "flow" as const,
+          columns: 1,
+          order: index,
+          emphasis: null,
+        },
+        fieldIds: section.fieldKeys,
+      })),
+    ...(fieldIds.filter((key) => !assignedKeys.has(key)).length > 0
+      ? [
+          {
+            id:
+              draftSections.length === 0
+                ? "draft.section"
+                : "draft.section.ungrouped",
+            title: draft.mode === "npc" ? "NPC" : "Character",
+            layout: {
+              mode: "flow" as const,
+              columns: 1,
+              order: draftSections.length,
+              emphasis: null,
+            },
+            fieldIds: fieldIds.filter((key) => !assignedKeys.has(key)),
+          },
+        ]
+      : []),
+  ];
   const spec: CharacterSheetSpec = {
     schemaVersion: "1",
     mode: draft.mode === "pc" ? "player" : "npc",
@@ -66,23 +103,11 @@ export function projectDraftToSpec(
         layout: {
           orientation: "portrait",
           sizeIntent: null,
-          sectionIds: ["draft.section"],
+          sectionIds: projectedSections.map((section) => section.id),
         },
       },
     ],
-    sections: [
-      {
-        id: "draft.section",
-        title: draft.mode === "npc" ? "NPC" : "Character",
-        layout: {
-          mode: "flow",
-          columns: 1,
-          order: 0,
-          emphasis: null,
-        },
-        fieldIds,
-      },
-    ],
+    sections: projectedSections,
     fields,
     values,
     theme: {
@@ -149,7 +174,25 @@ function draftFieldToSpecField(field: DraftField): CharacterSheetField {
           label: option,
         })),
       };
+    case "list":
+      return {
+        type: "list",
+        id: field.key,
+        label: field.label,
+        requiredForPlayableNpc: false,
+        placement: FIELD_PLACEMENT,
+        itemLabel: field.label,
+        maxItems: 100,
+      };
   }
+}
+
+function sectionTitle(draft: CharacterSheetDraft, key: string): string {
+  const section = (draft.sections ?? []).find((entry) => entry.key === key);
+  if (section === undefined) return key;
+  return section.parentKey === undefined
+    ? section.title
+    : `${sectionTitle(draft, section.parentKey)} · ${section.title}`;
 }
 
 function validateProjectedSpec(spec: CharacterSheetSpec): CharacterSheetSpec {

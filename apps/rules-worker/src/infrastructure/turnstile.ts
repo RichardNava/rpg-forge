@@ -7,6 +7,8 @@ import type { Env } from "../env.js";
 
 const TURNSTILE_VERIFY_URL =
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const LOCAL_TURNSTILE_MODE = "local";
+const LOCAL_TURNSTILE_TOKEN = "local-turnstile-bypass";
 
 interface SiteVerifyPayload {
   secret: string;
@@ -33,13 +35,21 @@ function isSiteVerifyResponse(value: unknown): value is SiteVerifyResponse {
  * cannot be made, the result is "unavailable" and session creation is denied.
  */
 export function createTurnstileHumanVerification(
-  env: Env,
+  env: Pick<Env, "TURNSTILE_MODE" | "TURNSTILE_SECRET">,
 ): HumanVerificationPort {
   return {
     async verify(
       token: string,
       context: VerificationRequestContext,
     ): Promise<VerificationResult> {
+      // Local-only opt-in: production has no bypass configuration and remains
+      // fail-closed when its Turnstile secret is absent.
+      if (
+        env.TURNSTILE_MODE === LOCAL_TURNSTILE_MODE &&
+        token === LOCAL_TURNSTILE_TOKEN
+      ) {
+        return { kind: "success" };
+      }
       const secret = env.TURNSTILE_SECRET;
       if (secret === undefined || secret === "") {
         return { kind: "unavailable" };

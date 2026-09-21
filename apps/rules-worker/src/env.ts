@@ -10,6 +10,10 @@ export interface Env {
   RULEBOOK_INGESTION_WORKFLOW?: Workflow<RulebookWorkflowParams>;
   RULES_ANALYSIS_WORKFLOW?: Workflow<RulesAnalysisWorkflowParams>;
   TURNSTILE_SECRET?: string;
+  TURNSTILE_MODE?: string;
+  SHEET_VISION_MODEL?: string;
+  SHEET_DRAFT_DEBUG?: string;
+  SHEET_VISION_DEBUG_RAW_RESPONSE?: string;
   AI?: Ai;
   VECTORIZE?: VectorizeIndex;
 }

@@ -1,5 +1,5 @@
 import type { CharacterSheetField } from "@repo/character-sheet-schema";
-import { CharacterSheetPdfRenderError } from "./errors.js";
+import { CharacterSheetPdfRenderError } from "./errors";
 
 /** Structural copy of the spec's values entry, kept local to avoid a rules-context dependency. */
 export type FieldSpecValue =

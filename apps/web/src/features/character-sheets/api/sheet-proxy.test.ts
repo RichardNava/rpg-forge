@@ -94,6 +94,19 @@ describe("resolveCharacterSheetProxyPath", () => {
     });
   });
 
+  it("accepts the authenticated document extraction endpoint", () => {
+    expect(
+      resolveCharacterSheetProxyPath("POST", [
+        "sessions",
+        SESSION_ID,
+        "extraction",
+      ]),
+    ).toMatchObject({
+      kind: "ok",
+      upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/extraction`,
+    });
+  });
+
   it("rejects unsafe identity segments", () => {
     expect(
       resolveCharacterSheetProxyPath("GET", ["sessions", "..", "etc"]),

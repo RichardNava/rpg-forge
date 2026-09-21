@@ -275,7 +275,7 @@ describe("createSheetStore", () => {
 describe("character-sheet workshop preferences", () => {
   it("starts with a player-character default and no threat level", () => {
     const store = createSheetStore({ api: makeApiClient() });
-    expect(store.getState().workshop).toEqual({
+    expect(store.getState().workshop).toMatchObject({
       characterType: "pc",
       threatLevel: null,
     });
@@ -306,7 +306,7 @@ describe("character-sheet workshop preferences", () => {
     store.setWorkshopPreferences({ threatLevel: "elite" });
     expect(store.getState().workshop.threatLevel).toBe("elite");
     store.setWorkshopPreferences({ characterType: "pc", threatLevel: null });
-    expect(store.getState().workshop).toEqual({
+    expect(store.getState().workshop).toMatchObject({
       characterType: "pc",
       threatLevel: null,
     });
@@ -318,7 +318,7 @@ describe("character-sheet workshop preferences", () => {
     await store.hydrate(DRAFT_ID);
     store.setWorkshopPreferences({ characterType: "npc", threatLevel: "boss" });
     store.reset();
-    expect(store.getState().workshop).toEqual({
+    expect(store.getState().workshop).toMatchObject({
       characterType: "pc",
       threatLevel: null,
     });

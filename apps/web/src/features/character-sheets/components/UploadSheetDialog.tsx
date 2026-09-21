@@ -7,12 +7,16 @@ import {
 } from "../lib/sheet-upload-validation";
 import type { SheetDocumentFileDescriptor } from "../extraction/extraction-service";
 
+interface SheetUploadDescriptor extends SheetDocumentFileDescriptor {
+  sheetStartPage?: number;
+}
+
 interface UploadSheetDialogProps {
   open: boolean;
   busy: boolean;
   error: string | null;
   onClose(): void;
-  onSubmit(file: SheetDocumentFileDescriptor): Promise<string | null>;
+  onSubmit(file: SheetUploadDescriptor): Promise<string | null>;
 }
 
 /**
@@ -31,6 +35,8 @@ export function UploadSheetDialog({
 }: UploadSheetDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [hasMoreThanThreePages, setHasMoreThanThreePages] = useState(false);
+  const [sheetStartPage, setSheetStartPage] = useState("1");
 
   if (!open) {
     return null;
@@ -41,20 +47,34 @@ export function UploadSheetDialog({
     if (!result.valid) {
       setFile(null);
       setValidationError(result.message);
+      setHasMoreThanThreePages(false);
+      setSheetStartPage("1");
       return;
     }
     setFile(next);
     setValidationError(null);
+    setHasMoreThanThreePages(false);
+    setSheetStartPage("1");
   }
 
   async function handleExtract() {
     if (file === null) {
       return;
     }
-    const descriptor: SheetDocumentFileDescriptor = {
+    const parsedStartPage = Number(sheetStartPage);
+    if (
+      hasMoreThanThreePages &&
+      (!Number.isSafeInteger(parsedStartPage) || parsedStartPage < 1)
+    ) {
+      setValidationError("Enter a whole page number of 1 or greater.");
+      return;
+    }
+    const descriptor: SheetUploadDescriptor = {
       name: file.name,
       mimeType: file.type,
       size: file.size,
+      blob: file,
+      ...(hasMoreThanThreePages ? { sheetStartPage: parsedStartPage } : {}),
     };
     const rejection = await onSubmit(descriptor);
     if (rejection !== null) {
@@ -102,14 +122,56 @@ export function UploadSheetDialog({
         </label>
 
         {file !== null && (
-          <div className="character-workshop__upload-file">
-            <span className="character-workshop__upload-file-name">
-              {file.name}
-            </span>
-            <span className="character-workshop__upload-file-size">
-              {formatFileSize(file.size)}
-            </span>
-          </div>
+          <>
+            <div className="character-workshop__upload-file">
+              <span className="character-workshop__upload-file-name">
+                {file.name}
+              </span>
+              <span className="character-workshop__upload-file-size">
+                {formatFileSize(file.size)}
+              </span>
+            </div>
+            {file.type === "application/pdf" && (
+              <div className="character-workshop__page-selection">
+                <label className="character-workshop__page-option">
+                  <input
+                    type="checkbox"
+                    checked={hasMoreThanThreePages}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setHasMoreThanThreePages(event.currentTarget.checked)
+                    }
+                  />
+                  This PDF has more than 3 pages
+                </label>
+                {hasMoreThanThreePages && (
+                  <label className="character-workshop__page-number">
+                    Start extracting at page
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      inputMode="numeric"
+                      value={sheetStartPage}
+                      disabled={busy}
+                      aria-describedby={
+                        validationError === null ? undefined : "upload-error"
+                      }
+                      onChange={(event) => {
+                        setSheetStartPage(event.currentTarget.value);
+                        setValidationError(null);
+                      }}
+                    />
+                  </label>
+                )}
+                <p className="character-workshop__page-selection-help">
+                  We cannot determine PDF page counts in this browser. Select
+                  the first page of the character sheet if this document has
+                  additional pages.
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {busy && (

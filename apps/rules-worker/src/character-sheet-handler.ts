@@ -14,9 +14,13 @@ import {
   type CharacterSheetDraft,
   type CharacterSheetDraftIdentity,
 } from "@repo/character-sheet-draft";
+import type { ExtractedCharacterNode } from "./features/character-sheets/extraction/extracted-character-structure.js";
+import { compileExtractedCharacterStructure } from "./features/character-sheets/extraction/compile-extracted-character-structure.js";
+import { ObservationError } from "./infrastructure/sheet-visual-extraction.js";
 import {
   parseBearerToken,
   hasJsonContentType,
+  readBoundedBytes,
   readBoundedJson,
 } from "./http.js";
 import { errorResponse, jsonResponse } from "./transport/errors.js";
@@ -40,6 +44,20 @@ const SHEET_DRAFT_REROLL_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/reroll$/;
 const SHEET_DRAFT_CONFIRM_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/confirm$/;
+const SHEET_DOCUMENT_EXTRACTION_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/extraction$/;
+const SHEET_DOCUMENT_MAX_BYTES = 8 * 1024 * 1024;
+const SHEET_DOCUMENT_MULTIPART_OVERHEAD_BYTES = 64 * 1024;
+const SHEET_DOCUMENT_MAX_REQUEST_BYTES =
+  16 * 1024 * 1024 + SHEET_DOCUMENT_MULTIPART_OVERHEAD_BYTES;
+const SHEET_DOCUMENT_MAX_IMAGE_PIXELS = 40_000_000;
+const SHEET_VISUAL_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+const SHEET_DOCUMENT_MAX_PDF_PAGES = 64;
+const SHEET_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+]);
 
 function toPublicSheetSession(session: SheetSession): SheetSessionView {
   return {
@@ -110,6 +128,11 @@ export async function handleCharacterSheetRequest(
     }
   }
 
+  const extractionMatch = SHEET_DOCUMENT_EXTRACTION_PATH_PATTERN.exec(path);
+  if (extractionMatch !== null && method === "POST") {
+    return handleExtractSheetDocument(extractionMatch[1] ?? "", request, deps);
+  }
+
   const draftRerollMatch = SHEET_DRAFT_REROLL_PATH_PATTERN.exec(path);
   if (draftRerollMatch !== null) {
     const sessionId = draftRerollMatch[1] ?? "";
@@ -149,6 +172,221 @@ export async function handleCharacterSheetRequest(
   }
 
   return errorResponse("INVALID_REQUEST", "Route not found.", 404);
+}
+
+async function handleExtractSheetDocument(
+  sessionId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (!request.headers.get("content-type")?.startsWith("multipart/form-data")) {
+    return errorResponse("SHEET_DOCUMENT_INVALID_REQUEST");
+  }
+  // Reject before multipart parsing can allocate an unbounded upload.
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateLimit = await deps.rateLimiter.consume(
+    `sheet-document-extraction:${clientIp}`,
+  );
+  if (rateLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (rateLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
+  const requestBytes = await readBoundedBytes(
+    request,
+    SHEET_DOCUMENT_MAX_REQUEST_BYTES,
+  );
+  if (requestBytes === null) {
+    return errorResponse("SHEET_DOCUMENT_TOO_LARGE");
+  }
+
+  let form: FormData;
+  try {
+    form = await new Request(request.url, {
+      method: "POST",
+      headers: request.headers,
+      body: requestBytes,
+    }).formData();
+  } catch {
+    return errorResponse("SHEET_DOCUMENT_INVALID_REQUEST");
+  }
+  const documents = form.getAll("document");
+  const document = documents.length === 1 ? documents[0] : null;
+  if (!(document instanceof File)) {
+    return errorResponse("SHEET_DOCUMENT_INVALID_REQUEST");
+  }
+  const pageValues = form.getAll("page");
+  const pages = pageValues.filter(
+    (value): value is File => value instanceof File,
+  );
+  if (pages.length !== pageValues.length || pages.length > 3) {
+    return errorResponse("SHEET_DOCUMENT_INVALID_REQUEST");
+  }
+  if (!SHEET_DOCUMENT_MIME_TYPES.has(document.type)) {
+    return errorResponse("SHEET_DOCUMENT_INVALID_TYPE");
+  }
+  if (document.size === 0 || document.size > SHEET_DOCUMENT_MAX_BYTES) {
+    return errorResponse("SHEET_DOCUMENT_TOO_LARGE");
+  }
+  if (!(await hasValidDocumentContent(document))) {
+    return errorResponse("SHEET_DOCUMENT_INVALID_CONTENT");
+  }
+  for (const page of pages) {
+    if (page.type !== "image/jpeg") {
+      return errorResponse("SHEET_DOCUMENT_INVALID_TYPE");
+    }
+    if (page.size === 0 || page.size > SHEET_VISUAL_PAGE_MAX_BYTES) {
+      return errorResponse("SHEET_DOCUMENT_TOO_LARGE");
+    }
+    if (!(await hasValidDocumentContent(page))) {
+      return errorResponse("SHEET_DOCUMENT_INVALID_CONTENT");
+    }
+  }
+  if (pages.length > 0 && deps.sheetVisualExtraction !== undefined) {
+    try {
+      const observed = await deps.sheetVisualExtraction.extract({ pages });
+      if (deps.debugSheetDrafts) {
+        console.info("[character-sheet] observed structure", {
+          pageCount: observed.document.pageCount,
+          rootNodes: observed.nodes.length,
+          observedFields: countObservedFields(observed.nodes),
+        });
+      }
+      const draft = compileExtractedCharacterStructure({
+        structure: observed,
+        sessionId: auth.sessionId,
+        sourceSheetId: deriveDocumentSourceId(document.name),
+      });
+      console.info("character-sheet draft compiled", {
+        compiledSectionCount: draft.sections?.length ?? 0,
+        compiledFieldCount: draft.fields.length,
+        ungroupedFieldCount: countUngroupedFields(draft),
+      });
+      traceSheetDraft(deps, "extraction response", draft);
+      return jsonResponse(200, draft);
+    } catch (error) {
+      // Provider diagnostics only; never log document bytes or model output.
+      console.warn("character-sheet visual extraction failed", {
+        error:
+          error instanceof Error && error.message !== ""
+            ? error.message.slice(0, 256)
+            : "unknown",
+      });
+      return errorResponse(
+        error instanceof ObservationError && error.stage !== "timeout"
+          ? "SHEET_DOCUMENT_EXTRACTION_FAILED"
+          : "SHEET_DOCUMENT_EXTRACTION_UNAVAILABLE",
+      );
+    }
+  }
+  return errorResponse("SHEET_DOCUMENT_EXTRACTION_UNAVAILABLE");
+}
+
+function countObservedFields(nodes: readonly ExtractedCharacterNode[]): number {
+  return nodes.reduce(
+    (count, node) =>
+      count + (node.kind === "field" ? 1 : countObservedFields(node.children)),
+    0,
+  );
+}
+
+function countUngroupedFields(draft: CharacterSheetDraft): number {
+  const assigned = new Set(
+    draft.sections?.flatMap((section) => section.fieldKeys) ?? [],
+  );
+  return draft.fields.filter((field) => !assigned.has(field.key)).length;
+}
+
+/** Debugging deliberately records only aggregate draft metadata, never content. */
+function traceSheetDraft(
+  deps: AppDeps,
+  title: string,
+  draft: CharacterSheetDraft,
+): void {
+  if (!deps.debugSheetDrafts) return;
+  console.info(`[character-sheet] ${title}`, {
+    fieldCount: draft.fields.length,
+    sectionCount: draft.sections?.length ?? 0,
+    valueCount: Object.keys(draft.values).length,
+    confirmed: draft.confirmed,
+  });
+}
+
+async function hasValidDocumentContent(document: File): Promise<boolean> {
+  const bytes = new Uint8Array(await document.arrayBuffer());
+  if (document.type === "application/pdf") {
+    if (!startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) {
+      return false;
+    }
+    const pdf = new TextDecoder("latin1").decode(bytes);
+    return (
+      (pdf.match(/\/Type\s*\/Page\b/g)?.length ?? 0) <=
+      SHEET_DOCUMENT_MAX_PDF_PAGES
+    );
+  }
+  if (document.type === "image/png") {
+    if (
+      !startsWith(bytes, [137, 80, 78, 71, 13, 10, 26, 10]) ||
+      bytes.length < 24
+    ) {
+      return false;
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return pixelsAreWithinLimit(view.getUint32(16), view.getUint32(20));
+  }
+  return isValidJpeg(bytes);
+}
+
+function startsWith(bytes: Uint8Array, expected: number[]): boolean {
+  return expected.every((value, index) => bytes[index] === value);
+}
+
+function pixelsAreWithinLimit(width: number, height: number): boolean {
+  return (
+    width > 0 && height > 0 && width * height <= SHEET_DOCUMENT_MAX_IMAGE_PIXELS
+  );
+}
+
+function isValidJpeg(bytes: Uint8Array): boolean {
+  if (!startsWith(bytes, [0xff, 0xd8, 0xff])) {
+    return false;
+  }
+  for (let offset = 2; offset + 8 < bytes.length;) {
+    if (bytes[offset] !== 0xff) return false;
+    while (bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset] ?? 0;
+    offset += 1;
+    if (marker === 0xd9 || marker === 0xda) return false;
+    const length = ((bytes[offset] ?? 0) << 8) | (bytes[offset + 1] ?? 0);
+    if (length < 7 || offset + length > bytes.length) return false;
+    if (
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf)
+    ) {
+      const height = ((bytes[offset + 3] ?? 0) << 8) | (bytes[offset + 4] ?? 0);
+      const width = ((bytes[offset + 5] ?? 0) << 8) | (bytes[offset + 6] ?? 0);
+      return pixelsAreWithinLimit(width, height);
+    }
+    offset += length;
+  }
+  return false;
+}
+
+function deriveDocumentSourceId(fileName: string): string {
+  const source = fileName
+    .replace(/\.[^.]+$/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._:-]+/g, "-")
+    .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")
+    .slice(0, 128);
+  return source === "" ? "uploaded-sheet" : source;
 }
 
 async function handleCreateSheetSession(
@@ -301,6 +539,7 @@ async function handleCreateDraft(
     return errorResponse("SHEET_DRAFT_ALREADY_EXISTS");
   }
 
+  traceSheetDraft(deps, "draft create response", snapshot);
   return jsonResponse(201, snapshot);
 }
 
@@ -341,6 +580,7 @@ async function handleGetDraft(
     if (draft === null) {
       return errorResponse("SHEET_DRAFT_NOT_FOUND");
     }
+    traceSheetDraft(deps, "draft version response", draft);
     return jsonResponse(200, draft);
   }
 
@@ -360,6 +600,7 @@ async function handleGetDraft(
   if (draft === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
+  traceSheetDraft(deps, "draft current response", draft);
   return jsonResponse(200, draft);
 }
 
@@ -427,6 +668,7 @@ async function handleMutateDraft(
     return committed.response;
   }
 
+  traceSheetDraft(deps, "draft mutation response", committed.draft);
   return jsonResponse(200, committed.draft);
 }
 
@@ -501,6 +743,7 @@ async function handleRerollDraft(
     return committed.response;
   }
 
+  traceSheetDraft(deps, "draft confirmation response", committed.draft);
   return jsonResponse(200, {
     draft: committed.draft,
     rerolledKeys,

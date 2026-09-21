@@ -98,8 +98,8 @@ Deferred:
   `SheetApiClient` route (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote` is
   implemented client-side but verifies against rules-worker only after the
   Turnstile secret is configured); the local backend is the default
-- production multimodal template extractor adapter (blocked: no vision model
-  is committed) — the only remaining 14.7C item
+- template extraction from external rulebook sources (the standalone uploaded
+  character-sheet path is implemented separately below)
 - production `RulebookFieldDerivationPort` adapter — superseded for the
   template-backed flow; kept as a legacy port
 - HTTP orchestration — 14.7D
@@ -564,15 +564,10 @@ Verified suites (all green in the current Phase 14.7E working tree):
   secret, so development defaults to the in-memory local backend
   (`createLocalSheetBackend`) which runs the same draft-domain rules. Also
   deferred: PDF export/download and PC/NPC mode selection in the workshop UI.
-- **14.7C remainder** — production multimodal template extractor. The port
-  and reference extractor are implemented, but no production adapter can be
-  written until a vision model is committed: only text and embedding models
-  exist in configuration (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
-  `@cf/google/embeddinggemma-300m`); vision types appear only in generated
-  `cloudflare-env.d.ts` unions, not in any provider selection. There is no
-  committed multimodal model. Also deferred: the production
-  `RulebookFieldDerivationPort` adapter, marked legacy/superseded for the
-  template-backed flow.
+- **14.7C remainder** — production template extraction from external rulebook
+  sources and the production `RulebookFieldDerivationPort` adapter, marked
+  legacy/superseded for the template-backed flow. This is distinct from the
+  temporary user-uploaded character-sheet extraction delivered below.
 - **14.7D** — HTTP orchestration: session creation/authorization, run
   management, ownership validation, artifact preview/download. Not present
   today.
@@ -719,7 +714,7 @@ Web-surface highlights:
   `add_field` schema (key slugification, `type`, bounds/options) and surfaces
   client + domain validation.
 - **Local dev backend.** rules-worker fails closed (`403
-  HUMAN_VERIFICATION_REQUIRED`) without a Turnstile secret, so development uses
+HUMAN_VERIFICATION_REQUIRED`) without a Turnstile secret, so development uses
   `createLocalSheetBackend` — an in-memory `SheetApiClientPort` running the
   real domain rules (`applyDraftMutation`, `finalizeDraft`,
   `rerollLockedDraftValues`, `validateDraft`, `bumpDraftVersion`,
@@ -745,6 +740,44 @@ Verified suites added in 14.7G (web, all green):
   over) and dialog-side domain rejection
 - local backend: `local-sheet-backend.test.ts` — port contract with real rules
 - pre-existing test-file type fixes listed in the commit's diff
+
+## Temporary Uploaded Sheet Extraction
+
+The standalone Character Workshop can now extract an editable draft from one
+user-uploaded PDF, PNG, or JPEG through the protected remote Worker path:
+
+```text
+browser File (<= 8 MiB, multipart/form-data)
+  → same-origin character-sheet proxy (binary forwarding, whitelist)
+  → authorized temporary sheet session + extraction rate limit
+  → browser rasterizes PDF pages / normalizes images to JPEG
+  → Cloudflare Workers AI vision adapter
+  → validated ExtractedCharacterStructure (flat observed nodes rebuilt as a tree)
+  → deterministic structure compiler
+  → validated CharacterSheetDraft
+  → existing store/editor flow
+```
+
+- The document and conversion output are processed in memory only: neither is
+  stored in D1, R2, logs, or the draft response.
+- The Worker accepts exactly one `document` form field, validates the MIME type
+  (`application/pdf`, `image/png`, `image/jpeg`) and the 8 MiB maximum again on
+  the server, requires the sheet-session bearer token, and consumes a dedicated
+  per-IP extraction rate-limit key.
+- The project-owned vision adapter receives only normalized page images. It asks
+  the configured server-side model to observe flat `id`/`parentId` nodes, then
+  validates and rebuilds the hierarchy before the deterministic compiler creates
+  the draft. The model never receives RPG Forge keys, session metadata, or UI
+  concepts.
+- The compiler derives safe unique keys, generic control types, section parent
+  links and field membership. It does not infer game-system mechanics or add
+  system-specific fields. Markdown conversion is not a functional dependency of
+  uploaded-sheet extraction.
+- The protected remote extraction path is selected by default. The local
+  extraction double is available only when explicitly selected for isolated
+  development and rejects uploads rather than fabricating fields from a file
+  name. `NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=local` must not be used to test
+  document extraction.
 
 ## Related documents
 

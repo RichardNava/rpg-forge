@@ -45,6 +45,7 @@ export function makeDraft(
       },
       { key: "veteran", label: "Veteran", type: "checkbox", locked: false },
     ],
+    sections: [],
     values: {
       character_name: "Aria Stone",
       strength: 12,

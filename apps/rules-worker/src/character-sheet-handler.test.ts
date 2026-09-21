@@ -362,6 +362,133 @@ describe("character-sheet session creation", () => {
   });
 });
 
+describe("character-sheet document extraction", () => {
+  it("compiles an observed visual hierarchy into draft sections", async () => {
+    const harness = makeHarness();
+    harness.deps.sheetVisualExtraction = {
+      extract: async () => ({
+        schemaVersion: "1",
+        document: { pageCount: 1 },
+        nodes: [
+          {
+            kind: "section",
+            label: "Attributes",
+            children: [
+              {
+                kind: "section",
+                label: "Physical",
+                children: [
+                  {
+                    kind: "field",
+                    label: "Strength",
+                    control: {
+                      kind: "rating",
+                      constraints: { min: 0, max: 5 },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    };
+    const { sessionId, accessToken } = await createSheetSession(harness);
+    const form = new FormData();
+    form.append(
+      "document",
+      new Blob(["%PDF-1.4\n/Type /Page\nsheet-bytes"], {
+        type: "application/pdf",
+      }),
+      "nyra.pdf",
+    );
+    form.append(
+      "page",
+      new Blob(
+        [new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0, 7, 8, 0, 1, 0, 1])],
+        { type: "image/jpeg" },
+      ),
+      "page-1.jpg",
+    );
+
+    const response = await handleRequest(
+      new Request(
+        `${BASE_URL}/v1/character-sheets/sessions/${sessionId}/extraction`,
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${accessToken}` },
+          body: form,
+        },
+      ),
+      harness.deps,
+    );
+
+    expect(response.status).toBe(200);
+    const draft = await readJson<CharacterSheetDraft>(response);
+    expect(draft.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "strength", type: "number" }),
+      ]),
+    );
+    expect(draft.sections).toEqual([
+      expect.objectContaining({ key: "attributes", fieldKeys: [] }),
+      expect.objectContaining({
+        key: "physical",
+        parentKey: "attributes",
+        fieldKeys: ["strength"],
+      }),
+    ]);
+  });
+
+  it("rejects invalid document types and unavailable conversion", async () => {
+    const harness = makeHarness();
+    const { sessionId, accessToken } = await createSheetSession(harness);
+    const textForm = new FormData();
+    textForm.append(
+      "document",
+      new Blob(["text"], { type: "text/plain" }),
+      "sheet.txt",
+    );
+    const invalidType = await handleRequest(
+      new Request(
+        `${BASE_URL}/v1/character-sheets/sessions/${sessionId}/extraction`,
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${accessToken}` },
+          body: textForm,
+        },
+      ),
+      harness.deps,
+    );
+    expect(invalidType.status).toBe(415);
+    expect((await readJson<ErrorBody>(invalidType)).error.code).toBe(
+      "SHEET_DOCUMENT_INVALID_TYPE",
+    );
+
+    const pdfForm = new FormData();
+    pdfForm.append(
+      "document",
+      new Blob(["%PDF-1.4\n/Type /Page"], { type: "application/pdf" }),
+      "sheet.pdf",
+    );
+    const unavailable = await handleRequest(
+      new Request(
+        `${BASE_URL}/v1/character-sheets/sessions/${sessionId}/extraction`,
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${accessToken}` },
+          body: pdfForm,
+        },
+      ),
+      harness.deps,
+    );
+    expect(unavailable.status).toBe(503);
+    expect((await readJson<ErrorBody>(unavailable)).error.code).toBe(
+      "SHEET_DOCUMENT_EXTRACTION_UNAVAILABLE",
+    );
+  });
+});
+
 describe("character-sheet session reads", () => {
   it("returns the active session view for a valid token", async () => {
     const harness = makeHarness();

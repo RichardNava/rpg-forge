@@ -5,7 +5,7 @@ import {
   type SectionLayout,
 } from "@repo/character-sheet-schema";
 
-import { CharacterSheetPdfRenderError } from "./errors.js";
+import { CharacterSheetPdfRenderError } from "./errors";
 
 /**
  * Deterministic page geometry and grid packing.

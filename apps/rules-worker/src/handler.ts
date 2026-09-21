@@ -20,6 +20,7 @@ import type {
   DraftHeadRepositoryPort,
 } from "@repo/character-sheet-session";
 import type { CharacterSheetDraftStore } from "@repo/character-sheet-draft";
+import type { CharacterSheetArtifactStore } from "@repo/character-sheet-artifacts";
 import {
   parseBearerToken,
   hasJsonContentType,
@@ -42,6 +43,7 @@ import type {
   RunArtifactPort,
 } from "@repo/rules-analysis-run";
 import type { RulesAnalysisWorkflowPort } from "./infrastructure/rules-analysis-workflow.js";
+import type { SheetVisualExtractionPort } from "./infrastructure/sheet-visual-extraction.js";
 
 export interface AppDeps {
   crypto: SessionCrypto;
@@ -60,6 +62,9 @@ export interface AppDeps {
   sheetSessionRepository: SheetSessionRepositoryPort;
   sheetDraftHeadRepository: DraftHeadRepositoryPort;
   sheetDraftStore?: CharacterSheetDraftStore;
+  sheetArtifactStore?: CharacterSheetArtifactStore;
+  sheetVisualExtraction?: SheetVisualExtractionPort;
+  debugSheetDrafts?: boolean;
 }
 
 const SESSIONS_PATH = "/v1/rules-analysis/sessions";

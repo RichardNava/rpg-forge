@@ -48,11 +48,13 @@ describe("CharacterWorkshop", () => {
       ).toBeTruthy();
     });
 
-    // Renaming the sheet mirrors the preview title.
+    // Renaming the sheet keeps the title input in sync without a persistent preview.
     const titleInput = screen.getByLabelText("Sheet title");
     fireEvent.change(titleInput, { target: { value: "Mara Thorn" } });
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Mara Thorn" })).toBeTruthy();
+      expect(
+        (screen.getByLabelText("Sheet title") as HTMLInputElement).value,
+      ).toBe("Mara Thorn");
     });
 
     // Add a number field through the dialog.
@@ -77,16 +79,12 @@ describe("CharacterWorkshop", () => {
     });
     expect(screen.queryByRole("dialog", { name: "Add a field" })).toBeNull();
 
-    // The new field is editable and drives the preview.
+    // The new field is editable directly in the single editor surface.
     const ageInput = screen.getByLabelText("Age");
     fireEvent.change(ageInput, { target: { value: "29" } });
-    await waitFor(() => {
-      expect(
-        screen.getByText("29", {
-          selector: ".character-workshop__preview-value",
-        }),
-      ).toBeTruthy();
-    });
+    await waitFor(() =>
+      expect((ageInput as HTMLInputElement).value).toBe("29"),
+    );
 
     // Confirm transitions the sheet to read-only.
     fireEvent.click(screen.getByRole("button", { name: "Confirm sheet" }));
@@ -100,6 +98,7 @@ describe("CharacterWorkshop", () => {
     await waitFor(() => {
       expect(screen.getByText(/confirmed and read-only/i)).toBeTruthy();
     });
+    expect(screen.getByRole("button", { name: "Download PDF" })).toBeTruthy();
 
     // Start a new sheet returns to the landing screen.
     fireEvent.click(screen.getByRole("button", { name: "Start a new sheet" }));
@@ -121,7 +120,9 @@ describe("CharacterWorkshop", () => {
 
   it("opens the upload dialog and rejects unsupported documents", async () => {
     render(<CharacterWorkshop />);
-    fireEvent.click(screen.getByRole("button", { name: /Upload existing sheet/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Upload existing sheet/i }),
+    );
 
     const dialog = screen.getByRole("dialog", {
       name: "Upload an existing sheet",
@@ -141,7 +142,9 @@ describe("CharacterWorkshop", () => {
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Extract fields" }),
     );
-    expect(screen.getByRole("dialog", { name: "Upload an existing sheet" })).toBeTruthy();
+    expect(
+      screen.getByRole("dialog", { name: "Upload an existing sheet" }),
+    ).toBeTruthy();
     expect(
       screen.queryByRole("heading", {
         name: /How do you want to create your character\?/i,

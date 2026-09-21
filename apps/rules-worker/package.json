@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --local --env local",
+    "dev": "wrangler dev --env local",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.mts",

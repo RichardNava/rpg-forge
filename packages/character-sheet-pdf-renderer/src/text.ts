@@ -1,6 +1,6 @@
 import type { PDFFont } from "pdf-lib";
 
-import { CharacterSheetPdfRenderError } from "./errors.js";
+import { CharacterSheetPdfRenderError } from "./errors";
 
 /**
  * Deterministic text fitting for the Standard 14 fonts.

@@ -11,8 +11,8 @@ import {
   type PDFPage,
 } from "pdf-lib";
 
-import { CharacterSheetPdfRenderError } from "./errors.js";
-import { assertSupportedGlyphs } from "./glyphs.js";
+import { CharacterSheetPdfRenderError } from "./errors";
+import { assertSupportedGlyphs } from "./glyphs";
 import {
   contentArea,
   layoutSection,
@@ -23,15 +23,15 @@ import {
   ROW_HEIGHT,
   SECTION_GAP,
   SECTION_TITLE_HEIGHT,
-} from "./layout.js";
+} from "./layout";
 import {
   buildManifest,
   type PdfRenderFormFieldEntry,
   type PdfRenderManifest,
-} from "./manifest.js";
-import type { PlacedField } from "./layout.js";
-import { fitFieldValue, fitLabel, fitSectionTitle } from "./text.js";
-import { pdfFieldNameFor, resolveFieldValue } from "./values.js";
+} from "./manifest";
+import type { PlacedField } from "./layout";
+import { fitFieldValue, fitLabel, fitSectionTitle } from "./text";
+import { pdfFieldNameFor, resolveFieldValue } from "./values";
 
 export interface RenderCharacterSheetPdfInput {
   readonly spec: CharacterSheetSpec;

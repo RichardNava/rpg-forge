@@ -150,6 +150,49 @@ describe("character sheet draft schema", () => {
     expect(() => validateDraft(draft)).toThrowError(/min cannot exceed/);
   });
 
+  it("accepts arbitrary nested section groupings and list values", () => {
+    const draft = makeDraft();
+    draft.fields.push({
+      key: "backgrounds",
+      label: "Backgrounds",
+      type: "list",
+      locked: false,
+    });
+    draft.sections = [
+      { key: "attributes", title: "Attributes", fieldKeys: [] },
+      {
+        key: "physical",
+        title: "Physical",
+        parentKey: "attributes",
+        fieldKeys: [draft.fields[0]!.key],
+      },
+      { key: "details", title: "Details", fieldKeys: ["backgrounds"] },
+    ];
+    draft.values.backgrounds = ["One", "Two"];
+    expect(() => validateDraft(draft)).not.toThrow();
+  });
+
+  it("rejects section cycles and repeated field membership", () => {
+    const draft = makeDraft();
+    draft.sections = [
+      {
+        key: "one",
+        title: "One",
+        parentKey: "two",
+        fieldKeys: ["character_name"],
+      },
+      {
+        key: "two",
+        title: "Two",
+        parentKey: "one",
+        fieldKeys: ["character_name"],
+      },
+    ];
+    expect(() => validateDraft(draft)).toThrowError(
+      /invalid field membership|invalid parent hierarchy/,
+    );
+  });
+
   it("rejects unsafe session and draft identities", () => {
     for (const identity of [
       { sessionId: ".." },

@@ -26,5 +26,23 @@ export default {
         `rules-analysis cleanup: ${result.failed.length}/${result.processed} sessions failed`,
       );
     }
+    const sheetCandidates = await deps.sheetSessionRepository.findCleanupCandidates(
+      deps.clock.now(),
+      MAX_CLEANUP_BATCH_SIZE,
+    );
+    for (const session of sheetCandidates) {
+      const transition = await deps.sheetSessionRepository.markDeletingIfActive(
+        session.sessionId,
+      );
+      if (transition === "not_found") continue;
+      try {
+        // This prefix sweep removes every snapshot, including extracted drafts.
+        await deps.sheetArtifactStore?.deleteSessionArtifacts(session.sessionId);
+        await deps.sheetDraftHeadRepository.deleteSessionHeads(session.sessionId);
+        await deps.sheetSessionRepository.delete(session.sessionId);
+      } catch {
+        console.warn(`character-sheet cleanup failed for session ${session.sessionId}`);
+      }
+    }
   },
 } satisfies ExportedHandler<Env>;

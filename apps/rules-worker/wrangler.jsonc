@@ -31,8 +31,20 @@
   },
   "env": {
     "local": {
+      "vars": {
+        // The in-memory limiter is intentionally local-only; remote deployments
+        // must provide the Cloudflare RATE_LIMITER binding instead.
+        "RATE_LIMIT_MODE": "local",
+        "TURNSTILE_MODE": "local",
+        "SHEET_VISION_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
+        // Prints raw model output only for a deliberate local diagnostic session.
+        "SHEET_VISION_DEBUG_RAW_RESPONSE": "true",
+      },
       "ai": {
         "binding": "AI",
+        // Workers AI has no local emulator. This binding uses the account while
+        // the named environment keeps D1 and R2 local.
+        "remote": true,
       },
       "d1_databases": [
         {

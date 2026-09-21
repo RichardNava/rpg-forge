@@ -33,6 +33,12 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   ANALYSIS_SESSION_DELETE_FAILED: 500,
   SHEET_SESSION_NOT_FOUND_OR_UNAUTHORIZED: 404,
   SHEET_SESSION_EXPIRED: 410,
+  SHEET_DOCUMENT_INVALID_REQUEST: 400,
+  SHEET_DOCUMENT_INVALID_TYPE: 415,
+  SHEET_DOCUMENT_INVALID_CONTENT: 400,
+  SHEET_DOCUMENT_TOO_LARGE: 413,
+  SHEET_DOCUMENT_EXTRACTION_UNAVAILABLE: 503,
+  SHEET_DOCUMENT_EXTRACTION_FAILED: 422,
   SHEET_DRAFT_INVALID: 400,
   SHEET_DRAFT_STORAGE_UNAVAILABLE: 503,
   SHEET_DRAFT_CORRUPT: 500,
@@ -96,6 +102,17 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   SHEET_SESSION_NOT_FOUND_OR_UNAUTHORIZED:
     "The sheet session was not found or the supplied credentials are invalid.",
   SHEET_SESSION_EXPIRED: "This sheet session has expired.",
+  SHEET_DOCUMENT_INVALID_REQUEST:
+    "Send exactly one character-sheet document as multipart field 'document'.",
+  SHEET_DOCUMENT_INVALID_TYPE: "Only PDF, PNG and JPG documents can be imported.",
+  SHEET_DOCUMENT_INVALID_CONTENT:
+    "The document contents do not match its declared type.",
+  SHEET_DOCUMENT_TOO_LARGE:
+    "The document is empty or exceeds the 8 MiB import limit.",
+  SHEET_DOCUMENT_EXTRACTION_UNAVAILABLE:
+    "Document extraction is temporarily unavailable. Please try again later.",
+  SHEET_DOCUMENT_EXTRACTION_FAILED:
+    "The document could not be converted into an editable character sheet.",
   SHEET_DRAFT_INVALID:
     "The draft is invalid. Check that the initial snapshot is well-formed.",
   SHEET_DRAFT_STORAGE_UNAVAILABLE:

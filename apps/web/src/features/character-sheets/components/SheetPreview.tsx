@@ -43,11 +43,80 @@ export function SheetPreview({ draft }: SheetPreviewProps) {
         </h2>
       </div>
       <div className="character-workshop__sheet-body">
-        {draft.fields.map((field) => (
-          <PreviewField key={field.key} draft={draft} fieldKey={field.key} />
-        ))}
+        <PreviewGroups draft={draft} />
       </div>
     </div>
+  );
+}
+
+function PreviewGroups({ draft }: { draft: CharacterSheetDraft }) {
+  const sections = draft.sections ?? [];
+  if (sections.length === 0)
+    return draft.fields.map((field) => (
+      <PreviewField key={field.key} draft={draft} fieldKey={field.key} />
+    ));
+  const assigned = new Set(sections.flatMap((section) => section.fieldKeys));
+  return (
+    <>
+      {sections
+        .filter((section) => section.parentKey === undefined)
+        .map((section) => (
+          <PreviewSection
+            key={section.key}
+            sectionKey={section.key}
+            draft={draft}
+            depth={0}
+          />
+        ))}
+      {draft.fields
+        .filter((field) => !assigned.has(field.key))
+        .map((field) => (
+          <PreviewField key={field.key} draft={draft} fieldKey={field.key} />
+        ))}
+    </>
+  );
+}
+
+function PreviewSection({
+  sectionKey,
+  draft,
+  depth,
+}: {
+  sectionKey: string;
+  draft: CharacterSheetDraft;
+  depth: number;
+}) {
+  const sections = draft.sections ?? [];
+  const section = sections.find((entry) => entry.key === sectionKey);
+  if (section === undefined) return null;
+  return (
+    <section
+      className="character-workshop__preview-section"
+      data-depth={depth}
+      aria-labelledby={`preview-section-${section.key}`}
+    >
+      <h3
+        id={`preview-section-${section.key}`}
+        className="character-workshop__preview-section-title"
+      >
+        {section.title}
+      </h3>
+      <div className="character-workshop__preview-section-fields">
+        {section.fieldKeys.map((key) => (
+          <PreviewField key={key} draft={draft} fieldKey={key} />
+        ))}
+      </div>
+      {sections
+        .filter((child) => child.parentKey === section.key)
+        .map((child) => (
+          <PreviewSection
+            key={child.key}
+            sectionKey={child.key}
+            draft={draft}
+            depth={depth + 1}
+          />
+        ))}
+    </section>
   );
 }
 

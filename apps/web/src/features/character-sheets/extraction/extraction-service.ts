@@ -5,10 +5,15 @@ export interface SheetDocumentFileDescriptor {
   name: string;
   mimeType: string;
   size: number;
+  /** Present for browser uploads; omitted by descriptor-only test doubles. */
+  blob?: Blob;
+  /** First page of a long PDF character sheet, selected by the user. */
+  sheetStartPage?: number;
 }
 
 export interface ExtractSheetDocumentInput {
   sessionId: string;
+  accessToken?: string;
   file: SheetDocumentFileDescriptor;
 }
 
@@ -17,9 +22,9 @@ export interface ExtractSheetDocumentInput {
  * PDF/PNG/JPG, extraction derives an editable draft surface, and the workshop
  * opens it through the same store as any other draft.
  *
- * The current MVP ships the placeholder implementation only. The production
- * multimodal extraction backend (vision model) is a future phase; it will
- * implement this same port so the workshop and store stay untouched.
+ * The remote implementation is the product path. The local implementation is
+ * an explicit development double that rejects uploads rather than fabricating
+ * a draft from a file name.
  */
 export interface SheetDocumentExtractionService {
   extractSheetDocument(

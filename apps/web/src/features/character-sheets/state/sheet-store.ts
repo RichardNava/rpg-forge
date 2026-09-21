@@ -67,7 +67,12 @@ export function createSheetStore(options: SheetStoreOptions): SheetStore {
   }
 
   function workshopForDraft(mode: CharacterSheetDraft["mode"]): WorkshopPreferences {
-    return { characterType: mode, threatLevel: null };
+    return {
+      characterType: mode,
+      threatLevel: null,
+      visualStyle: "medieval-fantasy",
+      portrait: { kind: "none" },
+    };
   }
 
   async function reconcile(): Promise<void> {

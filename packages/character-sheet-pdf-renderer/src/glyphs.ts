@@ -1,4 +1,4 @@
-import { CharacterSheetPdfRenderError } from "./errors.js";
+import { CharacterSheetPdfRenderError } from "./errors";
 
 /**
  * WinAnsi glyph gate for the Standard 14 fonts.
