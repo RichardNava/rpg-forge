@@ -17,7 +17,7 @@ These work independently and do not require campaigns or persistent storage:
 - adventure generation;
 - map generation;
 - NPC generation;
-- blank/generic character-sheet generation;
+- character-sheet generation (manual creation, upload extraction, editable draft);
 - standalone dice roller.
 
 Generated standalone resources are temporary until the user exports/downloads them.
@@ -29,6 +29,17 @@ Generated standalone resources are temporary until the user exports/downloads th
 It requires authenticated users and supports a shared map, grid, tokens, simple drawing tools and shared dice rolls.
 
 Its free MVP state is temporary. Temporary server state used for synchronization/reconnection is not premium persistence.
+
+## Current workstream
+
+**Phase 14 Character Sheets** is the active major workstream.
+
+- The authoritative detailed spec is `docs/features/character-sheets.md`.
+- Character Sheets use a temporary server-authoritative/session-based architecture.
+- Current approved baseline includes the existing editor/domain/storage work from main.
+- Advanced recursive reorder/reparent UX is the next stabilization work and must follow the active spec.
+- Do not recreate obsolete Root organizer/tree approaches.
+- Do not assume historical Phase 14 docs override the active feature spec.
 
 ## Future scope
 

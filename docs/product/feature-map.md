@@ -135,12 +135,20 @@ Export
 ### Character Sheets
 
 ```text
-Template
+Existing sheet / Manual input
+   ↓
+Structured editable template
+   ↓
+Review / edit
+   ↓
+Optional character metadata / image / style
    ↓
 Preview
    ↓
-PDF / JPG
+Original final rendered sheet / export
 ```
+
+See `docs/features/character-sheets.md` for the canonical specification.
 
 ## 4. Tools
 

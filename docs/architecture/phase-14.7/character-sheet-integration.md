@@ -1,11 +1,14 @@
 # Phase 14.7 Character-Sheet Integration — Generation Boundaries and Sheet Sessions
 
-**Status:** Implemented (14.7A + 14.7B + 14.7C template-backed generation, 14.7E
-editable authoring surface, 14.7G Character Workshop UI). The phase-14.7
-slices are proven by committed automated suites; 14.7G adds the first
-product-facing authoring UI driven by an in-memory local backend, with the
-server-wired (Turnstile + rules-worker) path remaining a configuration switch.
-**Date:** 2026-09-15
+**Status:** ACTIVE (14.7A–14.7G delivered; recursive DnD, remove_section, Undo,
+image/style integration in progress). The phase-14.7 slices are proven by
+committed automated suites; 14.7G adds the first product-facing authoring UI
+driven by an in-memory local backend, with the server-wired (Turnstile +
+rules-worker) path remaining a configuration switch.
+**Date:** 2026-09-26
+
+**Canonical product spec:** `docs/features/character-sheets.md` (ACTIVE)
+**Phase status labels:** CURRENT / COMPLETED / SUPERSEDED / DEFERRED
 
 ## Purpose
 
@@ -28,36 +31,38 @@ This document describes the **actual committed architecture** after 14.7A,
 14.7B, 14.7C, 14.7E and 14.7G. Planned slices are labeled explicitly as
 deferred and are never described as implemented.
 
-Slice summary:
+**For current product behavior, see `docs/features/character-sheets.md` (ACTIVE).**
 
-- **14.7A1** — `CharacterSheetSpec.rulesContextId` is required but nullable;
+Slice summary (labeled by status):
+
+- **14.7A1 [COMPLETED]** — `CharacterSheetSpec.rulesContextId` is required but nullable;
   null means "no RulesContext authority"; genuine GUI-only final construction;
   explicit `sheetId` for GUI-only; null-context provenance fails closed;
   GUI-only PDF integration green.
-- **14.7A2** — `@repo/character-sheet-session`; 120-minute temporary sheet
+- **14.7A2 [COMPLETED]** — `@repo/character-sheet-session`; 120-minute temporary sheet
   sessions; SHA-256 token-hash ownership; final synchronous run lifecycle;
   `sheet_sessions` and `sheet_generation_runs` D1 tables; nullable rulebook
   identity triple; one current run per session; repost-supersede semantics;
   additive migration 0003; real D1/workerd repository tests.
-- **14.7B** — `@repo/character-sheet-artifacts`; the `CharacterSheetArtifactStore`
+- **14.7B [COMPLETED]** — `@repo/character-sheet-artifacts`; the `CharacterSheetArtifactStore`
   port; R2 adapter in rules-worker; controlled object keys; content types and
   `Cache-Control: no-store` metadata; write compensation; retrieval; and total
   session/run prefix cleanup. Local-only `SHEET_ARTIFACTS` binding; production
   bucket identity deferred.
-- **14.7C** — template-backed generation: `@repo/character-sheet-template`
+- **14.7C [COMPLETED]** — template-backed generation: `@repo/character-sheet-template`
   (template contracts, extraction port, reference extractor); generation-side
   template normalization and template/GUI overlay; the provider-free
   `DeterministicLocalNamePort` default for the standalone character name; and
   `generateTemplateBackedSheet` wiring. The production multimodal extraction
   provider is **blocked** (no vision model is committed) and remains the only
   deferred 14.7C item.
-- **14.7E** — editable authoring surface: `@repo/character-sheet-draft`
+- **14.7E [COMPLETED]** — editable authoring surface: `@repo/character-sheet-draft`
   (bounded surface model, guided-edit edits map, order-preserving mutation API,
   deterministic reroll of read-locked fields, versioned immutable snapshots,
   R2 keys under the sheet-session tenant, the `CharacterSheetDraftStore` port)
   plus the `createR2CharacterSheetDraftStore` adapter in rules-worker. Web
   rehydration store interfaces and the glance-edit UI are delivered in 14.7G.
-- **14.7G** — Character Workshop UI: the web rehydration surface
+- **14.7G [COMPLETED]** — Character Workshop UI: the web rehydration surface
   (`SheetApiClientPort` transient session client, `SheetStore` lifecycle with
   domain-level mutation outcomes, `useSheetStore` React binding), a
   forge/cartography-themed workshop UI (creation-mode landing, toolbar,
@@ -69,12 +74,13 @@ Slice summary:
   into the `SheetApiClient` path (Turnstile verification remains to be wired,
   so remote is not the default).
 
-By design, Phases 14.7A–14.7E add **no** HTTP routes, **no** production AI
-providers, **no** Workflow, and **no** UI (14.7E adds no D1 tables and no new
-R2 bindings: drafts share the existing `SHEET_ARTIFACTS` bucket and sit under
-the same session tenant so the 14.7B session sweep already covers them). 14.7G
-delivers the first web UI slice and a `/character-sheets` route, still with no
-D1 tables, no new R2 bindings, and no production AI providers.
+**Current active work (not in original 14.7 slices):**
+
+- Recursive DnD with before/after/inside targets
+- `remove_section` mutation with safe semantics
+- Server-authoritative Undo with `expectedVersion` conflict protection
+- Character image (upload/URL/AI generation)
+- Visual style rendering integration
 
 ## Boundaries
 
@@ -92,7 +98,7 @@ Implemented through 14.7G:
 - Character Workshop UI (web rehydration store + React binding + schema-driven
   editors, preview, confirm flow) driven by an in-memory local backend
 
-Deferred:
+Deferred [DEFERRED]:
 
 - server-wired Workshop path — Turnstile verification widget and the production
   `SheetApiClient` route (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote` is
@@ -146,7 +152,7 @@ versioned draft snapshots  (R2, sheet-session tenant, immutable v<version>.json)
 future web rehydration     (store interfaces + glance-edit UI, deferred)
 ```
 
-Implemented today: domain contracts, GUI-only and rulebook-capable final
+**Implemented [COMPLETED]:** domain contracts, GUI-only and rulebook-capable final
 construction, the deterministic PDF renderer, sheet session/run persistence,
 temporary R2 artifact storage, the editable draft domain + R2 draft store
 adapter, and the Character Workshop UI (web rehydration store + React binding +
@@ -572,7 +578,7 @@ Verified suites (all green in the current Phase 14.7E working tree):
   management, ownership validation, artifact preview/download. Not present
   today.
 
-## 14.7B delivered slice
+## 14.7B delivered slice [COMPLETED]
 
 Delivered in 14.7B:
 
@@ -590,7 +596,7 @@ The D1 session/run tables remain the source of cleanup candidates; 14.7D's
 orchestrator and sweep use them to call `deleteRunArtifacts` /
 `deleteSessionArtifacts`.
 
-## 14.7C delivered slice
+## 14.7C delivered slice [COMPLETED]
 
 Delivered in 14.7C:
 
@@ -636,7 +642,7 @@ Template-semantics highlights:
   new R2 artifact kinds, and no HTTP surface. Templates remain inputs to
   generation, not stored resources.
 
-## 14.7E delivered slice
+## 14.7E delivered slice [COMPLETED]
 
 Delivered in 14.7E:
 
@@ -674,7 +680,7 @@ Authoring-semantics highlights:
 - **No D1, no new bindings.** Drafts add zero D1 tables and zero migrations,
   and reuse the local-only `SHEET_ARTIFACTS` binding.
 
-## 14.7G delivered slice
+## 14.7G delivered slice [COMPLETED]
 
 Delivered in 14.7G:
 

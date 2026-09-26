@@ -7,6 +7,7 @@ Aplicación web para generar y utilizar recursos de juegos de rol de mesa.
 ## Estado
 
 Phase 13: COMPLETE - the public standalone Dice Roller is available at `/dice`.
+Phase 14: ACTIVE - Character Sheets is the current development area.
 Campaigns are deferred to future persistence/premium work.
 
 ## Stack base
@@ -92,5 +93,6 @@ Empieza por:
 - `docs/product/vision.md`
 - `docs/product/mvp.md`
 - `docs/architecture/architecture.md`
+- `docs/features/character-sheets.md` (canonical Character Sheets specification)
 
 La configuración de OpenCode se encuentra en `opencode.jsonc` y `.opencode/`.

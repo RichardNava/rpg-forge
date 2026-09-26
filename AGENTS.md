@@ -273,6 +273,7 @@ Read the smallest relevant set.
 - `docs/product/vision.md` — product purpose, access model and long-term direction.
 - `docs/product/mvp.md` — what is and is not in the MVP; acceptance criteria.
 - `docs/product/feature-map.md` — relationships and release-level feature scope.
+- `docs/features/character-sheets.md` — **canonical specification for Character Sheets feature behavior**.
 
 ### Architecture
 
@@ -282,16 +283,41 @@ Read the smallest relevant set.
 - `docs/architecture/repository-structure.md` — workspace structure, folder responsibilities and dependency boundaries.
 - `docs/architecture/bootstrap.md` — reproducible Windows/bootstrap procedure and Phase 10 verification checkpoint.
 - `docs/architecture/adr/` — decision history. Read the ADR relevant to the decision being changed or questioned.
+- `docs/architecture/phase-14.7/character-sheet-integration.md` — implementation detail for Character Sheets; labeled CURRENT/COMPLETED/SUPERSEDED/DEFERRED.
 
 ### Loading rule
 
-- Product/UX change: read the relevant product document(s).
+- Product/UX change: read the relevant product document(s). **For Character Sheets, read `docs/features/character-sheets.md` first.**
 - Infrastructure/architecture change: read `architecture.md` and the relevant specialized architecture document/ADR.
 - Database change: read `data-model.md` plus relevant ADRs.
 - Folder/package/workspace change: read `repository-structure.md` plus relevant ADRs.
 - Cross-cutting redesign: read all directly affected documents, not the entire documentation tree by default.
 
-If documentation and implementation disagree, do not silently choose one. Identify the mismatch and preserve the current documented architecture unless the task explicitly authorizes changing it.
+### Source-of-truth hierarchy
+
+When resolving contradictions, the following authority order applies:
+
+1. Explicit current task requirements from the user
+2. Active feature specification for the feature being changed (e.g., `docs/features/character-sheets.md` for Character Sheets)
+3. Current architecture contracts / ADRs
+4. Current project context (`docs/opencode/project-context.md`)
+5. Product-level documents such as MVP / feature map / vision
+6. Historical phase documents
+7. Existing implementation
+
+**Important nuance:**
+
+- The implementation is evidence of the current code state, but it is NOT automatically the product specification.
+- Old documentation must NOT override a newer active feature specification.
+- If documentation and implementation disagree, **do not silently choose one. Identify the discrepancy and determine which document is explicitly marked current/authoritative.**
+- Historical/superseded documents are informative only.
+- If no current authoritative answer exists, stop and ask rather than inventing a decision.
+
+### Anti-regression rule
+
+For an existing working feature, agents MUST preserve existing behavior unless the active task/spec explicitly changes it.
+
+Large UI rewrites must not be used merely to make a new behavior easier to implement.
 
 ## 14. External documentation and MCP
 

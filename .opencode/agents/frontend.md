@@ -65,6 +65,7 @@ For product-facing work, read the smallest relevant set from:
 - `docs/product/vision.md`
 - `docs/product/mvp.md`
 - `docs/product/feature-map.md`
+- `docs/features/character-sheets.md` (canonical spec for Character Sheets)
 
 For structural/UI stack decisions, read:
 

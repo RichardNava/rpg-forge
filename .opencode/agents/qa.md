@@ -60,6 +60,7 @@ For acceptance criteria and feature scope, read:
 
 - `docs/product/mvp.md`
 - the relevant section of `docs/product/feature-map.md`
+- `docs/features/character-sheets.md` (canonical spec for Character Sheets)
 
 For architectural behavior under test, read the relevant architecture document:
 
