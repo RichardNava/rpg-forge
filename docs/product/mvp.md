@@ -1,8 +1,10 @@
 # Alcance del MVP — Proyecto OpenCode RPG
 
-**Estado:** Conceptual / Fase 0  
+**Estado:** Current high-level product/MVP scope document  
 **Versión:** 0.2  
 **Fecha:** 12 de agosto de 2026
+
+**Note:** Detailed active feature specifications override this document for feature-level behavior. For Character Sheets, see `docs/features/character-sheets.md` (ACTIVE).
 
 ## 1. Objetivo
 

@@ -309,24 +309,47 @@ Use the existing `rpg-frontend-style` skill as the visual implementation guide.
 
 ## IMPLEMENTATION STATUS
 
-| Capability                                           | Status      | Notes                                              |
-| ---------------------------------------------------- | ----------- | -------------------------------------------------- |
-| Manual sheet creation                                | IMPLEMENTED | Blank draft + editor                               |
-| Upload existing sheet (PDF/PNG/JPG)                  | IMPLEMENTED | AI vision extraction → editable draft              |
-| AI vision extraction                                 | IMPLEMENTED | Workers AI vision adapter                          |
-| Recursive Section hierarchy                          | IMPLEMENTED | Domain model supports arbitrary depth (max 12)     |
-| Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED | Schema-driven editors                              |
-| Live preview                                         | IMPLEMENTED | `projectDraftToSpec` projection                    |
-| Confirm → read-only                                  | IMPLEMENTED | `finalizeDraft`                                    |
-| PC/NPC mode                                          | IMPLEMENTED | UI + threat level for NPC                          |
-| Visual style selection                               | PLANNED     | Style keys defined, rendering integration pending  |
-| Character image (upload/URL/AI)                      | PLANNED     | UI placeholder only                                |
-| Visual style rendering                               | PLANNED     | Style keys defined, rendering integration pending  |
-| Recursive DnD (before/after/inside)                  | IN PROGRESS | Domain mutations exist, UI integration in progress |
-| `remove_section`                                     | IN PROGRESS | Domain mutation exists, UI integration in progress |
-| Undo (server-authoritative)                          | PLANNED     | Domain mutation exists, Worker endpoint planned    |
-| Visual style rendering                               | PLANNED     | Style keys defined                                 |
-| PDF export/download                                  | IMPLEMENTED | AcroForm renderer                                  |
+| Capability                                           | Status          | Notes                                                                                     |
+| ---------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| Manual sheet creation                                | IMPLEMENTED     | Blank draft + editor                                                                      |
+| Upload existing sheet (PDF/PNG/JPG)                  | IMPLEMENTED     | AI vision extraction → editable draft                                                     |
+| AI vision extraction                                 | IMPLEMENTED     | Workers AI vision adapter                                                                 |
+| Recursive Section hierarchy                          | IMPLEMENTED     | Domain model supports arbitrary depth (max 12) via `parentKey`                            |
+| Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED     | Schema-driven editors                                                                     |
+| Live preview                                         | IMPLEMENTED     | `projectDraftToSpec` projection                                                           |
+| Confirm → read-only                                  | IMPLEMENTED     | `finalizeDraft`                                                                           |
+| PC/NPC mode                                          | IMPLEMENTED     | UI + threat level for NPC                                                                 |
+| Visual style selection                               | PLANNED         | Style keys defined, rendering integration pending                                         |
+| Character image (upload/URL/AI)                      | PLANNED         | UI placeholder only                                                                       |
+| Visual style rendering                               | PLANNED         | Style keys defined, rendering integration pending                                         |
+| Recursive DnD (before/after/inside)                  | NOT IMPLEMENTED | Target UX defined; domain mutations and UI not implemented                                |
+| Arbitrary sibling ordering                           | NOT IMPLEMENTED | Target UX defined; no domain support for mixed Field/Section ordering or `before`/`after` |
+| Mixed Field/Section sibling ordering                 | NOT IMPLEMENTED | Target UX defined; current model appends Fields to Section end                            |
+| `place_node` mutation                                | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
+| `place_field` mutation                               | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
+| `place_section` mutation                             | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
+| `remove_section` mutation                            | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
+| `remove_section` safe semantics                      | NOT IMPLEMENTED | Target behavior defined; not implemented                                                  |
+| Undo (server-authoritative)                          | NOT IMPLEMENTED | Target architecture defined; no domain mutation, Worker endpoint, or UI                   |
+| `expectedVersion` conflict protection                | NOT IMPLEMENTED | Target architecture defined; not implemented                                              |
+| Visual style selection                               | PLANNED         | Style keys defined, rendering integration pending                                         |
+| Character image (upload/URL/AI)                      | PLANNED         | UI placeholder only                                                                       |
+| Visual style rendering                               | PLANNED         | Style keys defined, rendering integration pending                                         |
+| Preview as modal                                     | NOT IMPLEMENTED | Live preview pane exists; modal UX target not implemented                                 |
+| PDF export/download                                  | IMPLEMENTED     | AcroForm renderer                                                                         |
+| Recursive Section hierarchy (parentKey)              | IMPLEMENTED     | Domain model supports arbitrary depth (max 12) via `parentKey`                            |
+| Field ↔ Section movement (`move_field`)              | IMPLEMENTED     | Moves Field to Section (appends to end)                                                   |
+| Section reparenting (`reparent_section`)             | IMPLEMENTED     | Changes Section parent (including to Root)                                                |
+| Section creation/renaming                            | IMPLEMENTED     | `add_section`, `rename_section`                                                           |
+| Field label/type editing                             | IMPLEMENTED     | `set_field_label`, `set_field_type`                                                       |
+| Field lock/unlock                                    | IMPLEMENTED     | `lock_field`, `unlock_field`                                                              |
+| Value set/clear                                      | IMPLEMENTED     | `set_value`, `clear_value`                                                                |
+| Field add/remove                                     | IMPLEMENTED     | `add_field`, `remove_field`                                                               |
+| Section creation (`add_section`)                     | IMPLEMENTED     | `add_section`                                                                             |
+| Section renaming (`rename_section`)                  | IMPLEMENTED     | `rename_section`                                                                          |
+| Section reparenting (`reparent_section`)             | IMPLEMENTED     | `reparent_section` (changes parent, including to Root)                                    |
+| Section deletion (`remove_section`)                  | NOT IMPLEMENTED | Target mutation not implemented                                                           |
+| PDF export/download                                  | IMPLEMENTED     | AcroForm renderer                                                                         |
 
 ---
 

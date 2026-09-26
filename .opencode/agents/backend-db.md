@@ -25,8 +25,10 @@ permission:
     "apps/web/wrangler.jsonc": ask
     "apps/web/package.json": ask
     "apps/realtime/**": allow
+    "apps/rules-worker/**": allow
     "packages/dice-engine/**": allow
     "packages/table-contracts/**": allow
+    "packages/character-sheet-draft/**": allow
     "package.json": ask
     "pnpm-workspace.yaml": ask
   bash:

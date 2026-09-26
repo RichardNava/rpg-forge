@@ -54,7 +54,7 @@ Their presence in documentation does not authorize implementation during the MVP
 - D1 + Better Auth for MVP authentication persistence.
 - Workers AI behind project-owned provider abstractions.
 - Durable Objects + native WebSockets only for The Table.
-- R2 introduced when temporary shared map storage is needed.
+- R2 used for temporary Character Sheet artifact and draft storage.
 - pnpm workspace, no Turborepo.
 - Future cross-runtime packages are created only when their corresponding feature is implemented.
 

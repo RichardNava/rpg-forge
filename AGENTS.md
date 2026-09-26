@@ -132,6 +132,28 @@ Do not create MVP tables for:
 - lore packs;
 - user sources.
 
+### Temporary operational persistence (explicitly allowed by approved architecture)
+
+The following temporary operational metadata tables ARE permitted in the MVP when explicitly required by approved architecture:
+
+- `sheet_sessions` — temporary Character Sheet session metadata (120-minute lifetime)
+- `sheet_generation_runs` — temporary generation run metadata (session-scoped)
+- `sheet_drafts` — temporary versioned draft snapshots (session-scoped, R2-backed)
+
+These tables store **temporary operational metadata only** — no `CharacterSheetSpec` JSON, no PDF bytes, no provider payloads, no persistent user resources. They expire with their parent session and are cleaned up by session-sweep logic. They are NOT persistent user libraries, generation history, or campaign resources.
+
+Do not create MVP tables for:
+
+- campaigns;
+- resources;
+- generations;
+- saved Tables;
+- plans;
+- subscriptions;
+- entitlements;
+- lore packs;
+- user sources.
+
 ### D1 environments and migrations
 
 - Local development uses Wrangler local D1 by default.

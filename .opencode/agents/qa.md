@@ -82,6 +82,38 @@ Use the approved stack:
 
 Prefer the lowest test level that proves the requirement.
 
+## Active feature specification precedence
+
+When an ACTIVE feature specification exists (e.g., `docs/features/character-sheets.md`), it takes precedence over generic MVP/feature map behavior for acceptance criteria.
+
+## Test strategy for Character Sheets
+
+For Character Sheets, derive acceptance criteria from `docs/features/character-sheets.md` — not from generic MVP/feature-map descriptions.
+
+Test the observable user journey, not merely schema/contracts.
+
+A feature may NOT be reported complete while relevant interaction tests fail.
+
+"Known UI test ambiguity" is not a valid completion state when those tests cover changed behavior.
+
+Distinguish pre-existing unrelated failures from failures introduced by the task.
+
+For complex DnD/Undo work, require or recommend Playwright/E2E coverage at the journey level.
+
+The future target acceptance journey should include, when that functionality is actually implemented:
+
+1. Open editable sheet
+2. Reorder root Section A before root Section B
+3. Verify the actual editor order changed
+4. Open Preview
+5. Verify Preview uses the same order
+6. Move a Section inside another Section
+7. Verify hierarchy
+8. Move it back to Root
+9. Delete an empty Section from its own UI
+10. Undo
+11. Verify restoration
+
 ## AI tests
 
 Normal automated tests must not consume Workers AI quota.

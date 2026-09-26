@@ -141,3 +141,14 @@ Report:
 3. accessibility/responsive considerations;
 4. tests/checks run;
 5. any backend dependency that remains.
+
+## Existing-feature guidance
+
+- Preserve currently working behavior unless the active spec/task explicitly changes it.
+- Do not perform whole-component rewrites merely because they simplify implementation.
+- Prefer localized/refactor-safe changes.
+- Before replacing a component, identify behaviors/layouts that must be preserved.
+- Character Sheet UI work MUST consult `docs/features/character-sheets.md`.
+- Visual work MUST consult `rpg-frontend-style`.
+- UI implementation is not complete merely because typecheck/unit tests pass.
+- Observable interaction behavior must be validated at the correct test level.

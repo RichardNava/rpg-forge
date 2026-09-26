@@ -55,7 +55,7 @@ Slice summary (labeled by status):
   `DeterministicLocalNamePort` default for the standalone character name; and
   `generateTemplateBackedSheet` wiring. The production multimodal extraction
   provider is **blocked** (no vision model is committed) and remains the only
-  deferred 14.7C item.
+  deferred 14.7C item. **[SUPERSEDED / HISTORICAL 14.7C LIMITATION: this describes the template-backed generation flow (14.7C) only; the current uploaded-sheet visual extraction pipeline via Workers AI vision adapter is IMPLEMENTED — see Temporary Uploaded Sheet Extraction section below]**
 - **14.7E [COMPLETED]** — editable authoring surface: `@repo/character-sheet-draft`
   (bounded surface model, guided-edit edits map, order-preserving mutation API,
   deterministic reroll of read-locked fields, versioned immutable snapshots,
@@ -72,15 +72,15 @@ Slice summary (labeled by status):
   an in-memory local backend (`createLocalSheetBackend`) that implements the
   real draft-domain rules; `NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote` opts
   into the `SheetApiClient` path (Turnstile verification remains to be wired,
-  so remote is not the default).
+  so remote is not the default). **[SUPERSEDED: current official code defaults to remote (production), local only for NODE_ENV=test]**
 
 **Current active work (not in original 14.7 slices):**
 
-- Recursive DnD with before/after/inside targets
-- `remove_section` mutation with safe semantics
-- Server-authoritative Undo with `expectedVersion` conflict protection
-- Character image (upload/URL/AI generation)
-- Visual style rendering integration
+- Recursive DnD with before/after/inside targets [TARGET — not implemented]
+- `remove_section` mutation with safe semantics [TARGET — not implemented]
+- Server-authoritative Undo with `expectedVersion` conflict protection [TARGET — not implemented]
+- Character image (upload/URL/AI generation) [TARGET — not implemented]
+- Visual style rendering integration [TARGET — not implemented]
 
 ## Boundaries
 
@@ -103,14 +103,13 @@ Deferred [DEFERRED]:
 - server-wired Workshop path — Turnstile verification widget and the production
   `SheetApiClient` route (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote` is
   implemented client-side but verifies against rules-worker only after the
-  Turnstile secret is configured); the local backend is the default
+  Turnstile secret is configured); **the local backend was the default [SUPERSEDED: current official code defaults to remote (production), local only for NODE_ENV=test]**
 - template extraction from external rulebook sources (the standalone uploaded
   character-sheet path is implemented separately below)
 - production `RulebookFieldDerivationPort` adapter — superseded for the
   template-backed flow; kept as a legacy port
 - HTTP orchestration — 14.7D
-- PDF export/download and PC/NPC mode selection in the workshop UI — future
-  14.7 slices
+- **PDF export/download [IMPLEMENTED]** and **PC/NPC mode selection [IMPLEMENTED]** in the workshop UI — future 14.7 slices
 
 ## Authoritative production pipeline
 
@@ -157,7 +156,7 @@ construction, the deterministic PDF renderer, sheet session/run persistence,
 temporary R2 artifact storage, the editable draft domain + R2 draft store
 adapter, and the Character Workshop UI (web rehydration store + React binding +
 schema-driven editors) driven by an in-memory local backend. The server-wired
-Turnstile path, HTTP orchestration, and PDF export/download remain deferred.
+Turnstile path, HTTP orchestration, and **PDF export/download [IMPLEMENTED]** remain deferred.
 
 ## GUI-only is first-class
 
@@ -569,7 +568,7 @@ Verified suites (all green in the current Phase 14.7E working tree):
   closed (`403 HUMAN_VERIFICATION_REQUIRED`) without a configured Turnstile
   secret, so development defaults to the in-memory local backend
   (`createLocalSheetBackend`) which runs the same draft-domain rules. Also
-  deferred: PDF export/download and PC/NPC mode selection in the workshop UI.
+  deferred: **PDF export/download [IMPLEMENTED]** and **PC/NPC mode selection [IMPLEMENTED]** in the workshop UI.
 - **14.7C remainder** — production template extraction from external rulebook
   sources and the production `RulebookFieldDerivationPort` adapter, marked
   legacy/superseded for the template-backed flow. This is distinct from the

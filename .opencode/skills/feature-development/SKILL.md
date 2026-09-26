@@ -34,7 +34,10 @@ For product behavior, read the smallest relevant documents:
 docs/product/vision.md
 docs/product/mvp.md
 docs/product/feature-map.md
+docs/features/character-sheets.md (when working on Character Sheets)
 ```
+
+When an ACTIVE feature specification exists (e.g., `docs/features/character-sheets.md`), it must be read before generic product docs.
 
 For architectural impact, read only the relevant architecture file(s) and ADRs.
 
@@ -187,6 +190,14 @@ cross-application user journey
 AI tests use fake providers by default.
 
 Do not use live AI output as a deterministic assertion.
+
+**When an ACTIVE feature specification exists, it must be read before generic product docs.**
+
+**User-visible cross-layer interactions must be validated at the appropriate level.**
+
+**Typecheck + unit tests alone are insufficient evidence for complex interactive UI completion.**
+
+**Preserve existing behavior not explicitly superseded by the active feature spec.**
 
 ## 9. Cloudflare compatibility gate
 
