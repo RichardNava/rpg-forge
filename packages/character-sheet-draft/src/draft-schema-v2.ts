@@ -26,7 +26,7 @@ import {
 
 export const CHARACTER_SHEET_DRAFT_V2_VERSION = "2" as const;
 
-const draftKeyPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+export const draftKeyPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 
 /** V2 Section contains ONLY key and title. No parentKey, no fieldKeys. */
 export const DraftSectionV2Schema = z.strictObject({
