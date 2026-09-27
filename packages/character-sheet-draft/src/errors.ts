@@ -11,6 +11,7 @@ export const DRAFT_ERROR_CODES = [
   "surface_out_of_bounds",
   "draft_inflight",
   "draft_confirmed",
+  "version_conflict",
   "projection_invalid",
   "writeback_invalid",
 ] as const;
