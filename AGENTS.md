@@ -276,6 +276,27 @@ Cloudflare/OpenNext preview
 
 Prefer focused tests while iterating, followed by the required broader checks.
 
+## 11.1 Formatting validation
+
+Run the repository formatting check when required:
+
+```bash
+pnpm format:check
+```
+
+If the repo-wide formatting check fails only because of pre-existing
+formatting violations in files untouched by the current task:
+
+- do NOT reformat unrelated files;
+- do NOT expand the task scope to fix repository-wide formatting debt;
+- report the repo-wide formatting failure as a pre-existing baseline issue;
+- run Prettier --check explicitly on every file changed by the current task;
+- the task may be considered formatting-clean only if all changed files pass
+  their targeted formatting check.
+
+Never run `prettier --write .` merely to make an unrelated baseline
+formatting failure disappear.
+
 ## 12. Git and destructive operations
 
 - Never push to a remote repository unless the user explicitly requests it.
