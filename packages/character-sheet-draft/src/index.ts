@@ -12,3 +12,10 @@ export * from "./finalize";
 export * from "./keys";
 export * from "./draft-store";
 export * from "./preview/index";
+export { parseCanonicalCharacterSheetDraft } from "./draft-canonical";
+export type { CharacterSheetDraftV2 } from "./draft-schema-v2";
+export {
+  CHARACTER_SHEET_DRAFT_V2_VERSION,
+  CharacterSheetDraftV2Schema,
+  validateDraftV2,
+} from "./draft-schema-v2";
