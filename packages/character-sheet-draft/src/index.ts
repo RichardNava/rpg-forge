@@ -25,3 +25,8 @@ export {
   parseDraftMutationV2,
 } from "./draft-mutation-v2";
 export type { DraftMutationV2 } from "./draft-mutation-v2";
+export { initialDraftVersionV2 } from "./draft-versioning-v2";
+export type { InitialCharacterSheetDraftV2 } from "./draft-versioning-v2";
+export { rerollLockedDraftValuesV2 } from "./draft-reroll-v2";
+export type { DraftRerollResultV2 } from "./draft-reroll-v2";
+export { finalizeDraftV2 } from "./draft-finalize-v2";

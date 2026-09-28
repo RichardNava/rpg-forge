@@ -96,8 +96,20 @@ Section
 - The actual editable Sections are the objects that users reorder
 - Editor, preview and persistence must ultimately interpret the **SAME canonical structure**
 - Do NOT maintain competing structural sources of truth whose synchronization depends on every mutation remembering to update several unrelated representations
-- The exact domain representation will be designed in a later implementation slice
 - This specification MUST NOT decide prematurely that `nodeOrder`/`rootNodeOrder` from the abandoned experiment is the final solution
+
+### Approved V2 canonical structural model (DOMAIN IMPLEMENTED)
+
+The V2 domain representation is now approved and implemented; it is not deferred to a later implementation slice:
+
+- `fields[]` — the Field registry, holding Field content only
+- `sections[]` — the Section registry, holding only `key` and `title`; no `parentKey`, no `fieldKeys`
+- `structure[]` — the single canonical structural authority: one preorder array of placements, each `{ kind, key, parentKey }`
+- Root membership is expressed by `parentKey === null`
+
+Because `structure[]` is the only structural authority, a Section's position is its current placement rather than a property of the Section record, and mixed Field/Section sibling ordering needs no second ordering mechanism.
+
+**Status:** implemented in the V2 domain. Web, Worker, and persistence still consume the V1 runtime structures until the coordinated cutover; the editor DnD UI is not implemented.
 
 ---
 
@@ -309,47 +321,57 @@ Use the existing `rpg-frontend-style` skill as the visual implementation guide.
 
 ## IMPLEMENTATION STATUS
 
-| Capability                                           | Status          | Notes                                                                                     |
-| ---------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
-| Manual sheet creation                                | IMPLEMENTED     | Blank draft + editor                                                                      |
-| Upload existing sheet (PDF/PNG/JPG)                  | IMPLEMENTED     | AI vision extraction → editable draft                                                     |
-| AI vision extraction                                 | IMPLEMENTED     | Workers AI vision adapter                                                                 |
-| Recursive Section hierarchy                          | IMPLEMENTED     | Domain model supports arbitrary depth (max 12) via `parentKey`                            |
-| Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED     | Schema-driven editors                                                                     |
-| Live preview                                         | IMPLEMENTED     | `projectDraftToSpec` projection                                                           |
-| Confirm → read-only                                  | IMPLEMENTED     | `finalizeDraft`                                                                           |
-| PC/NPC mode                                          | IMPLEMENTED     | UI + threat level for NPC                                                                 |
-| Visual style selection                               | PLANNED         | Style keys defined, rendering integration pending                                         |
-| Character image (upload/URL/AI)                      | PLANNED         | UI placeholder only                                                                       |
-| Visual style rendering                               | PLANNED         | Style keys defined, rendering integration pending                                         |
-| Recursive DnD (before/after/inside)                  | NOT IMPLEMENTED | Target UX defined; domain mutations and UI not implemented                                |
-| Arbitrary sibling ordering                           | NOT IMPLEMENTED | Target UX defined; no domain support for mixed Field/Section ordering or `before`/`after` |
-| Mixed Field/Section sibling ordering                 | NOT IMPLEMENTED | Target UX defined; current model appends Fields to Section end                            |
-| `place_node` mutation                                | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
-| `place_field` mutation                               | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
-| `place_section` mutation                             | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
-| `remove_section` mutation                            | NOT IMPLEMENTED | Target domain mutation; not implemented                                                   |
-| `remove_section` safe semantics                      | NOT IMPLEMENTED | Target behavior defined; not implemented                                                  |
-| Undo (server-authoritative)                          | NOT IMPLEMENTED | Target architecture defined; no domain mutation, Worker endpoint, or UI                   |
-| `expectedVersion` conflict protection                | NOT IMPLEMENTED | Target architecture defined; not implemented                                              |
-| Visual style selection                               | PLANNED         | Style keys defined, rendering integration pending                                         |
-| Character image (upload/URL/AI)                      | PLANNED         | UI placeholder only                                                                       |
-| Visual style rendering                               | PLANNED         | Style keys defined, rendering integration pending                                         |
-| Preview as modal                                     | NOT IMPLEMENTED | Live preview pane exists; modal UX target not implemented                                 |
-| PDF export/download                                  | IMPLEMENTED     | AcroForm renderer                                                                         |
-| Recursive Section hierarchy (parentKey)              | IMPLEMENTED     | Domain model supports arbitrary depth (max 12) via `parentKey`                            |
-| Field ↔ Section movement (`move_field`)              | IMPLEMENTED     | Moves Field to Section (appends to end)                                                   |
-| Section reparenting (`reparent_section`)             | IMPLEMENTED     | Changes Section parent (including to Root)                                                |
-| Section creation/renaming                            | IMPLEMENTED     | `add_section`, `rename_section`                                                           |
-| Field label/type editing                             | IMPLEMENTED     | `set_field_label`, `set_field_type`                                                       |
-| Field lock/unlock                                    | IMPLEMENTED     | `lock_field`, `unlock_field`                                                              |
-| Value set/clear                                      | IMPLEMENTED     | `set_value`, `clear_value`                                                                |
-| Field add/remove                                     | IMPLEMENTED     | `add_field`, `remove_field`                                                               |
-| Section creation (`add_section`)                     | IMPLEMENTED     | `add_section`                                                                             |
-| Section renaming (`rename_section`)                  | IMPLEMENTED     | `rename_section`                                                                          |
-| Section reparenting (`reparent_section`)             | IMPLEMENTED     | `reparent_section` (changes parent, including to Root)                                    |
-| Section deletion (`remove_section`)                  | NOT IMPLEMENTED | Target mutation not implemented                                                           |
-| PDF export/download                                  | IMPLEMENTED     | AcroForm renderer                                                                         |
+### How to read this table
+
+Statuses distinguish **domain implementation** from **runtime/UI integration**. A capability marked as V2 domain support is implemented and tested inside the draft domain package, but that does not mean a user can perform it in the editor yet, nor that the Worker, Web client, or persistence layer speak V2.
+
+### V2 domain lifecycle status
+
+The V2 domain layer now implements its complete lifecycle, independently of any runtime:
+
+- direct V2 initial versioning (`initialDraftVersionV2`)
+- V2 edit transitions (`applyDraftMutationV2`, the only public V2 edit contract)
+- deterministic V2 reroll (`rerollLockedDraftValuesV2`)
+- terminal V2 confirmation producing permanently read-only snapshots (`finalizeDraftV2`)
+
+**Runtime cutover is still pending.** Worker routes, the extraction compiler, Web draft producers, the Sheet API client and its response schemas, `SheetStore`, the local dev backend, and the R2 draft adapter all still read and write V1. The current V1 confirmation flow remains live until 4E. Nothing in this section should be read as a claim that the V2 UI or the V2 runtime cutover has happened.
+
+| Capability                                           | Status                  | Notes                                                                                     |
+| ---------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| Manual sheet creation                                | IMPLEMENTED             | Blank draft + editor (V1 runtime)                                                         |
+| Upload existing sheet (PDF/PNG/JPG)                  | IMPLEMENTED             | AI vision extraction → editable draft (V1 runtime)                                        |
+| AI vision extraction                                 | IMPLEMENTED             | Workers AI vision adapter; extraction compiler still emits V1 drafts                      |
+| Recursive Section hierarchy                          | IMPLEMENTED             | Domain model supports arbitrary depth (max 12) via `parentKey`                            |
+| Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED             | Schema-driven editors (V1 runtime)                                                        |
+| Live preview                                         | IMPLEMENTED             | `projectDraftToSpec` projection                                                           |
+| Confirm → read-only                                  | IMPLEMENTED             | V1 `finalizeDraft` live; V2 `finalizeDraftV2` implemented in domain                       |
+| PC/NPC mode                                          | IMPLEMENTED             | UI + threat level for NPC                                                                 |
+| PDF export/download                                  | IMPLEMENTED             | AcroForm renderer                                                                         |
+| Visual style selection                               | PLANNED                 | Style keys defined, rendering integration pending                                         |
+| Visual style rendering                               | PLANNED                 | Style keys defined, rendering integration pending                                         |
+| Character image (upload/URL/AI)                      | PLANNED                 | UI placeholder only                                                                       |
+| Preview as modal                                     | NOT IMPLEMENTED         | Live preview pane exists; modal UX target not implemented                                 |
+| Undo (server-authoritative)                          | NOT IMPLEMENTED         | Target architecture defined; no domain mutation, Worker endpoint, or UI                   |
+| V2 initial versioning                                | IMPLEMENTED (V2 DOMAIN) | `initialDraftVersionV2`; creation validates supplied structure, never infers placements   |
+| V2 edit transitions                                  | IMPLEMENTED (V2 DOMAIN) | `applyDraftMutationV2` is the only public V2 edit contract                                |
+| V2 deterministic reroll                              | IMPLEMENTED (V2 DOMAIN) | `rerollLockedDraftValuesV2`; deterministic per seed and Field registry order              |
+| V2 terminal confirmation / read-only                 | IMPLEMENTED (V2 DOMAIN) | `finalizeDraftV2`; confirmed snapshots are permanently read-only                          |
+| `place_node` mutation                                | IMPLEMENTED (V2 DOMAIN) | Unified V2 placement for Fields and Sections; not reachable from Web or Worker            |
+| Recursive DnD (before/after/inside)                  | PARTIAL                 | Domain: before/after/inside implemented via `place_node`; DnD UI not implemented          |
+| Arbitrary sibling ordering                           | PARTIAL                 | Domain: single canonical preorder implemented; editor DnD UI pending                      |
+| Mixed Field/Section sibling ordering                 | PARTIAL                 | Domain support implemented; UI/runtime integration pending                                |
+| `place_field` mutation                               | SUPERSEDED              | Not a separate V2 operation; unified `place_node` handles Field and Section placement     |
+| `place_section` mutation                             | SUPERSEDED              | Not a separate V2 operation; unified `place_node` handles Field and Section placement     |
+| `expectedVersion` conflict protection                | PARTIAL                 | V2 domain implemented (precondition → `version_conflict`); Worker/HTTP transport still V1 |
+| Field label/type editing                             | IMPLEMENTED             | V1 runtime + V2 domain parity: `set_field_label`, `set_field_type`                        |
+| Field lock/unlock                                    | IMPLEMENTED             | V1 runtime + V2 domain parity: `lock_field`, `unlock_field`                               |
+| Value set/clear                                      | IMPLEMENTED             | V1 runtime + V2 domain parity: `set_value`, `clear_value`                                 |
+| Field add/remove                                     | IMPLEMENTED             | V1 runtime + V2 domain parity: `add_field`, `remove_field`                                |
+| Section creation/renaming                            | IMPLEMENTED             | V1 runtime + V2 domain parity: `add_section`, `rename_section`                            |
+| Field ↔ Section movement (`move_field`)              | IMPLEMENTED (V1 ONLY)   | V1 compatibility/runtime op; superseded in V2 by `place_node`; not in `DraftMutationV2`   |
+| Section reparenting (`reparent_section`)             | IMPLEMENTED (V1 ONLY)   | V1 compatibility/runtime op; superseded in V2 by `place_node`; not in `DraftMutationV2`   |
+| `remove_section` mutation                            | NOT IMPLEMENTED         | Not implemented in V1 or V2; `place_node` does not cover deletion                         |
+| `remove_section` safe semantics                      | NOT IMPLEMENTED         | Target behavior only: empty Section may be removed, non-empty Section rejected            |
 
 ---
 
