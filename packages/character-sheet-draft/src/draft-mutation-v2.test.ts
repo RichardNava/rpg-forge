@@ -4,7 +4,10 @@ import {
   DraftMutationV2Schema,
   parseDraftMutationV2,
 } from "./draft-mutation-v2";
-import type { DraftMutationV2 } from "./draft-mutation-v2";
+import type {
+  DraftMutationV2,
+  DraftPlaceNodeMutationV2,
+} from "./draft-mutation-v2";
 import {
   draftKeyPattern,
   validateDraftV2,
@@ -127,6 +130,9 @@ describe("draft-mutation-v2 parser — BLOCK B", () => {
         destination: { position: "before", targetKey: "A" },
       });
       expect(mutation.op).toBe("place_node");
+      if (mutation.op !== "place_node") {
+        throw new Error("unreachable");
+      }
       expect(mutation.key).toBe("B");
       expect(mutation.destination).toEqual({
         position: "before",
@@ -141,6 +147,9 @@ describe("draft-mutation-v2 parser — BLOCK B", () => {
         destination: { position: "after", targetKey: "B" },
       });
       expect(mutation.op).toBe("place_node");
+      if (mutation.op !== "place_node") {
+        throw new Error("unreachable");
+      }
       expect(mutation.destination).toEqual({
         position: "after",
         targetKey: "B",
@@ -154,6 +163,9 @@ describe("draft-mutation-v2 parser — BLOCK B", () => {
         destination: { position: "inside", parentKey: "skills" },
       });
       expect(mutation.op).toBe("place_node");
+      if (mutation.op !== "place_node") {
+        throw new Error("unreachable");
+      }
       expect(mutation.destination).toEqual({
         position: "inside",
         parentKey: "skills",
@@ -167,6 +179,9 @@ describe("draft-mutation-v2 parser — BLOCK B", () => {
         destination: { position: "inside", parentKey: null },
       });
       expect(mutation.op).toBe("place_node");
+      if (mutation.op !== "place_node") {
+        throw new Error("unreachable");
+      }
       expect(mutation.destination).toEqual({
         position: "inside",
         parentKey: null,
@@ -892,7 +907,7 @@ function makeDeepDraft(): CharacterSheetDraftV2 {
 
 function direct2B2(
   draft: CharacterSheetDraftV2,
-  mutation: DraftMutationV2,
+  mutation: DraftPlaceNodeMutationV2,
   expectedVersion: number,
 ): CharacterSheetDraftV2 {
   return applyDraftNodePlacementWithExpectedVersionV2(

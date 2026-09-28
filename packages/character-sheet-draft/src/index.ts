@@ -19,3 +19,9 @@ export {
   CharacterSheetDraftV2Schema,
   validateDraftV2,
 } from "./draft-schema-v2";
+export {
+  applyDraftMutationV2,
+  DraftMutationV2Schema,
+  parseDraftMutationV2,
+} from "./draft-mutation-v2";
+export type { DraftMutationV2 } from "./draft-mutation-v2";
