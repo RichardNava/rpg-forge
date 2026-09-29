@@ -2,6 +2,7 @@ import { RulesContextSchema } from "@repo/rules-context";
 import { describe, expect, it } from "vitest";
 
 import {
+  CHARACTER_SHEET_SPEC_VERSION,
   CharacterSheetSpecSchema,
   FormulaSchema,
   getCharacterSheetSpecJsonSchema,
@@ -115,6 +116,87 @@ function issueCodes(
   value: ReturnType<typeof validateCharacterSheetSpecDomain>,
 ) {
   return value.issues.map((issue) => issue.code);
+}
+
+/**
+ * Builds a spec with `sectionCount` Sections, one Field each, distributed
+ * exactly 16 per Page with page-local `layout.order`. This exercises the global
+ * Section capacity, which is the page-addressable capacity (12 x 16 = 192).
+ */
+function createWideSheet(sectionCount: number, pagesPerSheet = 16) {
+  const sectionIds = Array.from(
+    { length: sectionCount },
+    (_, index) => `section-${index}`,
+  );
+  const fieldIds = Array.from(
+    { length: sectionCount },
+    (_, index) => `field-${index}`,
+  );
+  const pages = Array.from(
+    { length: Math.ceil(sectionCount / pagesPerSheet) },
+    (_, pageIndex) => {
+      const start = pageIndex * pagesPerSheet;
+      const pageSectionIds = sectionIds.slice(start, start + pagesPerSheet);
+      return {
+        id: `page-${pageIndex}`,
+        layout: {
+          orientation: "portrait" as const,
+          sizeIntent: null,
+          sectionIds: pageSectionIds,
+        },
+      };
+    },
+  );
+
+  return {
+    schemaVersion: CHARACTER_SHEET_SPEC_VERSION,
+    mode: "player",
+    metadata: {
+      id: "sheet-wide",
+      title: "Wide Sheet",
+      description: null,
+      locale: null,
+    },
+    rulesContextId: null,
+    pages,
+    sections: sectionIds.map((sectionId, index) => ({
+      id: sectionId,
+      title: `Section ${index}`,
+      layout: {
+        mode: "flow" as const,
+        columns: 1,
+        // Page-local ordinal: page N holds sections N*16 .. N*16+15.
+        order: index % pagesPerSheet,
+        emphasis: null,
+      },
+      fieldIds: [fieldIds[index]!],
+    })),
+    fields: fieldIds.map((fieldId, index) => ({
+      id: fieldId,
+      type: "text" as const,
+      label: `Field ${index}`,
+      requiredForPlayableNpc: false,
+      placement: {
+        order: 0,
+        columnStart: 1,
+        columnSpan: 1,
+        rowSpan: 1,
+        breakBefore: false,
+      },
+      maxLength: 80,
+    })),
+    values: {},
+    theme: {
+      style: "minimal" as const,
+      typography: "serif" as const,
+      density: "standard" as const,
+      borderStyle: "none" as const,
+      decorationIntensity: "none" as const,
+      accentColor: "#332211",
+      backgroundIntent: "none" as const,
+    },
+    sourceMap: {},
+  };
 }
 
 function createNestedFormula(depth: number): unknown {
@@ -1022,5 +1104,135 @@ describe("CharacterSheetSpecSchema", () => {
         sourceMap: expect.any(Object),
       }),
     });
+  });
+});
+
+describe("CharacterSheetSpecSchema global Section capacity", () => {
+  it("accepts 192 Sections, the page-addressable capacity (12 x 16)", () => {
+    const wide = createWideSheet(192);
+
+    expect(wide.sections).toHaveLength(192);
+    expect(wide.fields).toHaveLength(192);
+    expect(wide.pages).toHaveLength(12);
+    for (const page of wide.pages) {
+      expect(page.layout.sectionIds).toHaveLength(16);
+    }
+
+    const parsed = CharacterSheetSpecSchema.safeParse(wide);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("domain-validates a 192-Section spec", () => {
+    const parsed = CharacterSheetSpecSchema.parse(createWideSheet(192));
+
+    const result = validateCharacterSheetSpecDomain(parsed);
+    expect(result.valid).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
+  it("references every 192 Section and Field exactly once", () => {
+    const parsed = CharacterSheetSpecSchema.parse(createWideSheet(192));
+
+    const referencedSections = parsed.pages.flatMap(
+      (page) => page.layout.sectionIds,
+    );
+    expect(referencedSections).toHaveLength(192);
+    expect(new Set(referencedSections).size).toBe(192);
+
+    const referencedFields = parsed.sections.flatMap(
+      (section) => section.fieldIds,
+    );
+    expect(referencedFields).toHaveLength(192);
+    expect(new Set(referencedFields).size).toBe(192);
+  });
+
+  it("keeps layout.order unique within each of the 12 pages", () => {
+    const parsed = CharacterSheetSpecSchema.parse(createWideSheet(192));
+    const sectionById = new Map(
+      parsed.sections.map((section) => [section.id, section]),
+    );
+
+    for (const page of parsed.pages) {
+      const orders = page.layout.sectionIds.map(
+        (id) => sectionById.get(id)?.layout.order,
+      );
+      expect(orders).toEqual(page.layout.sectionIds.map((_, index) => index));
+    }
+  });
+
+  it("rejects 193 Sections: the global bound stays finite", () => {
+    const tooWide = createWideSheet(193);
+
+    expect(CharacterSheetSpecSchema.safeParse(tooWide).success).toBe(false);
+  });
+
+  it("does not raise MAX_PAGES or the per-page limit to admit 193", () => {
+    // 193 Sections cannot be placed without exceeding 12 pages x 16 Sections,
+    // so the rejection above is structural rather than a formatting artifact.
+    const tooWide = createWideSheet(193);
+    expect(tooWide.pages).toHaveLength(13);
+    expect(
+      CharacterSheetSpecSchema.safeParse({
+        ...tooWide,
+        pages: tooWide.pages.slice(0, 12),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("still rejects more than 16 Sections on a single page", () => {
+    const base = createWideSheet(17);
+    // createWideSheet splits 17 Sections into 16 + 1; force them onto one page.
+    const overfullPage = {
+      ...base,
+      pages: [
+        {
+          ...base.pages[0]!,
+          layout: {
+            ...base.pages[0]!.layout,
+            sectionIds: base.sections.map((section) => section.id),
+          },
+        },
+      ],
+    };
+
+    expect(overfullPage.pages[0]!.layout.sectionIds).toHaveLength(17);
+    expect(CharacterSheetSpecSchema.safeParse(overfullPage).success).toBe(
+      false,
+    );
+  });
+
+  it("still rejects more than 64 Field ids in one Section", () => {
+    const base = createWideSheet(1);
+    const tooManyFields = {
+      ...base,
+      sections: [
+        {
+          ...base.sections[0]!,
+          fieldIds: Array.from({ length: 65 }, (_, index) => `field-${index}`),
+        },
+      ],
+    };
+
+    expect(CharacterSheetSpecSchema.safeParse(tooManyFields).success).toBe(
+      false,
+    );
+  });
+
+  it("leaves ordinary specs unchanged and still on schemaVersion 1", () => {
+    const sheet = createPlayerSheet();
+    const parsed = CharacterSheetSpecSchema.parse(sheet);
+
+    expect(parsed).toEqual(sheet);
+    expect(parsed.schemaVersion).toBe("1");
+    expect(CHARACTER_SHEET_SPEC_VERSION).toBe("1");
+    expect(validateCharacterSheetSpecDomain(parsed).valid).toBe(true);
+  });
+
+  it("keeps the 48-Section spec that the old global limit allowed", () => {
+    const previouslyMaximal = createWideSheet(48);
+    const parsed = CharacterSheetSpecSchema.parse(previouslyMaximal);
+
+    expect(parsed.sections).toHaveLength(48);
+    expect(validateCharacterSheetSpecDomain(parsed).valid).toBe(true);
   });
 });

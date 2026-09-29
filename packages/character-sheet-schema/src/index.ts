@@ -13,9 +13,21 @@ import { z } from "zod";
 export const CHARACTER_SHEET_SPEC_VERSION = "1" as const;
 
 const MAX_PAGES = 12;
-const MAX_SECTIONS = 48;
-const MAX_FIELDS = 256;
 const MAX_SECTIONS_PER_PAGE = 16;
+/**
+ * Global Section capacity is exactly the page-addressable capacity, not an
+ * independent magic number: 12 pages x 16 Sections = 192.
+ *
+ * This is the compatibility bound for the V2 draft -> spec projection. A
+ * canonical `CharacterSheetDraftV2` allows at most 192 editable Fields, the
+ * projection never emits an empty Section, and it emits every canonical Field
+ * exactly once, so no valid V2 projection can require more than 192
+ * non-empty Sections. Keeping the global bound at the page-addressable
+ * capacity removes a representational ceiling that the page model could already
+ * address. It stays finite: 193 Sections is still rejected.
+ */
+const MAX_SECTIONS = MAX_PAGES * MAX_SECTIONS_PER_PAGE;
+const MAX_FIELDS = 256;
 const MAX_FIELDS_PER_SECTION = 64;
 const MAX_LAYOUT_COLUMNS = 4;
 const MAX_ROW_SPAN = 12;

@@ -623,78 +623,190 @@ describe("projection-v2 BLOCK G page chunking", () => {
   });
 });
 
-describe("projection-v2 BLOCK H flat capacity failure", () => {
-  /** 25 root runs + 25 Section runs = 50 required Sections (> 48). */
-  const overCapacity = (): CharacterSheetDraftV2 => {
+describe("projection-v2 BLOCK H flat capacity alignment", () => {
+  /**
+   * Builds `pairs` interleaved root-Field / Section groups, each Section
+   * holding `fieldsPerSection` child Fields.
+   *
+   * Projected groups = 2 * pairs: the Section boundary splits the root run, so
+   * each pair yields one root group plus one Section group. Stays inside valid
+   * V2 limits: Sections <= MAX_DRAFT_SECTIONS (48) and
+   * Fields <= MAX_DRAFT_SURFACE_FIELDS (192).
+   */
+  const interleavedDraft = (
+    pairs: number,
+    fieldsPerSection = 1,
+  ): CharacterSheetDraftV2 => {
     const fields: DraftField[] = [];
     const sections: { key: string; title: string }[] = [];
     const structure: DraftPlacement[] = [];
-    for (let index = 0; index < 25; index += 1) {
+    for (let index = 0; index < pairs; index += 1) {
       const rootKey = `r${index}`;
       const sectionKey = `s${index}`;
-      const childKey = `c${index}`;
-      fields.push(textField(rootKey), textField(childKey));
+      fields.push(textField(rootKey));
       sections.push({ key: sectionKey, title: `S${index}` });
       structure.push({ kind: "field", key: rootKey, parentKey: null });
       structure.push({ kind: "section", key: sectionKey, parentKey: null });
-      structure.push({ kind: "field", key: childKey, parentKey: sectionKey });
+      for (let slot = 0; slot < fieldsPerSection; slot += 1) {
+        const childKey = `c${index}_${slot}`;
+        fields.push(textField(childKey));
+        structure.push({
+          kind: "field",
+          key: childKey,
+          parentKey: sectionKey,
+        });
+      }
     }
     return makeDraft({ fields, sections, structure });
   };
 
-  it("33. exceeding 48 required flat Sections fails closed", () => {
-    const draft = overCapacity();
-    expect(errorCodeOf(() => projectDraftV2ToSpec(draft))).toBe(
-      "projection_invalid",
+  /** The 4C2 fixture that previously failed: 25 pairs = 50 required Sections. */
+  const overOldLimit = (): CharacterSheetDraftV2 => interleavedDraft(25);
+
+  it("33. a valid draft requiring 50 groups now projects", () => {
+    const spec = projectDraftV2ToSpec(overOldLimit());
+    expect(spec.sections).toHaveLength(50);
+  });
+
+  it("34. the 50-group projection paginates 16/16/16/2", () => {
+    const spec = projectDraftV2ToSpec(overOldLimit());
+    expect(spec.pages).toHaveLength(4);
+    expect(spec.pages.map((page) => page.layout.sectionIds.length)).toEqual([
+      16, 16, 16, 2,
+    ]);
+  });
+
+  it("35. the 50-group projection preserves canonical Field preorder", () => {
+    const draft = overOldLimit();
+    const spec = projectDraftV2ToSpec(draft);
+    expect(flattenedFieldIds(spec)).toEqual(canonicalFieldKeys(draft));
+    expect(flattenedFieldIds(spec)).toEqual(
+      spec.fields.map((field) => field.id),
     );
   });
 
-  it("34. the failure message names the flat capacity", () => {
-    try {
-      projectDraftV2ToSpec(overCapacity());
-      throw new Error("expected projection to fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DraftError);
-      expect((error as DraftError).code).toBe("projection_invalid");
-      expect((error as DraftError).message).toContain("50");
-      expect((error as DraftError).message).toContain("48");
+  it("36. no Field is merged or dropped to clear the old 48 limit", () => {
+    const draft = overOldLimit();
+    const spec = projectDraftV2ToSpec(draft);
+    const all = spec.sections.flatMap((section) => section.fieldIds);
+    expect(all).toHaveLength(draft.fields.length);
+    expect(new Set(all).size).toBe(all.length);
+    for (const section of spec.sections) {
+      expect(section.fieldIds.length).toBeGreaterThanOrEqual(1);
     }
-  });
-
-  it("35. the input draft is unchanged after a capacity failure", () => {
-    const draft = overCapacity();
-    const before = JSON.stringify(draft);
-    const beforeFields = draft.fields.length;
-    const beforeStructure = draft.structure.length;
-    expect(errorCodeOf(() => projectDraftV2ToSpec(draft))).toBe(
-      "projection_invalid",
-    );
-    expect(JSON.stringify(draft)).toBe(before);
-    expect(draft.fields).toHaveLength(beforeFields);
-    expect(draft.structure).toHaveLength(beforeStructure);
-  });
-
-  it("36. the 48-section boundary still projects successfully", () => {
-    // 24 pairs = 48 required Sections, exactly at capacity.
-    const fields: DraftField[] = [];
-    const sections: { key: string; title: string }[] = [];
-    const structure: DraftPlacement[] = [];
-    for (let index = 0; index < 24; index += 1) {
-      const rootKey = `r${index}`;
-      const sectionKey = `s${index}`;
-      const childKey = `c${index}`;
-      fields.push(textField(rootKey), textField(childKey));
-      sections.push({ key: sectionKey, title: `S${index}` });
-      structure.push({ kind: "field", key: rootKey, parentKey: null });
-      structure.push({ kind: "section", key: sectionKey, parentKey: null });
-      structure.push({ kind: "field", key: childKey, parentKey: sectionKey });
-    }
-    const spec = projectDraftV2ToSpec(
-      makeDraft({ fields, sections, structure }),
-    );
-    expect(spec.sections).toHaveLength(48);
-    expect(spec.pages).toHaveLength(3);
     expectSchemaAndDomainValid(spec);
+  });
+
+  it("37. groups 48, 49 and 50 all exist with deterministic IDs", () => {
+    const spec = projectDraftV2ToSpec(overOldLimit());
+    const ids = spec.sections.map((section) => section.id);
+    expect(ids).toHaveLength(50);
+    expect(ids[47]).toBe("draft.v2.section.47");
+    expect(ids[48]).toBe("draft.v2.section.48");
+    expect(ids[49]).toBe("draft.v2.section.49");
+    expect(new Set(ids).size).toBe(50);
+    expect(spec.sections[47]?.fieldIds).toEqual(["c23_0"]);
+    expect(spec.sections[48]?.fieldIds).toEqual(["r24"]);
+    expect(spec.sections[49]?.fieldIds).toEqual(["c24_0"]);
+  });
+
+  it("38. every projected Section stays non-empty at high group counts", () => {
+    const spec = projectDraftV2ToSpec(overOldLimit());
+    for (const section of spec.sections) {
+      expect(section.fieldIds).not.toHaveLength(0);
+    }
+  });
+
+  it("39. layout.order remains page-local unique across 4 pages", () => {
+    const spec = projectDraftV2ToSpec(overOldLimit());
+    const byId = new Map(spec.sections.map((section) => [section.id, section]));
+    for (const page of spec.pages) {
+      const orders = page.layout.sectionIds.map(
+        (id) => byId.get(id)?.layout.order ?? -1,
+      );
+      expect(orders).toEqual(page.layout.sectionIds.map((_, index) => index));
+      expect(new Set(orders).size).toBe(orders.length);
+    }
+  });
+
+  it("40. the projection is deterministic at 50 groups", () => {
+    const draft = overOldLimit();
+    expect(projectDraftV2ToSpec(draft)).toEqual(
+      projectDraftV2ToSpec(interleavedDraft(25)),
+    );
+  });
+
+  it("41. an 80-group draft projects and preserves order", () => {
+    const draft = interleavedDraft(40);
+    const spec = projectDraftV2ToSpec(draft);
+    expect(spec.sections).toHaveLength(80);
+    expect(spec.pages).toHaveLength(5);
+    expect(flattenedFieldIds(spec)).toEqual(canonicalFieldKeys(draft));
+    expectSchemaAndDomainValid(spec);
+  });
+
+  it("42. a 96-group draft at the V2 Section limit projects", () => {
+    // 48 Sections is MAX_DRAFT_SECTIONS, the canonical V2 ceiling, and each
+    // Section splits one root group, so 96 is the maximum reachable group count.
+    const draft = interleavedDraft(48);
+    expect(draft.sections).toHaveLength(48);
+    const spec = projectDraftV2ToSpec(draft);
+    expect(spec.sections).toHaveLength(96);
+    expect(spec.pages).toHaveLength(6);
+    expect(flattenedFieldIds(spec)).toEqual(canonicalFieldKeys(draft));
+    expectSchemaAndDomainValid(spec);
+  });
+
+  it("43. projected Sections never exceed canonical Fields", () => {
+    for (const draft of [
+      makeRichDraft(),
+      interleavedDraft(25),
+      interleavedDraft(40),
+      interleavedDraft(48),
+    ]) {
+      const spec = projectDraftV2ToSpec(draft);
+      expect(spec.sections.length).toBeLessThanOrEqual(draft.fields.length);
+    }
+  });
+
+  it("44. the 192-Field maximum V2 draft projects at capacity", () => {
+    // 48 Sections x 4 Fields = 192 canonical Fields, the MAX_DRAFT_SURFACE_FIELDS
+    // ceiling, projecting 96 non-empty Sections.
+    const draft = interleavedDraft(48, 3);
+    expect(draft.fields).toHaveLength(192);
+    const spec = projectDraftV2ToSpec(draft);
+    expect(spec.sections).toHaveLength(96);
+    expect(spec.sections.length).toBeLessThanOrEqual(draft.fields.length);
+    expect(spec.pages).toHaveLength(6);
+    expect(flattenedFieldIds(spec)).toEqual(canonicalFieldKeys(draft));
+    expectSchemaAndDomainValid(spec);
+  });
+
+  it("45. the >192 guard stays unreachable for every valid V2 draft", () => {
+    // Documents the invariant: because Sections <= Fields and V2 caps Fields at
+    // 192, no valid draft can trip the defensive guard. The guard remains for a
+    // future schema change, not for normal V2 input.
+    for (const [pairs, perSection] of [
+      [1, 1],
+      [25, 1],
+      [48, 1],
+      [48, 3],
+    ] as const) {
+      const draft = interleavedDraft(pairs, perSection);
+      expect(draft.fields.length).toBeLessThanOrEqual(192);
+      const spec = projectDraftV2ToSpec(draft);
+      expect(spec.sections.length).toBeLessThanOrEqual(192);
+      for (const section of spec.sections) {
+        expect(section.fieldIds.length).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it("46. the projection never mutates a large draft", () => {
+    const draft = interleavedDraft(48);
+    const before = JSON.stringify(draft);
+    projectDraftV2ToSpec(draft);
+    expect(JSON.stringify(draft)).toBe(before);
   });
 });
 

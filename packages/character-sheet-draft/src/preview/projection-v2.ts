@@ -21,10 +21,23 @@ import { draftError } from "../errors";
  * constants, deliberately not imports, so this projection fails closed on its
  * own terms instead of silently depending on schema internals.
  */
-const MAX_FLAT_SECTIONS = 48;
+const MAX_PAGES = 12;
 const MAX_SECTIONS_PER_PAGE = 16;
 /** Mirrors the current flat-section fieldId capacity of 64. */
 const MAX_FIELD_IDS_PER_SECTION = 64;
+/**
+ * Mirrors the global flat `CharacterSheetSpec` Section capacity of
+ * `MAX_PAGES * MAX_SECTIONS_PER_PAGE` = 192.
+ *
+ * This guard is an INTERNAL impossible-state / future-schema protection, not a
+ * valid V2 limitation. Every projected Section is non-empty and every canonical
+ * Field is projected exactly once, so the projected Section count can never
+ * exceed the canonical Field count, which `CharacterSheetDraftV2` bounds at
+ * `MAX_DRAFT_SURFACE_FIELDS` = 192. A valid V2 draft therefore cannot reach this
+ * threshold; it exists so a future schema relaxation fails closed instead of
+ * silently emitting a spec the contract cannot represent.
+ */
+const MAX_FLAT_SECTIONS = MAX_PAGES * MAX_SECTIONS_PER_PAGE;
 
 const SECTION_LAYOUT = {
   mode: "flow",
@@ -78,9 +91,12 @@ export function projectDraftV2ToSpec(
   const sections = chunkRunsIntoSections(runs);
 
   if (sections.length > MAX_FLAT_SECTIONS) {
+    // Unreachable for a valid V2 draft: every projected Section is non-empty and
+    // every canonical Field projects exactly once, so Sections <= Fields <= 192.
+    // Guarded so a future capacity change fails closed loudly.
     throw draftError(
       "projection_invalid",
-      `The canonical V2 surface requires ${sections.length} flat sections, which exceeds the current CharacterSheetSpec capacity of ${MAX_FLAT_SECTIONS}.`,
+      `The canonical V2 surface requires ${sections.length} flat sections, which exceeds the CharacterSheetSpec capacity of ${MAX_FLAT_SECTIONS}. This is an internal invariant violation, not a valid V2 draft limitation.`,
     );
   }
 
