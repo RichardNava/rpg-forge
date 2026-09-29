@@ -14,6 +14,46 @@ export * from "./draft-store";
 export * from "./preview/index";
 export { parseCanonicalCharacterSheetDraft } from "./draft-canonical";
 export type { CharacterSheetDraftV2 } from "./draft-schema-v2";
+
+/**
+ * 4C public V2 read boundary.
+ *
+ * Exported EXPLICITLY rather than with `export * from "./draft-read-model-v2"`
+ * so the reviewed public surface stays small and reviewable: only the resolution
+ * layer above the structural index is public, while the lower structural
+ * machinery (`buildDraftStructuralIndex`, `getDraftPlacement`,
+ * `getDraftChildren`, `getDraftParentKey`, `getDraftDepth`,
+ * `getDraftSubtreeRange`, `DraftStructuralIndex`, `DraftSubtreeRange`) stays
+ * private implementation detail. Future Web consumers should read the
+ * structural view through `buildDraftStructuralReadModelV2`, not the index.
+ */
+export { buildDraftStructuralReadModelV2 } from "./draft-read-model-v2";
+export type {
+  DraftFieldReadNodeV2,
+  DraftSectionReadNodeV2,
+  DraftReadNodeV2,
+  DraftStructuralReadModelV2,
+} from "./draft-read-model-v2";
+
+/**
+ * 4C public V2 projection boundary.
+ *
+ * `projectDraftV2ToSpec` is exported straight from its own module through the
+ * package root; `preview/index.ts` is deliberately left untouched so the
+ * historical V1 preview barrel is not broadened merely to expose this one V2
+ * operation. Only this function is public — the run/pagination helpers
+ * (`ProjectedFieldRun`, `contextTitle`, `fieldKeysInCanonicalOrder`,
+ * `buildProjectedFieldRuns`, `chunkRunsIntoSections`, `chunkSectionsIntoPages`,
+ * `draftFieldToSpecField`, `validateProjectedSpec`) and the adapter capacity
+ * constants remain private.
+ *
+ * V1 `projectDraftToSpec` and `writebackDraftToSpec` remain public through
+ * `./preview/index`. The two projections are deliberately NOT unified or
+ * overloaded: they are distinct structural models, and migration keeps them
+ * explicit.
+ */
+export { projectDraftV2ToSpec } from "./preview/projection-v2";
+
 export {
   CHARACTER_SHEET_DRAFT_V2_VERSION,
   CharacterSheetDraftV2Schema,

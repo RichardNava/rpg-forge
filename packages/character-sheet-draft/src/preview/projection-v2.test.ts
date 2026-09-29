@@ -1296,9 +1296,13 @@ describe("projection-v2 BLOCK O scope guarantees", () => {
     expect(flattenedFieldIds(spec)).toEqual(fromReadModel);
   });
 
-  it("69. the V2 projection is not exposed through the package index", async () => {
+  it("69. the V2 projection is exposed through the package index", async () => {
+    // 4C3 supersedes the 4C2 public-absence assumption: `projectDraftV2ToSpec` is
+    // now intentionally part of the reviewed package-root V2 boundary. This
+    // assertion only records that deliberate promotion; the full public
+    // contract lives in draft-read-projection-v2-public.test.ts.
     const index = await import("../index");
-    expect(Object.keys(index)).not.toContain("projectDraftV2ToSpec");
+    expect(Object.keys(index)).toContain("projectDraftV2ToSpec");
   });
 
   it("70. a large realistic draft projects within canonical order", () => {
