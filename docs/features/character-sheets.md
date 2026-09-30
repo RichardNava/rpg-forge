@@ -364,53 +364,68 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 
 **Runtime cutover is still pending.** Worker routes, the extraction compiler, Web draft producers, the Sheet API client and its response schemas, `SheetStore`, the local dev backend, and the R2 draft adapter all still read and write V1. The current V1 confirmation flow remains live until 4E. Nothing in this section should be read as a claim that the V2 UI or the V2 runtime cutover has happened.
 
-| Capability                                           | Status                   | Notes                                                                                     |
-| ---------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- |
-| Manual sheet creation                                | IMPLEMENTED              | Blank draft + editor (V1 runtime)                                                         |
-| Upload existing sheet (PDF/PNG/JPG)                  | IMPLEMENTED              | AI vision extraction → editable draft (V1 runtime)                                        |
-| AI vision extraction                                 | IMPLEMENTED              | Workers AI vision adapter; extraction compiler still emits V1 drafts                      |
-| Recursive Section hierarchy                          | IMPLEMENTED              | Domain model supports arbitrary depth (max 12) via `parentKey`                            |
-| Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED              | Schema-driven editors (V1 runtime)                                                        |
-| Live preview                                         | IMPLEMENTED (V1 RUNTIME) | Live preview renders via V1 `projectDraftToSpec`; V2 projection ready but not wired       |
-| Confirm → read-only                                  | IMPLEMENTED              | V1 `finalizeDraft` live; V2 `finalizeDraftV2` implemented in domain                       |
-| PC/NPC mode                                          | IMPLEMENTED              | UI + threat level for NPC                                                                 |
-| PDF export/download                                  | IMPLEMENTED (V1 RUNTIME) | Export renders via V1 `projectDraftToSpec`; V2 projection ready but not wired             |
-| Visual style selection                               | PLANNED                  | Style keys defined, rendering integration pending                                         |
-| Visual style rendering                               | PLANNED                  | Style keys defined, rendering integration pending                                         |
-| Character image (upload/URL/AI)                      | PLANNED                  | UI placeholder only                                                                       |
-| Preview as modal                                     | NOT IMPLEMENTED          | Live preview pane exists; modal UX target not implemented                                 |
-| Undo (server-authoritative)                          | NOT IMPLEMENTED          | Target architecture defined; no domain mutation, Worker endpoint, or UI                   |
-| V2 initial versioning                                | IMPLEMENTED (V2 DOMAIN)  | `initialDraftVersionV2`; creation validates supplied structure, never infers placements   |
-| V2 edit transitions                                  | IMPLEMENTED (V2 DOMAIN)  | `applyDraftMutationV2` is the only public V2 edit contract                                |
-| V2 deterministic reroll                              | IMPLEMENTED (V2 DOMAIN)  | `rerollLockedDraftValuesV2`; deterministic per seed and Field registry order              |
-| V2 terminal confirmation / read-only                 | IMPLEMENTED (V2 DOMAIN)  | `finalizeDraftV2`; confirmed snapshots are permanently read-only                          |
-| V2 structural read model                             | IMPLEMENTED (V2 DOMAIN)  | Derived canonical preorder/roots/children/node lookup; `structure[]` stays canonical      |
-| V2 Draft → CharacterSheetSpec projection             | IMPLEMENTED (V2 DOMAIN)  | `projectDraftV2ToSpec`; canonical Field order preserved; not wired to preview or export   |
-| `place_node` mutation                                | IMPLEMENTED (V2 DOMAIN)  | Unified V2 placement for Fields and Sections; not reachable from Web or Worker            |
-| Recursive DnD (before/after/inside)                  | PARTIAL                  | Domain: before/after/inside implemented via `place_node`; DnD UI not implemented          |
-| Arbitrary sibling ordering                           | PARTIAL                  | Domain: single canonical preorder implemented; editor DnD UI pending                      |
-| Mixed Field/Section sibling ordering                 | PARTIAL                  | Domain support implemented; UI/runtime integration pending                                |
-| `place_field` mutation                               | SUPERSEDED               | Not a separate V2 operation; unified `place_node` handles Field and Section placement     |
-| `place_section` mutation                             | SUPERSEDED               | Not a separate V2 operation; unified `place_node` handles Field and Section placement     |
-| `expectedVersion` conflict protection                | PARTIAL                  | V2 domain implemented (precondition → `version_conflict`); Worker/HTTP transport still V1 |
-| Field label/type editing                             | IMPLEMENTED              | V1 runtime + V2 domain parity: `set_field_label`, `set_field_type`                        |
-| Field lock/unlock                                    | IMPLEMENTED              | V1 runtime + V2 domain parity: `lock_field`, `unlock_field`                               |
-| Value set/clear                                      | IMPLEMENTED              | V1 runtime + V2 domain parity: `set_value`, `clear_value`                                 |
-| Field add/remove                                     | IMPLEMENTED              | V1 runtime + V2 domain parity: `add_field`, `remove_field`                                |
-| Section creation/renaming                            | IMPLEMENTED              | V1 runtime + V2 domain parity: `add_section`, `rename_section`                            |
-| Field ↔ Section movement (`move_field`)              | IMPLEMENTED (V1 ONLY)    | V1 compatibility/runtime op; superseded in V2 by `place_node`; not in `DraftMutationV2`   |
-| Section reparenting (`reparent_section`)             | IMPLEMENTED (V1 ONLY)    | V1 compatibility/runtime op; superseded in V2 by `place_node`; not in `DraftMutationV2`   |
-| `remove_section` mutation                            | NOT IMPLEMENTED          | Not implemented in V1 or V2; `place_node` does not cover deletion                         |
-| `remove_section` safe semantics                      | NOT IMPLEMENTED          | Target behavior only: empty Section may be removed, non-empty Section rejected            |
-| Web V2 cutover                                       | NOT IMPLEMENTED          | Sidebar, preview, store and export still read V1 draft structures                         |
-| Worker V2 cutover                                    | NOT IMPLEMENTED          | Create/mutate/reroll/confirm routes and extraction compiler still V1                      |
-| Persistence V2 write path                            | NOT IMPLEMENTED          | R2 draft store still validates and persists V1                                            |
+| Capability                                           | Status                                       | Notes                                                                                                                                               |
+| ---------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manual sheet creation                                | IMPLEMENTED                                  | Blank draft + editor (V1 runtime)                                                                                                                   |
+| Upload existing sheet (PDF/PNG/JPG)                  | IMPLEMENTED                                  | AI vision extraction → editable draft (V1 runtime)                                                                                                  |
+| AI vision extraction                                 | IMPLEMENTED                                  | Workers AI vision adapter; extraction compiler still emits V1 drafts                                                                                |
+| Recursive Section hierarchy                          | IMPLEMENTED                                  | Domain model supports arbitrary depth (max 12) via `parentKey`                                                                                      |
+| Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED                                  | Schema-driven editors (V1 runtime)                                                                                                                  |
+| Live preview                                         | IMPLEMENTED (V1 RUNTIME)                     | Live preview renders via V1 `projectDraftToSpec`; V2 projection ready but not wired                                                                 |
+| Confirm → read-only                                  | IMPLEMENTED                                  | V1 `finalizeDraft` live; V2 `finalizeDraftV2` implemented in domain                                                                                 |
+| PC/NPC mode                                          | IMPLEMENTED                                  | UI + threat level for NPC                                                                                                                           |
+| PDF export/download                                  | IMPLEMENTED (V1 RUNTIME)                     | Export renders via V1 `projectDraftToSpec`; V2 projection ready but not wired                                                                       |
+| Visual style selection                               | PLANNED                                      | Style keys defined, rendering integration pending                                                                                                   |
+| Visual style rendering                               | PLANNED                                      | Style keys defined, rendering integration pending                                                                                                   |
+| Character image (upload/URL/AI)                      | PLANNED                                      | UI placeholder only                                                                                                                                 |
+| Preview as modal                                     | NOT IMPLEMENTED                              | Live preview pane exists; modal UX target not implemented                                                                                           |
+| Undo (server-authoritative)                          | NOT IMPLEMENTED                              | Target architecture defined; no domain mutation, Worker endpoint, or UI                                                                             |
+| V2 initial versioning                                | IMPLEMENTED (V2 DOMAIN)                      | `initialDraftVersionV2`; creation validates supplied structure, never infers placements                                                             |
+| V2 edit transitions                                  | IMPLEMENTED (V2 DOMAIN)                      | `applyDraftMutationV2` is the only public V2 edit contract                                                                                          |
+| V2 deterministic reroll                              | IMPLEMENTED (V2 DOMAIN)                      | `rerollLockedDraftValuesV2`; deterministic per seed and Field registry order                                                                        |
+| V2 terminal confirmation / read-only                 | IMPLEMENTED (V2 DOMAIN)                      | `finalizeDraftV2`; confirmed snapshots are permanently read-only                                                                                    |
+| V2 structural read model                             | IMPLEMENTED (V2 DOMAIN)                      | Derived canonical preorder/roots/children/node lookup; `structure[]` stays canonical                                                                |
+| V2 Draft → CharacterSheetSpec projection             | IMPLEMENTED (V2 DOMAIN)                      | `projectDraftV2ToSpec`; canonical Field order preserved; not wired to preview or export                                                             |
+| `place_node` mutation                                | IMPLEMENTED (V2 DOMAIN)                      | Unified V2 placement for Fields and Sections; not reachable from Web or Worker                                                                      |
+| Recursive DnD (before/after/inside)                  | PARTIAL                                      | Domain: before/after/inside implemented via `place_node`; DnD UI not implemented                                                                    |
+| Arbitrary sibling ordering                           | PARTIAL                                      | Domain: single canonical preorder implemented; editor DnD UI pending                                                                                |
+| Mixed Field/Section sibling ordering                 | PARTIAL                                      | Domain support implemented; UI/runtime integration pending                                                                                          |
+| `place_field` mutation                               | SUPERSEDED                                   | Not a separate V2 operation; unified `place_node` handles Field and Section placement                                                               |
+| `place_section` mutation                             | SUPERSEDED                                   | Not a separate V2 operation; unified `place_node` handles Field and Section placement                                                               |
+| `expectedVersion` conflict protection                | IMPLEMENTED (V2 DOMAIN + TRANSPORT CONTRACT) | Domain precondition → `version_conflict`; `expectedVersion` carried in every post-create V2 transport envelope. Worker/HTTP runtime cutover pending |
+| Field label/type editing                             | IMPLEMENTED                                  | V1 runtime + V2 domain parity: `set_field_label`, `set_field_type`                                                                                  |
+| Field lock/unlock                                    | IMPLEMENTED                                  | V1 runtime + V2 domain parity: `lock_field`, `unlock_field`                                                                                         |
+| Value set/clear                                      | IMPLEMENTED                                  | V1 runtime + V2 domain parity: `set_value`, `clear_value`                                                                                           |
+| Field add/remove                                     | IMPLEMENTED                                  | V1 runtime + V2 domain parity: `add_field`, `remove_field`                                                                                          |
+| Section creation/renaming                            | IMPLEMENTED                                  | V1 runtime + V2 domain parity: `add_section`, `rename_section`                                                                                      |
+| Field ↔ Section movement (`move_field`)              | IMPLEMENTED (V1 ONLY)                        | V1 compatibility/runtime op; superseded in V2 by `place_node`; not in `DraftMutationV2`                                                             |
+| Section reparenting (`reparent_section`)             | IMPLEMENTED (V1 ONLY)                        | V1 compatibility/runtime op; superseded in V2 by `place_node`; not in `DraftMutationV2`                                                             |
+| `remove_section` mutation                            | NOT IMPLEMENTED                              | Not implemented in V1 or V2; `place_node` does not cover deletion                                                                                   |
+| `remove_section` safe semantics                      | NOT IMPLEMENTED                              | Target behavior only: empty Section may be removed, non-empty Section rejected                                                                      |
+| Web V2 cutover                                       | NOT IMPLEMENTED                              | Sidebar, preview, store and export still read V1 draft structures                                                                                   |
+| Worker V2 cutover                                    | NOT IMPLEMENTED                              | Create/mutate/reroll/confirm routes and extraction compiler still V1                                                                                |
+| Persistence V2 write path                            | NOT IMPLEMENTED                              | R2 draft store still validates and persists V1                                                                                                      |
+| V2 transport schemas                                 | IMPLEMENTED (V2 CONTRACT)                    | Six frozen payload schemas public via `@repo/character-sheet-draft`; no runtime consumer yet                                                        |
+| V2 HTTP runtime cutover                              | NOT IMPLEMENTED                              | Worker routes, Web client/store and R2 read/write remain V1                                                                                         |
+
+### V2 response policy (after runtime cutover)
+
+- HTTP draft responses are canonical V2 only; there is no V1|V2 response union.
+- Historical V1 persistence is canonicalized in memory by
+  `parseCanonicalCharacterSheetDraft`; the stored bytes are never rewritten
+  merely because they were read, and the next state-changing write is V2.
+- The `/v1/character-sheets` route prefix is API/storage-layout versioning, not
+  draft `schemaVersion`, and is unchanged by the V2 draft cutover.
+
+Full transport, concurrency and error contract:
+`docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md`.
 
 ---
 
 ## RELATED DOCUMENTS
 
 - **Architecture:** `docs/architecture/phase-14.7/character-sheet-integration.md` (for implementation details, labeled with CURRENT/COMPLETED/SUPERSEDED/DEFERRED)
+- **V2 transport contract:** `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md` (FROZEN FOR 4E CUTOVER)
 - **Data Model:** `docs/architecture/data-model.md` (persistence direction)
 - **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`
