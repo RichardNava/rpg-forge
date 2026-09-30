@@ -16,6 +16,22 @@ export { parseCanonicalCharacterSheetDraft } from "./draft-canonical";
 export type { CharacterSheetDraftV2 } from "./draft-schema-v2";
 
 /**
+ * 4E1 canonical V2 draft persistence port.
+ *
+ * Exported EXPLICITLY and separately from the V1 `CharacterSheetDraftStore`
+ * barrel (`export * from "./draft-store"`, line above). The two ports are
+ * deliberately NOT unified, widened to a union, or generalized into a `<T>`
+ * store: the live V1 Worker still consumes the V1 port, and a canonical V2
+ * consumer must never receive V1. `CharacterSheetDraftIdentity` is reused from
+ * the V1 module rather than duplicated, because both ports address the same
+ * immutable key layout.
+ *
+ * The frozen behavior this port commits to is specified in
+ * `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md`.
+ */
+export type { CharacterSheetDraftStoreV2 } from "./draft-store-v2";
+
+/**
  * 4C public V2 read boundary.
  *
  * Exported EXPLICITLY rather than with `export * from "./draft-read-model-v2"`
