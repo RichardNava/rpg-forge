@@ -56,6 +56,7 @@ import type {
   CharacterSheetDraftStore,
   CharacterSheetDraftIdentity,
 } from "@repo/character-sheet-draft";
+import { draftError, type DraftErrorCode } from "@repo/character-sheet-draft";
 import type { RulesAnalysisWorkflowPort } from "../infrastructure/rules-analysis-workflow.js";
 
 export class FakeClock implements Clock {
@@ -1030,6 +1031,12 @@ function cloneDraft(draft: CharacterSheetDraft): CharacterSheetDraft {
 export class FakeCharacterSheetDraftStore implements CharacterSheetDraftStore {
   readonly snapshots = new Map<string, CharacterSheetDraft>();
   failOnPutDraft = false;
+  /**
+   * 4E3A — optional read failure. When set, `getDraftVersion` rejects with this
+   * `DraftError` code, mirroring the real R2 adapter. Defaults to null so no
+   * existing test changes behavior.
+   */
+  failOnGetDraftVersion: DraftErrorCode | null = null;
 
   private versionKey(
     identity: CharacterSheetDraftIdentity,
@@ -1057,6 +1064,9 @@ export class FakeCharacterSheetDraftStore implements CharacterSheetDraftStore {
     identity: CharacterSheetDraftIdentity,
     version: number,
   ): Promise<CharacterSheetDraft | null> {
+    if (this.failOnGetDraftVersion !== null) {
+      throw draftError(this.failOnGetDraftVersion, "Injected read failure.");
+    }
     const draft = this.snapshots.get(this.versionKey(identity, version));
     return draft === undefined ? null : cloneDraft(draft);
   }

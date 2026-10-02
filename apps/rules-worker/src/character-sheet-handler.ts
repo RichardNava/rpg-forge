@@ -13,6 +13,7 @@ import {
   validateDraft,
   type CharacterSheetDraft,
   type CharacterSheetDraftIdentity,
+  type CharacterSheetDraftStore,
 } from "@repo/character-sheet-draft";
 import type { ExtractedCharacterNode } from "./features/character-sheets/extraction/extracted-character-structure.js";
 import { compileExtractedCharacterStructure } from "./features/character-sheets/extraction/compile-extracted-character-structure.js";
@@ -576,12 +577,19 @@ async function handleGetDraft(
 
   // If a specific version is requested, serve it directly (no head-read needed).
   if (version !== null) {
-    const draft = await deps.sheetDraftStore.getDraftVersion(identity, version);
-    if (draft === null) {
+    const read = await readDraftSnapshot(
+      deps.sheetDraftStore,
+      identity,
+      version,
+    );
+    if (read.kind === "error") {
+      return read.response;
+    }
+    if (read.draft === null) {
       return errorResponse("SHEET_DRAFT_NOT_FOUND");
     }
-    traceSheetDraft(deps, "draft version response", draft);
-    return jsonResponse(200, draft);
+    traceSheetDraft(deps, "draft version response", read.draft);
+    return jsonResponse(200, read.draft);
   }
 
   // No version requested: resolve through the draft head.
@@ -593,15 +601,19 @@ async function handleGetDraft(
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  const draft = await deps.sheetDraftStore.getDraftVersion(
+  const current = await readDraftSnapshot(
+    deps.sheetDraftStore,
     identity,
     head.currentVersion,
   );
-  if (draft === null) {
+  if (current.kind === "error") {
+    return current.response;
+  }
+  if (current.draft === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
-  traceSheetDraft(deps, "draft current response", draft);
-  return jsonResponse(200, draft);
+  traceSheetDraft(deps, "draft current response", current.draft);
+  return jsonResponse(200, current.draft);
 }
 
 async function handleMutateDraft(
@@ -644,13 +656,18 @@ async function handleMutateDraft(
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  const currentDraft = await deps.sheetDraftStore.getDraftVersion(
+  const currentRead = await readDraftSnapshot(
+    deps.sheetDraftStore,
     draftIdentity,
     head.currentVersion,
   );
-  if (currentDraft === null) {
+  if (currentRead.kind === "error") {
+    return currentRead.response;
+  }
+  if (currentRead.draft === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
+  const currentDraft = currentRead.draft;
 
   let mutated: CharacterSheetDraft;
   try {
@@ -721,16 +738,20 @@ async function handleRerollDraft(
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  const currentDraft = await deps.sheetDraftStore.getDraftVersion(
+  const currentRead = await readDraftSnapshot(
+    deps.sheetDraftStore,
     draftIdentity,
     head.currentVersion,
   );
-  if (currentDraft === null) {
+  if (currentRead.kind === "error") {
+    return currentRead.response;
+  }
+  if (currentRead.draft === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
   const { draft: rerolledDraft, rerolledKeys } = rerollLockedDraftValues(
-    currentDraft,
+    currentRead.draft,
     seed,
   );
 
@@ -779,13 +800,18 @@ async function handleConfirmDraft(
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  const headDraft = await deps.sheetDraftStore.getDraftVersion(
+  const headRead = await readDraftSnapshot(
+    deps.sheetDraftStore,
     draftIdentity,
     head.currentVersion,
   );
-  if (headDraft === null) {
+  if (headRead.kind === "error") {
+    return headRead.response;
+  }
+  if (headRead.draft === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
+  const headDraft = headRead.draft;
 
   let confirmedDraft: CharacterSheetDraft;
   try {
@@ -810,6 +836,38 @@ async function handleConfirmDraft(
 type ClaimCommitOutcome =
   | { kind: "ok"; draft: CharacterSheetDraft }
   | { kind: "error"; response: Response };
+
+type DraftReadOutcome =
+  | { kind: "ok"; draft: CharacterSheetDraft | null }
+  | { kind: "error"; response: Response };
+
+/**
+ * Reads one immutable snapshot through the shared `DraftError` translation.
+ *
+ * 4E3A — every `getDraftVersion` call site previously invoked the store
+ * directly, so a `corrupt_draft` or `storage_unavailable` raised by the R2
+ * adapter escaped the handler as an unhandled rejection (a non-contract Worker
+ * 500) instead of a mapped error response. Routing reads through one helper keeps
+ * the new `corrupt_draft` mapping reachable and keeps the translation in a
+ * single place instead of five `try`/`catch` blocks.
+ *
+ * A missing snapshot is `null`, never an error: absence is a routing decision
+ * (`SHEET_DRAFT_NOT_FOUND`), not a storage failure.
+ */
+async function readDraftSnapshot(
+  store: CharacterSheetDraftStore,
+  identity: CharacterSheetDraftIdentity,
+  version: number,
+): Promise<DraftReadOutcome> {
+  try {
+    return {
+      kind: "ok",
+      draft: await store.getDraftVersion(identity, version),
+    };
+  } catch (error) {
+    return { kind: "error", response: draftErrorToResponse(error) };
+  }
+}
 
 async function claimCommitDraft(
   input: {
@@ -930,6 +988,26 @@ async function claimCommitDraft(
   return { kind: "ok", draft: nextVersion };
 }
 
+/**
+ * Translates a thrown `DraftError` into its HTTP response.
+ *
+ * 4E3A — repaired additively. Two arms were missing:
+ *
+ * - `version_conflict` previously fell through to the default arm and became
+ *   `SHEET_DRAFT_MUTATION_INVALID` (422). V2 throws this code from its
+ *   `expectedVersion` preconditions, so a stale client would have received a 422
+ *   that invites a blind retry loop against a version it can never reconcile.
+ *   It now maps to `SHEET_DRAFT_VERSION_CONFLICT` (409).
+ * - `corrupt_draft` has been declared in `ErrorCodeSchema` since it existed, but
+ *   no arm ever produced it, so a corrupt stored snapshot surfaced as the default
+ *   422 mutation error. It now maps to `SHEET_DRAFT_CORRUPT` (500).
+ *
+ * `storage_unavailable` is added in the same change because making the store-read
+ * paths below reachable is what exposes it: without this arm, a transient R2 read
+ * failure on those newly-translated paths would report 422 instead of 503.
+ *
+ * No existing arm was removed or re-statused.
+ */
 function draftErrorToResponse(error: unknown): Response {
   if (error instanceof DraftError) {
     switch (error.code) {
@@ -947,6 +1025,12 @@ function draftErrorToResponse(error: unknown): Response {
       case "draft_session_mismatch":
       case "session_expired":
         return errorResponse("SHEET_SESSION_NOT_FOUND_OR_UNAUTHORIZED");
+      case "corrupt_draft":
+        return errorResponse("SHEET_DRAFT_CORRUPT", error.message);
+      case "version_conflict":
+        return errorResponse("SHEET_DRAFT_VERSION_CONFLICT", error.message);
+      case "storage_unavailable":
+        return draftStorageUnavailable();
     }
     return errorResponse("SHEET_DRAFT_MUTATION_INVALID", error.message);
   }

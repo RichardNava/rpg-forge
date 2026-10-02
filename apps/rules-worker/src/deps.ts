@@ -18,6 +18,7 @@ import { createR2ChunkSource } from "./infrastructure/r2-chunk-source.js";
 import { createR2RulebookFileHash } from "./infrastructure/r2-rulebook-file-hash.js";
 import { createR2RuleArtifacts } from "./infrastructure/r2-rule-artifacts.js";
 import { createR2CharacterSheetDraftStore } from "./infrastructure/r2-character-sheet-drafts.js";
+import { createR2CharacterSheetDraftStoreV2 } from "./infrastructure/r2-character-sheet-drafts-v2.js";
 import { createR2CharacterSheetArtifactStore } from "./infrastructure/r2-character-sheet-artifacts.js";
 import { createRulebookResourceCleaner } from "./infrastructure/rulebook-cleaner.js";
 import { createCloudflareRulebookWorkflowPort } from "./infrastructure/rulebook-workflow.js";
@@ -70,6 +71,13 @@ export function createAppDeps(env: Env): AppDeps {
     env.SHEET_ARTIFACTS === undefined
       ? undefined
       : createR2CharacterSheetDraftStore(env.SHEET_ARTIFACTS);
+  // 4E3A — the V2 draft store shares the same bucket and key layout, but is a
+  // distinct adapter: it writes V2 only and reads V1-or-V2 as canonical V2.
+  // Constructed alongside V1; no route consumes it yet.
+  const sheetDraftStoreV2 =
+    env.SHEET_ARTIFACTS === undefined
+      ? undefined
+      : createR2CharacterSheetDraftStoreV2(env.SHEET_ARTIFACTS);
   const sheetArtifactStore =
     env.SHEET_ARTIFACTS === undefined
       ? undefined
@@ -115,6 +123,7 @@ export function createAppDeps(env: Env): AppDeps {
     sheetSessionRepository,
     sheetDraftHeadRepository,
     ...(sheetDraftStore === undefined ? {} : { sheetDraftStore }),
+    ...(sheetDraftStoreV2 === undefined ? {} : { sheetDraftStoreV2 }),
     ...(sheetArtifactStore === undefined ? {} : { sheetArtifactStore }),
     ...(sheetVisualExtraction === undefined ? {} : { sheetVisualExtraction }),
     debugSheetDrafts: env.SHEET_DRAFT_DEBUG === "true",

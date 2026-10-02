@@ -246,6 +246,21 @@ function rerollDraft(
   );
 }
 
+function confirmDraft(
+  harness: Harness,
+  sessionId: string,
+  token: string,
+  draftId: string,
+): Promise<Response> {
+  return handleRequest(
+    new Request(`${draftUrlPath(sessionId, draftId)}/confirm`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+    }),
+    harness.deps,
+  );
+}
+
 describe("character-sheet session creation", () => {
   it("creates an anonymous 120-minute session and persists only the token hash", async () => {
     const harness = makeHarness();
@@ -1097,6 +1112,180 @@ describe("character-sheet draft reroll", () => {
     expect(response.status).toBe(404);
     expect((await readJson<ErrorBody>(response)).error.code).toBe(
       "SHEET_DRAFT_NOT_FOUND",
+    );
+  });
+});
+
+/**
+ * 4E3A — error-mapping repairs.
+ *
+ * `SHEET_DRAFT_CORRUPT` and the domain `version_conflict` -> 409 mapping had no
+ * producing arm in `draftErrorToResponse`, and every `getDraftVersion` call site
+ * invoked the store directly, so a `DraftError` raised during a read escaped the
+ * handler as an unhandled rejection rather than a contract response.
+ */
+describe("character-sheet draft error mapping (4E3A)", () => {
+  async function seedDraft(): Promise<{
+    harness: Harness;
+    sessionId: string;
+    accessToken: string;
+    draftId: string;
+  }> {
+    const harness = makeHarness();
+    const { sessionId, accessToken } = await createSheetSession(harness);
+    const draft = makeDraft(sessionId);
+    const created = await createDraft(harness, sessionId, accessToken, draft);
+    expect(created.status).toBe(201);
+    return { harness, sessionId, accessToken, draftId: draft.draftId };
+  }
+
+  it("maps corrupt_draft to SHEET_DRAFT_CORRUPT on a head-resolved read", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "corrupt_draft";
+
+    const response = await getDraft(harness, sessionId, accessToken, draftId);
+
+    expect(response.status).toBe(500);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_CORRUPT",
+    );
+  });
+
+  it("maps corrupt_draft to SHEET_DRAFT_CORRUPT on a version-pinned read", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "corrupt_draft";
+
+    const response = await getDraft(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      "1",
+    );
+
+    expect(response.status).toBe(500);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_CORRUPT",
+    );
+  });
+
+  it("maps corrupt_draft to SHEET_DRAFT_CORRUPT on the mutation read", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "corrupt_draft";
+
+    const response = await patchDraft(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      { op: "set_value", key: "homeland", value: "North" },
+    );
+
+    expect(response.status).toBe(500);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_CORRUPT",
+    );
+  });
+
+  it("maps corrupt_draft to SHEET_DRAFT_CORRUPT on the reroll read", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "corrupt_draft";
+
+    const response = await rerollDraft(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      { seed: "seed" },
+    );
+
+    expect(response.status).toBe(500);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_CORRUPT",
+    );
+  });
+
+  it("maps corrupt_draft to SHEET_DRAFT_CORRUPT on the confirm read", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "corrupt_draft";
+
+    const response = await confirmDraft(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+    );
+
+    expect(response.status).toBe(500);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_CORRUPT",
+    );
+  });
+
+  it("maps a storage_unavailable read failure to a 503, not a 422", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "storage_unavailable";
+
+    const response = await getDraft(harness, sessionId, accessToken, draftId);
+
+    expect(response.status).toBe(503);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_STORAGE_UNAVAILABLE",
+    );
+  });
+
+  it("maps a thrown domain version_conflict to 409 rather than 422", async () => {
+    const { harness, sessionId, accessToken, draftId } = await seedDraft();
+    harness.draftStore.failOnGetDraftVersion = "version_conflict";
+
+    const response = await patchDraft(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      { op: "set_value", key: "homeland", value: "North" },
+    );
+
+    // A domain version_conflict is V2-shaped; V1 never raises it from a read.
+    // The assertion pins the MAPPING (409 + the conflict code), which is what
+    // 4E3B depends on once V2 primitives are wired into this route.
+    expect(response.status).toBe(409);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_VERSION_CONFLICT",
+    );
+  });
+
+  it("still reports a missing snapshot as SHEET_DRAFT_NOT_FOUND", async () => {
+    const harness = makeHarness();
+    const { sessionId, accessToken } = await createSheetSession(harness);
+    const draft = makeDraft(sessionId);
+    await createDraft(harness, sessionId, accessToken, draft);
+
+    const response = await getDraft(
+      harness,
+      sessionId,
+      accessToken,
+      draft.draftId,
+      "99",
+    );
+
+    expect(response.status).toBe(404);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_NOT_FOUND",
+    );
+  });
+
+  it("leaves the existing SHEET_DRAFT_ALREADY_EXISTS create mapping intact", async () => {
+    const harness = makeHarness();
+    const { sessionId, accessToken } = await createSheetSession(harness);
+    const draft = makeDraft(sessionId);
+    await createDraft(harness, sessionId, accessToken, draft);
+
+    const response = await createDraft(harness, sessionId, accessToken, draft);
+
+    expect(response.status).toBe(409);
+    expect((await readJson<ErrorBody>(response)).error.code).toBe(
+      "SHEET_DRAFT_ALREADY_EXISTS",
     );
   });
 });

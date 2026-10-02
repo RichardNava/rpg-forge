@@ -19,7 +19,10 @@ import type {
   SheetSessionRepositoryPort,
   DraftHeadRepositoryPort,
 } from "@repo/character-sheet-session";
-import type { CharacterSheetDraftStore } from "@repo/character-sheet-draft";
+import type {
+  CharacterSheetDraftStore,
+  CharacterSheetDraftStoreV2,
+} from "@repo/character-sheet-draft";
 import type { CharacterSheetArtifactStore } from "@repo/character-sheet-artifacts";
 import {
   parseBearerToken,
@@ -62,6 +65,19 @@ export interface AppDeps {
   sheetSessionRepository: SheetSessionRepositoryPort;
   sheetDraftHeadRepository: DraftHeadRepositoryPort;
   sheetDraftStore?: CharacterSheetDraftStore;
+  /**
+   * 4E3A — parallel V2 draft store seam.
+   *
+   * Deliberately optional and deliberately typed V2-only. It coexists with
+   * `sheetDraftStore` so the live V1 routes keep their V1-typed store while V2
+   * orchestration becomes possible. It is NOT yet read by any route: wiring it
+   * into a handler is the 4E3B cutover, which this slice must not perform.
+   *
+   * Never widen this to `CharacterSheetDraftStore`, a `V1 | V2` union, or a
+   * generic store. A canonical V2 consumer must never be able to receive V1,
+   * and widening would force a partial cutover.
+   */
+  sheetDraftStoreV2?: CharacterSheetDraftStoreV2;
   sheetArtifactStore?: CharacterSheetArtifactStore;
   sheetVisualExtraction?: SheetVisualExtractionPort;
   debugSheetDrafts?: boolean;
