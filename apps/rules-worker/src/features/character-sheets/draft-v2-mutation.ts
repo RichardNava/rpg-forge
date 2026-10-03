@@ -1,5 +1,5 @@
 /**
- * 4E3B2 — INTERNAL V2 mutation orchestration (not wired to any route).
+ * V2 mutation orchestration for the live mutate route.
  *
  * Composes the 4E3B1 runtime kernel with the V2 domain mutation authority.
  *

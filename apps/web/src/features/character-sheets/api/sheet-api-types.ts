@@ -1,8 +1,4 @@
 import { z } from "zod";
-import {
-  CharacterSheetDraftSchema,
-  type CharacterSheetDraft,
-} from "@repo/character-sheet-draft";
 
 export const CHARACTER_SHEET_API_PREFIX = "/api/character-sheets";
 
@@ -35,19 +31,3 @@ export const SheetSessionViewSchema = z.strictObject({
   status: z.enum(["ACTIVE", "DELETING"]),
   expiresAt: z.iso.datetime(),
 });
-
-export interface SheetDraftRerollRequest {
-  seed: string;
-}
-
-export interface SheetDraftRerollResponse {
-  draft: CharacterSheetDraft;
-  rerolledKeys: string[];
-}
-
-export const SheetDraftRerollResponseSchema = z.strictObject({
-  draft: CharacterSheetDraftSchema,
-  rerolledKeys: z.array(z.string().min(1)),
-});
-
-export type { CharacterSheetDraft } from "@repo/character-sheet-draft";

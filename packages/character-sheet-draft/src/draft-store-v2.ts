@@ -1,18 +1,15 @@
 import type { CharacterSheetDraftV2 } from "./draft-schema-v2";
-import type { CharacterSheetDraftIdentity } from "./draft-store";
+import type { CharacterSheetDraftIdentity } from "./draft-identity";
 
 /**
  * 4E1 — canonical V2 draft persistence port.
  *
- * This is a PARALLEL port. It deliberately coexists with the V1-typed
- * `CharacterSheetDraftStore` rather than replacing or widening it, because the
- * live V1 Worker still consumes that port. Widening V1 to
- * `CharacterSheetDraft | CharacterSheetDraftV2`, or introducing a
- * generic `<T>` store, would force a partial runtime cutover and would let a
- * canonical V2 consumer receive V1. Neither is acceptable, so this contract is
- * separate and V2-only at the type level.
+ * This is the SOLE live draft store contract. It is V2-only at the type
+ * level: widening it to a `CharacterSheetDraft | CharacterSheetDraftV2`
+ * union, or introducing a generic `<T>` store, would let a canonical V2
+ * consumer receive V1. Neither is acceptable.
  *
- * The identity type is REUSED, not duplicated: both ports address the same
+ * The identity type is SHARED, not duplicated: the port addresses the same
  * opaque session/draft identity against the same immutable key layout.
  *
  * ## Semantics

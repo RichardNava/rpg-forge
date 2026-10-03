@@ -1,5 +1,5 @@
 /**
- * 4E3A-R — INTERNAL V2 request boundary (not wired to any route).
+ * V2 request boundary for the live draft routes.
  *
  * ## Authority
  *
@@ -9,7 +9,7 @@
  * NOT define its own `expectedVersion` schema, mutation envelope, reroll
  * envelope, confirm envelope, snapshot response, or reroll response.
  *
- * The re-export block below is a Worker-local façade that gives future handlers
+ * The re-export block below is a Worker-local façade that gives handlers
  * one import site, and it deliberately covers ALL SIX frozen schemas including
  * the create schema. A partial façade is an omission trap: it is how the create
  * route would end up importing from two different places.
@@ -18,9 +18,9 @@
  *
  * Only the request-PARSE convention at the route edge. A parse failure is a
  * transport concern, so it is returned as a value (`ok` / `invalid`) rather than
- * thrown, letting a handler branch once and never unwrap a `ZodError`. This is
- * the same convention the live V1 route already uses for
- * `SheetDraftRerollRequestSchema.safeParse`.
+ * thrown, letting a handler branch once and never unwrap a `ZodError`. This
+ * matches the established route-edge convention of parsing request bodies with
+ * `safeParse` into a value.
  *
  * This is NOT a domain result union. V2 domain operations still signal failure
  * by THROWING `DraftError`; nothing here converts a thrown domain error into a
@@ -47,7 +47,7 @@
  * ```
  *
  * Create accepts a client-supplied FULL canonical V2 snapshot. That decision is
- * frozen by 4D and retained for this cutover. Create has no `expectedVersion`
+ * frozen by 4D. Create has no `expectedVersion`
  * because there is no prior version to race against. Worker create policy —
  * distinct from payload shape — is: canonical V2 validation, `sessionId` must
  * match the authorized session, `version` must equal 1, existing-head duplicate
@@ -66,14 +66,13 @@
  * ```
  *
  * Confirm returns a raw snapshot. There is no `{ draft: ... }` wrapper in V2.
- * The live V1 confirm route's `{ draft: ... }` envelope is a known pre-existing
- * integration defect, corrected by 4E3B rather than here.
+ * The previous V1 confirm route's `{ draft: ... }` envelope was a known
+ * pre-existing integration defect, corrected by the 4E5 cutover.
  *
- * ## V1 payloads are untouched
+ * ## V2 envelopes are the only live request shapes
  *
- * Nothing in this module is imported by a live route. The V1 request shapes stay
- * exactly as they are until 4E5 activates the V2 runtime, and the Web client is
- * updated in lockstep before that activation.
+ * The retired V1 request shapes are gone. Every state-changing draft route
+ * parses one of the frozen V2 envelopes below; anything else is a 400.
  */
 import {
   SheetDraftConfirmRequestV2Schema,
@@ -108,7 +107,7 @@ export type {
 };
 
 /**
- * Parse outcome for a future V2 request body: `ok` with the parsed value, or
+ * Parse outcome for a V2 request body: `ok` with the parsed value, or
  * `invalid`. A request-shape failure is a transport concern, so it is a value at
  * the route edge rather than a thrown `ZodError`.
  *
@@ -118,7 +117,7 @@ export type DraftV2RequestOutcome<T> =
   { kind: "ok"; value: T } | { kind: "invalid" };
 
 /**
- * `{ expectedVersion, mutation }` for the future V2 mutate route.
+ * `{ expectedVersion, mutation }` for the V2 mutate route.
  *
  * Both the strict envelope and the strict `DraftMutationV2` union are enforced
  * by the frozen package schema, which also rejects an `expectedVersion` placed
@@ -134,10 +133,10 @@ export function parseDraftV2MutationRequest(
 }
 
 /**
- * `{ expectedVersion, seed }` for the future V2 reroll route.
+ * `{ expectedVersion, seed }` for the V2 reroll route.
  *
- * Seed bounds match V1 exactly, so reroll seeds transfer across the cutover
- * unchanged.
+ * Seed bounds are unchanged from the previous contract, so reroll seeds
+ * transfer across the cutover unchanged.
  */
 export function parseDraftV2RerollRequest(
   body: unknown,
@@ -149,9 +148,9 @@ export function parseDraftV2RerollRequest(
 }
 
 /**
- * `{ expectedVersion }` for the future V2 confirm route.
+ * `{ expectedVersion }` for the V2 confirm route.
  *
- * There is no empty-body confirm in V2: the live V1 confirm route takes no body
+ * There is no empty-body confirm in V2: the previous confirm route took no body
  * at all, which is exactly what made an unguarded confirmation possible.
  */
 export function parseDraftV2ConfirmRequest(

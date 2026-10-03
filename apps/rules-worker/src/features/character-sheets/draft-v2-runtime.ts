@@ -1,6 +1,5 @@
 /**
- * 4E3B1 — INTERNAL V2 orchestration kernel: D1 concurrency barriers plus R2
- * persistence (not wired to any route).
+ * V2 orchestration kernel: D1 concurrency barriers plus R2 persistence.
  *
  * ## Scope
  *
@@ -15,8 +14,8 @@
  *    snapshot through the proven D1 claim → R2 put → D1 commit lifecycle.
  *
  * This module does NOT call `applyDraftMutationV2`, `rerollLockedDraftValuesV2`
- * or `finalizeDraftV2`. Those are 4E3B2/4E3B3. This slice only makes the kernel
- * they will sit on top of correct.
+ * or `finalizeDraftV2`. Those live in the mutation/reroll/confirm orchestration
+ * modules that sit on top of this kernel.
  *
  * ## Layering
  *
@@ -44,7 +43,7 @@
  * - **No artificial error channel.** Every domain and persistence failure is a
  *   THROWN `DraftError`, exactly as in V2. There is no `DraftV2Outcome`, no
  *   `runDraftV2Operation`, no `{ kind: "ok" | "error" }`. This module sits BELOW
- *   the HTTP translation boundary; the future handler keeps using the private
+ *   the HTTP translation boundary; the handler keeps using the private
  *   `draftErrorToResponse` in `character-sheet-handler.ts`.
  *
  * ## Version ownership
@@ -86,7 +85,7 @@ export type { DraftHeadIdentity };
 
 /**
  * The kernel's collaborators. Narrow and explicit rather than `AppDeps`, so it
- * can never reach a live V1 store, a route helper or an HTTP concern.
+ * can never reach a route helper or an HTTP concern.
  *
  * `identity` is always `DraftHeadIdentity`, which is structurally the same
  * `{ sessionId, draftId }` pair the V2 store addresses snapshots by; the two
@@ -104,8 +103,8 @@ export interface DraftV2Runtime {
  *
  * `draft` is `null` when the head exists but its immutable snapshot does not.
  * Absence is a routing decision (`SHEET_DRAFT_NOT_FOUND`), NOT a storage
- * failure, so it is never an error here — this mirrors the established live V1
- * behavior, where a null read becomes a 404 rather than a 422/503.
+ * failure, so it is never an error here — a null read becomes a 404 rather
+ * than a 422/503.
  */
 export interface DraftV2CurrentState {
   readonly head: DraftHead;
@@ -142,8 +141,7 @@ export interface DraftV2CurrentState {
  * ## Pending-claim detection: any pending claim counts
  *
  * A pending claim is reported whenever `pendingVersion`/`pendingClaimId` is set,
- * regardless of `pendingSince` age. This is the established live V1 behavior and
- * it is also what the D1 CAS enforces anyway (`claim` requires
+ * regardless of `pendingSince` age. This matches what the D1 CAS enforces anyway (`claim` requires
  * `pendingVersion IS NULL`), so a stale claim could not be written past even if
  * this check were relaxed. Stale claims are resolved out of band by the bounded
  * `recoverStaleDraftClaims` sweep; inlining that resolution here would duplicate
@@ -239,15 +237,15 @@ export async function openDraftV2Mutation(
  * version. `next.version` was already produced by the V2 domain; this function
  * asserts it continues from `current` and persists exactly that snapshot.
  *
- * ## Failure semantics (identical to the proven live V1 lifecycle)
+ * ## Failure semantics (identical to the proven previous lifecycle)
  *
  * - claim `already_pending`  → `draft_inflight`, no R2 write
  * - claim `version_conflict` → `version_conflict`, no R2 write
  * - claim `not_found`        → `version_conflict` (the head vanished after the
- *   caller read it, so the client's expected version is no longer current; V1
- *   already maps a mid-write `not_found` on COMMIT to `version_conflict`)
+ *   caller read it, so the client's expected version is no longer current; a
+ *   mid-write `not_found` on COMMIT maps to `version_conflict`)
  * - R2 put failure           → best-effort release, then the store's own
- *   `DraftError` is rethrown unchanged (V1 discarded it and hard-coded a 503)
+ *   `DraftError` is rethrown unchanged (never replaced with a hard-coded 503)
  * - commit failure           → best-effort release, then `version_conflict`
  *
  * A failed write never leaves a visible skipped version: the release clears the
@@ -344,8 +342,8 @@ export async function persistNextDraftV2(
  *
  * `invalid_draft` is the established code for "this value is not a valid draft".
  * In correct operation this never fires: the V2 domain is the sole producer of
- * `N+1` snapshots. Mapping it to a client status is the future handler's decision
- * (4E3B2/3), not this module's.
+ * `N+1` snapshots. Mapping it to a client status is the handler's decision,
+ * not this module's.
  */
 function assertNextSnapshotContinues(
   current: CharacterSheetDraftV2,

@@ -3,7 +3,7 @@ import type {
   ThreatLevelPreference,
   VisualStyleKey,
   PortraitSource,
-} from "../state/sheet-store-types";
+} from "../state/sheet-workshop-types";
 
 export const CHARACTER_TYPE_OPTIONS: readonly CharacterTypePreference[] = [
   "pc",

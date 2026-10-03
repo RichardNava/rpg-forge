@@ -20,8 +20,8 @@ export interface DraftRerollResultV2 {
  * deterministic draw grammar: a `number` with both bounds, or a `choice` with
  * at least one declared option. Everything else — unlocked Fields, text,
  * textarea, checkbox, list, and under-bounded numbers — has no draw grammar,
- * so its authored value is preserved. `rerollLockedDraftValues` never invents
- * free text or list content, and neither does this.
+ * so its authored value is preserved. Reroll never invents
+ * free text or list content.
  *
  * The draw stream is deterministic: same seed + same ordered Field registry
  * reproduces the same values on every runtime. Iteration follows `draft.fields`

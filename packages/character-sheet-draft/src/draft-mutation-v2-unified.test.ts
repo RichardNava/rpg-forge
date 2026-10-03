@@ -715,11 +715,6 @@ describe("unified V2 mutation contract — BLOCK M public API", () => {
     expect(typed.op).toBe("set_value");
   });
 
-  it("index keeps the V1 mutation API intact", () => {
-    expect(typeof publicApi.applyDraftMutation).toBe("function");
-    expect(publicApi.DraftMutationSchema).toBeDefined();
-  });
-
   it("index does not expose isolated internal primitives or family schemas", () => {
     const ns = publicApi as unknown as Record<string, unknown>;
     expect(

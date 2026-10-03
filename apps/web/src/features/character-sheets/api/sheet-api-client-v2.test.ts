@@ -5,7 +5,7 @@ import {
   type CharacterSheetDraftV2,
 } from "@repo/character-sheet-draft";
 import { SheetApiClientV2 } from "./sheet-api-client-v2";
-import type { SheetFetch } from "./sheet-api-client";
+import type { SheetFetch } from "./sheet-fetch";
 import { SheetApiError } from "./sheet-api-errors";
 
 const SESSION_URL = "/api/character-sheets";

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SheetFetch } from "./sheet-api-client";
+import type { SheetFetch } from "./sheet-fetch";
 import {
   proxyCharacterSheetRequest,
   resolveCharacterSheetProxyPath,

@@ -1,5 +1,5 @@
 import { isSheetIdentitySegment } from "./sheet-identity-segments";
-import type { SheetFetch } from "./sheet-api-client";
+import type { SheetFetch } from "./sheet-fetch";
 
 const UPSTREAM_CHARACTER_SHEET_PATH = "/v1/character-sheets";
 

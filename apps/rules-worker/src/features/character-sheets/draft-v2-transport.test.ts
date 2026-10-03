@@ -117,7 +117,7 @@ describe("draft-v2-transport parse convention", () => {
     if (ok.kind === "ok") {
       expect(ok.value.expectedVersion).toBe(5);
     }
-    // The live V1 confirm route takes no body; that is what V2 removes.
+    // The previous confirm route took no body; that is what V2 removes.
     expect(parseDraftV2ConfirmRequest({}).kind).toBe("invalid");
   });
 

@@ -5,7 +5,7 @@ import {
   SHEET_UPLOAD_ACCEPT,
   validateSheetUploadFile,
 } from "../lib/sheet-upload-validation";
-import type { SheetDocumentFileDescriptor } from "../extraction/extraction-service";
+import type { SheetDocumentFileDescriptor } from "../extraction/extraction-types";
 
 interface SheetUploadDescriptor extends SheetDocumentFileDescriptor {
   sheetStartPage?: number;

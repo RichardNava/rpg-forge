@@ -7,9 +7,9 @@ import type {
   SheetDraftSaveStatus,
   SheetStorePhase,
   WorkshopPreferences,
-} from "./sheet-store-types";
+} from "./sheet-workshop-types";
 
-export type { WorkshopPreferences } from "./sheet-store-types";
+export type { WorkshopPreferences } from "./sheet-workshop-types";
 
 export interface SheetStoreV2State {
   phase: SheetStorePhase;

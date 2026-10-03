@@ -2,15 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   CharacterSheetSpecSchema,
   validateCharacterSheetSpecDomain,
-  type CharacterSheetField,
   type CharacterSheetSpec,
 } from "@repo/character-sheet-schema";
 import { buildDraftStructuralReadModelV2 } from "../draft-read-model-v2";
 import type { DraftField } from "../draft-schema";
 import type { CharacterSheetDraftV2, DraftPlacement } from "../draft-schema-v2";
 import { DraftError } from "../errors";
-import { makeDraft as makeV1Draft } from "../draft-fixture";
-import { projectDraftToSpec } from "./projection";
 import { projectDraftV2ToSpec } from "./projection-v2";
 
 /**
@@ -869,30 +866,6 @@ describe("projection-v2 BLOCK I field conversion", () => {
     expect(byId.get("l")?.type).toBe("list");
   });
 
-  it("38. V2 and V1 conversions agree Field for Field", () => {
-    const typed = typedDraft();
-    const v2 = projectDraftV2ToSpec(typed);
-    const v1 = projectDraftToSpec(
-      makeV1Draft({
-        characterName: null,
-        fields: typed.fields,
-        sections: [
-          {
-            key: "s",
-            title: "Stats",
-            fieldKeys: ["t", "ta", "n", "c", "ch", "l"],
-          },
-        ],
-        values: typed.values,
-      }),
-    );
-    const strip = (field: CharacterSheetField): unknown => {
-      const { placement: _placement, ...rest } = field;
-      return rest;
-    };
-    expect(v2.fields.map(strip)).toEqual(v1.fields.map(strip));
-  });
-
   it("39. number bounds, choice options and list semantics are preserved", () => {
     const byId = new Map(
       projectDraftV2ToSpec(typedDraft()).fields.map((field) => [
@@ -1036,28 +1009,15 @@ describe("projection-v2 BLOCK K values and metadata", () => {
     expect(projectDraftV2ToSpec(unnamed).metadata.title).toBe("Untitled draft");
   });
 
-  it("48b. a null text value fails closed exactly as V1 does", () => {
+  it("48b. a null text value fails closed", () => {
     // A V2 draft may legitimately carry `values.character_name = null`, but
-    // CharacterSheetSpec requires a text value to be a string. V1 projection
-    // fails closed on the identical input, so this is an inherited
-    // representational boundary rather than a V2 regression.
+    // CharacterSheetSpec requires a text value to be a string, so the
+    // projection fails closed on the identical input.
     const draft = makeRichDraft({
       characterName: null,
       values: { ...makeRichDraft().values, character_name: null },
     });
     expect(errorCodeOf(() => projectDraftV2ToSpec(draft))).toBe(
-      "projection_invalid",
-    );
-
-    const v1Draft = makeV1Draft({
-      characterName: null,
-      fields: [
-        { key: "character_name", label: "Name", type: "text", locked: false },
-      ],
-      sections: [],
-      values: { character_name: null },
-    });
-    expect(errorCodeOf(() => projectDraftToSpec(v1Draft))).toBe(
       "projection_invalid",
     );
   });
@@ -1251,23 +1211,6 @@ describe("projection-v2 BLOCK N validation", () => {
 });
 
 describe("projection-v2 BLOCK O scope guarantees", () => {
-  it("65. V1 projection is unchanged and still operational", () => {
-    const spec = projectDraftToSpec(
-      makeV1Draft({
-        draftId: "draft.v1",
-        characterName: "V1 Hero",
-        fields: [textField("a"), textField("b")],
-        sections: [{ key: "s", title: "Stats", fieldKeys: ["a"] }],
-        values: { a: "A" },
-      }),
-    );
-    expect(spec.sections.map((section) => section.id)).toEqual([
-      "draft.section.s",
-      "draft.section.ungrouped",
-    ]);
-    expect(spec.pages[0]?.id).toBe("draft.page");
-  });
-
   it("66. the V2 projection uses bounded ordinal IDs only", () => {
     const spec = projectDraftV2ToSpec(makeRichDraft());
     for (const section of spec.sections) {

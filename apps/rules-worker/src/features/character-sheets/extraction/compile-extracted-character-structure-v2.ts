@@ -20,19 +20,12 @@ type DraftSectionV2 = CharacterSheetDraftV2["sections"][number];
 type DraftPlacement = CharacterSheetDraftV2["structure"][number];
 
 /**
- * 4E2 — DIRECT V2 draft producer.
+ * DIRECT V2 draft producer.
  *
- * This is the V2 counterpart of `compileExtractedCharacterStructure`. The V1
- * producer is retained only as transitional compatibility code for the 4E6
- * cleanup; the live extraction route now calls this module directly since the
- * 4E5 cutover.
- *
- * ## Direct production, not migrate-after-V1
- *
- * The producer emits the canonical V2 shape on the FIRST pass. It never builds a
- * V1 draft and never calls `parseCanonicalCharacterSheetDraft` or
- * `migrateCharacterSheetDraftV1ToV2`. This matters structurally, not just
- * stylistically:
+ * The live extraction route calls this module directly: it emits the canonical
+ * V2 shape on the FIRST pass. It never builds a V1 draft and never calls
+ * `parseCanonicalCharacterSheetDraft` or `migrateCharacterSheetDraftV1ToV2`.
+ * This matters structurally, not just stylistically:
  *
  * - V1 represents hierarchy with `sections[].fieldKeys` and `sections[].parentKey`.
  *   V2 DROPS both and makes the flat `structure[]` placement array the only

@@ -1,30 +1,18 @@
 export * from "./errors";
 export * from "./reroll-random";
 export * from "./draft-schema";
-export * from "./draft-types";
 export * from "./versioning";
-export * from "./authoring-session";
-export * from "./guided-edit";
-export * from "./in-flight-processing";
-export * from "./mutation-api";
-export * from "./reroll";
-export * from "./finalize";
 export * from "./keys";
-export * from "./draft-store";
-export * from "./preview/index";
+export type { CharacterSheetDraftIdentity } from "./draft-identity";
 export { parseCanonicalCharacterSheetDraft } from "./draft-canonical";
 export type { CharacterSheetDraftV2 } from "./draft-schema-v2";
 
 /**
  * 4E1 canonical V2 draft persistence port.
  *
- * Exported EXPLICITLY and separately from the V1 `CharacterSheetDraftStore`
- * barrel (`export * from "./draft-store"`, line above). The two ports are
- * deliberately NOT unified, widened to a union, or generalized into a `<T>`
- * store: the live V1 Worker still consumes the V1 port, and a canonical V2
- * consumer must never receive V1. `CharacterSheetDraftIdentity` is reused from
- * the V1 module rather than duplicated, because both ports address the same
- * immutable key layout.
+ * Exported EXPLICITLY so the reviewed public surface stays small: only the
+ * canonical V2 store contract is public. The identity it addresses snapshots
+ * by is the shared neutral `CharacterSheetDraftIdentity`.
  *
  * The frozen behavior this port commits to is specified in
  * `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md`.
@@ -55,18 +43,11 @@ export type {
  * 4C public V2 projection boundary.
  *
  * `projectDraftV2ToSpec` is exported straight from its own module through the
- * package root; `preview/index.ts` is deliberately left untouched so the
- * historical V1 preview barrel is not broadened merely to expose this one V2
- * operation. Only this function is public — the run/pagination helpers
+ * package root. Only this projection is public — the run/pagination helpers
  * (`ProjectedFieldRun`, `contextTitle`, `fieldKeysInCanonicalOrder`,
  * `buildProjectedFieldRuns`, `chunkRunsIntoSections`, `chunkSectionsIntoPages`,
  * `draftFieldToSpecField`, `validateProjectedSpec`) and the adapter capacity
  * constants remain private.
- *
- * V1 `projectDraftToSpec` and `writebackDraftToSpec` remain public through
- * `./preview/index`. The two projections are deliberately NOT unified or
- * overloaded: they are distinct structural models, and migration keeps them
- * explicit.
  */
 export { projectDraftV2ToSpec } from "./preview/projection-v2";
 

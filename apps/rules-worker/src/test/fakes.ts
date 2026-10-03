@@ -51,12 +51,6 @@ import type {
   CreateDraftHeadResult,
 } from "@repo/character-sheet-session";
 import { toDraftHeadStableView } from "@repo/character-sheet-session";
-import type {
-  CharacterSheetDraft,
-  CharacterSheetDraftStore,
-  CharacterSheetDraftIdentity,
-} from "@repo/character-sheet-draft";
-import { draftError, type DraftErrorCode } from "@repo/character-sheet-draft";
 import type { RulesAnalysisWorkflowPort } from "../infrastructure/rules-analysis-workflow.js";
 
 export class FakeClock implements Clock {
@@ -1020,84 +1014,6 @@ export class FakeDraftHeadRepository implements DraftHeadRepositoryPort {
   async deleteSessionHeads(sessionId: string): Promise<void> {
     for (const [key, head] of this.rows) {
       if (head.sessionId === sessionId) this.rows.delete(key);
-    }
-  }
-}
-
-function cloneDraft(draft: CharacterSheetDraft): CharacterSheetDraft {
-  return structuredClone(draft);
-}
-
-export class FakeCharacterSheetDraftStore implements CharacterSheetDraftStore {
-  readonly snapshots = new Map<string, CharacterSheetDraft>();
-  failOnPutDraft = false;
-  /**
-   * 4E3A — optional read failure. When set, `getDraftVersion` rejects with this
-   * `DraftError` code, mirroring the real R2 adapter. Defaults to null so no
-   * existing test changes behavior.
-   */
-  failOnGetDraftVersion: DraftErrorCode | null = null;
-
-  private versionKey(
-    identity: CharacterSheetDraftIdentity,
-    version: number,
-  ): string {
-    return `${identity.sessionId}:${identity.draftId}:v${version}`;
-  }
-
-  private allVersionsKey(identity: CharacterSheetDraftIdentity): string {
-    return `${identity.sessionId}:${identity.draftId}`;
-  }
-
-  async putDraft(draft: CharacterSheetDraft): Promise<void> {
-    if (this.failOnPutDraft) {
-      throw new Error("draft snapshot write failed");
-    }
-    const identity = { sessionId: draft.sessionId, draftId: draft.draftId };
-    this.snapshots.set(
-      this.versionKey(identity, draft.version),
-      cloneDraft(draft),
-    );
-  }
-
-  async getDraftVersion(
-    identity: CharacterSheetDraftIdentity,
-    version: number,
-  ): Promise<CharacterSheetDraft | null> {
-    if (this.failOnGetDraftVersion !== null) {
-      throw draftError(this.failOnGetDraftVersion, "Injected read failure.");
-    }
-    const draft = this.snapshots.get(this.versionKey(identity, version));
-    return draft === undefined ? null : cloneDraft(draft);
-  }
-
-  async getLatestDraft(
-    identity: CharacterSheetDraftIdentity,
-  ): Promise<CharacterSheetDraft | null> {
-    const versions = await this.listDraftVersions(identity);
-    if (versions.length === 0) return null;
-    const latest = versions[versions.length - 1];
-    return this.getDraftVersion(identity, latest!);
-  }
-
-  async listDraftVersions(
-    identity: CharacterSheetDraftIdentity,
-  ): Promise<number[]> {
-    const versions: number[] = [];
-    const prefix = `${identity.sessionId}:${identity.draftId}:v`;
-    for (const key of this.snapshots.keys()) {
-      if (!key.startsWith(prefix)) continue;
-      const versionStr = key.slice(prefix.length);
-      const version = Number.parseInt(versionStr, 10);
-      if (Number.isFinite(version)) versions.push(version);
-    }
-    return versions.sort((a, b) => a - b);
-  }
-
-  async deleteDraft(identity: CharacterSheetDraftIdentity): Promise<void> {
-    const prefix = this.allVersionsKey(identity) + ":";
-    for (const key of [...this.snapshots.keys()]) {
-      if (key.startsWith(prefix)) this.snapshots.delete(key);
     }
   }
 }

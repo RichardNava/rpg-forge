@@ -1,5 +1,5 @@
 /**
- * 4E3B3 — INTERNAL V2 confirm/finalize orchestration (not wired to any route).
+ * V2 confirm/finalize orchestration for the live confirm route.
  *
  * Composes the 4E3B1 runtime kernel with the V2 finalize domain authority.
  *

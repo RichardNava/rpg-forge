@@ -10,7 +10,6 @@ import {
 } from "@repo/character-sheet-draft";
 import { describe, expect, it } from "vitest";
 import type { R2BucketLike } from "./r2-character-sheet-artifacts.js";
-import { createR2CharacterSheetDraftStore } from "./r2-character-sheet-drafts.js";
 import { createR2CharacterSheetDraftStoreV2 } from "./r2-character-sheet-drafts-v2.js";
 
 type StoredValue = {
@@ -896,28 +895,12 @@ describe("4E1 R2 V2 character sheet draft store", () => {
     });
   });
 
-  describe("NO RUNTIME CUTOVER — V1 adapter stays live", () => {
-    it("31. the V1 adapter still serves a V2 payload via the V1 canonical path", async () => {
-      // 4E1 adds a parallel port and adapter only. The live V1 adapter is
-      // untouched and remains wired in production.
-      const bucket = new FakeR2Bucket();
-      const v1Store = createR2CharacterSheetDraftStore(bucket);
-
-      await v1Store.putDraft(makeValidDraftV1({ version: 1 }));
-
-      expect(await v1Store.getDraftVersion(identityFor(), 1)).toMatchObject({
-        schemaVersion: "1",
-        version: 1,
-      });
-    });
-
-    it("32. the V2 adapter and the V1 adapter do not leak into each other", async () => {
+  describe("WRITE — key isolation", () => {
+    it("32. the V2 adapter writes exactly one key per snapshot", async () => {
       const bucket = new FakeR2Bucket();
       const v2Store: CharacterSheetDraftStoreV2 =
         createR2CharacterSheetDraftStoreV2(bucket);
 
-      // The V2 adapter writes V2 bytes; the V1 adapter is never invoked by it,
-      // so no V1-shaped put happens.
       await v2Store.putDraft(makeValidDraftV2({ version: 1 }));
 
       expect(bucket.putKeys).toEqual([

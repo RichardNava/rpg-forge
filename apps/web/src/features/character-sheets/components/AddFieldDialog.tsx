@@ -1,8 +1,14 @@
 import { useState, type FormEvent } from "react";
 import type {
-  DraftAddField,
   DraftFieldType,
+  DraftMutationV2,
 } from "@repo/character-sheet-draft";
+
+/** V2 add_field input, owned by the canonical V2 mutation contract. */
+export type DraftAddFieldV2Input = Extract<
+  DraftMutationV2,
+  { op: "add_field" }
+>["field"];
 
 const FIELD_TYPES: Array<{ value: DraftFieldType; label: string }> = [
   { value: "text", label: "Text" },
@@ -17,7 +23,7 @@ const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 interface AddFieldDialogProps {
   open: boolean;
   onClose(): void;
-  onSubmit(field: DraftAddField): Promise<string | null>;
+  onSubmit(field: DraftAddFieldV2Input): Promise<string | null>;
   existingKeys: string[];
 }
 
@@ -67,7 +73,7 @@ export function AddFieldDialog({
       return;
     }
 
-    const field: DraftAddField = {
+    const field: DraftAddFieldV2Input = {
       key: trimmedKey,
       label: trimmedLabel,
       type,

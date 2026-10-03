@@ -17,12 +17,7 @@ const DRAFT_CONTENT_TYPE = "application/json; charset=utf-8";
 const CACHE_CONTROL_NO_STORE = "no-store";
 
 /**
- * 4E1 — R2 adapter for the canonical V2 draft port.
- *
- * PARALLEL TO, NOT A REPLACEMENT FOR, the live V1 adapter
- * (`createR2CharacterSheetDraftStore`). The V1 factory, its port and its
- * callers are untouched and stay live until the coordinated runtime switch;
- * this adapter is deliberately NOT wired into `AppDeps` in this slice.
+ * R2 adapter for the canonical V2 draft port — the sole live draft store.
  *
  * ## Key layout is unchanged
  *

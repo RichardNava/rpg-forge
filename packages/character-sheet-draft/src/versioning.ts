@@ -1,4 +1,3 @@
-import type { CharacterSheetDraft } from "./draft-schema";
 import { draftError } from "./errors";
 
 /**
@@ -15,22 +14,4 @@ export function nextDraftVersion(current: number): number {
     );
   }
   return current + 1;
-}
-
-/** Returns a new snapshot with the version bumped by one, base version intact. */
-export function bumpDraftVersion(
-  draft: CharacterSheetDraft,
-): CharacterSheetDraft {
-  return { ...draft, version: nextDraftVersion(draft.version) };
-}
-
-/** First snapshot of a draft: version 1, reusing the supplied run provenance. */
-export function initialDraftVersion(
-  draft: Omit<CharacterSheetDraft, "version" | "baseVersion">,
-): CharacterSheetDraft {
-  return {
-    ...draft,
-    baseVersion: 1,
-    version: 1,
-  };
 }

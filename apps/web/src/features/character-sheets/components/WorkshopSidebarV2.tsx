@@ -434,11 +434,9 @@ function DraggableFieldV2({
 }
 
 /**
- * Compact V2 field card. `FieldEditor` is deliberately not reused here: its
- * callback contract carries V1-only operations (`move_field`,
- * `reparent_section`) and its section lookup reads V1 `section.fieldKeys`,
- * so reusing it would require either a V1|V2 union or rewriting live V1 UI —
- * both prohibited. Shared CSS classes keep the visual language identical.
+ * Compact V2 field card, rendered directly against the V2 structural read
+ * model. Shared CSS classes keep the visual language identical to the
+ * rest of the workshop.
  */
 function FieldCardV2({
   field,

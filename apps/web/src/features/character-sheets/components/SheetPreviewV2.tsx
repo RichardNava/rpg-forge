@@ -5,7 +5,7 @@ import {
   type CharacterSheetDraftV2,
   type DraftReadNodeV2,
 } from "@repo/character-sheet-draft";
-import { previewValue } from "./FieldEditor";
+import { previewValue } from "./field-value-preview";
 
 interface SheetPreviewV2Props {
   draft: CharacterSheetDraftV2;

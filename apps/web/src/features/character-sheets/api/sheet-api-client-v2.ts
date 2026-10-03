@@ -27,7 +27,7 @@ import {
   SheetApiError,
   parseSheetApiErrorBody,
 } from "./sheet-api-errors";
-import type { SheetFetch } from "./sheet-api-client";
+import type { SheetFetch } from "./sheet-fetch";
 
 export interface SheetApiClientV2Options {
   /** Same-origin base path; defaults to `/api/character-sheets`. */
@@ -37,11 +37,10 @@ export interface SheetApiClientV2Options {
 }
 
 /**
- * The V2 API surface the V2 rehydration store depends on. Parallel to the live
- * V1 `SheetApiClientPort` and NOT consumed by any live route: every envelope
- * carries the frozen V2 transport contract (`expectedVersion` on all
- * post-create operations, raw canonical V2 responses, no `{ draft }`
- * wrapper on confirm).
+ * The V2 API surface the V2 rehydration store depends on. It carries the
+ * frozen V2 transport contract (`expectedVersion` on all post-create
+ * operations, raw canonical V2 responses, no `{ draft }` wrapper on
+ * confirm).
  */
 export interface SheetApiClientV2Port {
   createSession(turnstileToken: string): Promise<SheetSession>;

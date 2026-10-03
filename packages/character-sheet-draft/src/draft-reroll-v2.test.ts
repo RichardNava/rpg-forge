@@ -5,8 +5,6 @@ import {
 } from "./draft-reroll-v2";
 import { validateDraftV2, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { bumpDraftVersionV2 } from "./draft-versioning-v2";
-import { rerollLockedDraftValues } from "./reroll";
-import { makeDraft } from "./draft-fixture";
 import type { DraftField } from "./draft-schema";
 import { DraftError } from "./errors";
 
@@ -866,47 +864,6 @@ describe("rerollLockedDraftValuesV2 — canonical V2 validation", () => {
       );
       expect(() => validateDraftV2(result.draft)).not.toThrow();
     }
-  });
-});
-
-describe("rerollLockedDraftValuesV2 — V1 semantic parity", () => {
-  const PARITY_SEED = "parity-seed";
-
-  it("reports the same rerolledKeys as V1 for an equivalent snapshot", () => {
-    const v1 = rerollLockedDraftValues(makeDraft(), PARITY_SEED);
-    const v2 = rerollLockedDraftValuesV2(makeRerollDraft(), PARITY_SEED);
-    expect([...v2.rerolledKeys].sort()).toEqual([...v1.rerolledKeys].sort());
-  });
-
-  it("draws the same values as V1 for shared eligible Fields", () => {
-    const v1 = rerollLockedDraftValues(makeDraft(), PARITY_SEED);
-    const v2 = rerollLockedDraftValuesV2(makeRerollDraft(), PARITY_SEED);
-    expect(v2.draft.values.strength).toBe(v1.draft.values.strength);
-    expect(v2.draft.values.weapon).toBe(v1.draft.values.weapon);
-  });
-
-  it("preserves the same authored values as V1", () => {
-    const v1 = rerollLockedDraftValues(makeDraft(), PARITY_SEED);
-    const v2 = rerollLockedDraftValuesV2(makeRerollDraft(), PARITY_SEED);
-    expect(v2.draft.values.agility).toBe(14);
-    expect(v1.draft.values.homeland).toBe("Riverside");
-    expect(v2.draft.values.history).toBe("Riverside");
-  });
-
-  it("matches V1 characterName behavior", () => {
-    const v1 = rerollLockedDraftValues(makeDraft(), PARITY_SEED);
-    const v2 = rerollLockedDraftValuesV2(makeRerollDraft(), PARITY_SEED);
-    expect(v2.draft.characterName).toBe(v1.draft.characterName);
-    expect(v2.draft.characterName).toBe("Aria Stone");
-  });
-
-  it("intentionally diverges on version: V1 does not bump, V2 does", () => {
-    const v1Input = makeDraft();
-    const v2Input = makeRerollDraft();
-    const v1 = rerollLockedDraftValues(v1Input, PARITY_SEED);
-    const v2 = rerollLockedDraftValuesV2(v2Input, PARITY_SEED);
-    expect(v1.draft.version).toBe(v1Input.version);
-    expect(v2.draft.version).toBe(v2Input.version + 1);
   });
 });
 

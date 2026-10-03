@@ -3,10 +3,10 @@
 import { useCallback, useState } from "react";
 import type {
   CharacterSheetDraftV2,
-  DraftAddField,
   DraftMutationV2,
   DraftValue,
 } from "@repo/character-sheet-draft";
+import type { DraftAddFieldV2Input } from "./AddFieldDialog";
 import { SheetApiClientV2 } from "../api/sheet-api-client-v2";
 import type { SheetApiClientV2Port } from "../api/sheet-api-client-v2";
 import { createLocalSheetBackendV2 } from "../lib/local-sheet-backend-v2";
@@ -345,7 +345,7 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
   );
 
   const handleAddField = useCallback(
-    async (field: DraftAddField): Promise<string | null> => {
+    async (field: DraftAddFieldV2Input): Promise<string | null> => {
       const outcome = await store.applyMutation({ op: "add_field", field });
       if (outcome.kind === "rejected") {
         return outcome.message;

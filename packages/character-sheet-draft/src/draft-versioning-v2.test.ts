@@ -6,11 +6,7 @@ import {
 } from "./draft-versioning-v2";
 import { validateDraftV2, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { DraftError } from "./errors";
-import {
-  bumpDraftVersion,
-  initialDraftVersion,
-  nextDraftVersion,
-} from "./versioning";
+import { nextDraftVersion } from "./versioning";
 import { makeDraft as makeDraftV1 } from "./draft-fixture";
 import type { CharacterSheetDraft } from "./draft-schema";
 
@@ -460,27 +456,5 @@ describe("validation-gate reference behavior", () => {
     expect(bumped.sections[0]).toBe(draft.sections[0]);
     expect(bumped.structure[0]).toBe(draft.structure[0]);
     expect(bumped.values).toBe(draft.values);
-  });
-});
-
-describe("V1 / V2 versioning parity", () => {
-  it("initial creation parity: both produce version 1 and baseVersion 1", () => {
-    const v1 = initialDraftVersion(makeInitialV1());
-    const v2 = initialDraftVersionV2(makeInitialRichDraft());
-    expect(v1.version).toBe(1);
-    expect(v1.baseVersion).toBe(1);
-    expect(v2.version).toBe(1);
-    expect(v2.baseVersion).toBe(1);
-  });
-
-  it("bump parity: both increment once and keep baseVersion", () => {
-    const v1Source = makeDraftV1({ version: 7, baseVersion: 3 });
-    const v1 = bumpDraftVersion(v1Source);
-    const v2 = bumpDraftVersionV2(makeRichDraftV2(7, 3));
-    expect(v1.version).toBe(8);
-    expect(v1.baseVersion).toBe(3);
-    expect(v2.version).toBe(8);
-    expect(v2.baseVersion).toBe(3);
-    expect(v1Source.version).toBe(7);
   });
 });

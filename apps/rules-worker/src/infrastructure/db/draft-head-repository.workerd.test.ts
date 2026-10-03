@@ -3,10 +3,13 @@ import {
   recoverStaleDraftClaims,
   type DraftSnapshotProbe,
 } from "@repo/character-sheet-session";
-import { type CharacterSheetDraft } from "@repo/character-sheet-draft";
+import {
+  CHARACTER_SHEET_DRAFT_V2_VERSION,
+  type CharacterSheetDraftV2,
+} from "@repo/character-sheet-draft";
 import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createR2CharacterSheetDraftStore } from "../r2-character-sheet-drafts.js";
+import { createR2CharacterSheetDraftStoreV2 } from "../r2-character-sheet-drafts-v2.js";
 import { createD1DraftHeadRepository } from "./draft-head-repository.js";
 
 const MIGRATION_DDL =
@@ -34,9 +37,9 @@ function makeValidDraft(
   sessionId: string,
   draftId: string,
   version: number,
-): CharacterSheetDraft {
+): CharacterSheetDraftV2 {
   return {
-    schemaVersion: "1",
+    schemaVersion: CHARACTER_SHEET_DRAFT_V2_VERSION,
     draftId,
     sessionId,
     baseVersion: 1,
@@ -52,6 +55,8 @@ function makeValidDraft(
         locked: false,
       },
     ],
+    sections: [],
+    structure: [{ kind: "field", key: "character_name", parentKey: null }],
     values: { character_name: "Aria Stone" },
     source: { sourceSheetId: "sheet.0001", sourceRunId: null },
     confirmed: false,
@@ -277,7 +282,7 @@ describe("stale-claim recovery against real D1 (14.7D coordination)", () => {
     if (bucket === undefined) {
       throw new Error("SHEET_ARTIFACTS binding is missing");
     }
-    const draftStore = createR2CharacterSheetDraftStore(bucket);
+    const draftStore = createR2CharacterSheetDraftStoreV2(bucket);
     const identity = { sessionId: "sess-r2", draftId: "draft-r2" };
     await repo.create(identity);
     await repo.claim(identity, 1, "claim-r2", NOW);

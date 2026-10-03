@@ -1,5 +1,5 @@
 /**
- * 4E3A-R — INTERNAL V2 HTTP egress serialization (not wired to any route).
+ * V2 HTTP egress serialization for the live draft routes.
  *
  * ## Scope
  *
@@ -22,8 +22,8 @@
  * - `rerollLockedDraftValuesV2(draft, seed)` RETURNS `{ draft, rerolledKeys }` —
  *   a success payload, not an error union — and THROWS `draftError("draft_confirmed")`.
  *
- * V2 therefore keeps V1's throw-based domain failure channel, and the preferred
- * future handler shape stays exactly what V1 already uses:
+ * V2 therefore keeps the throw-based domain failure channel, and the handler
+ * shape stays:
  *
  * ```text
  * try   { parse strict V2 request; const draft = applyDraftMutationV2(...); ... }
@@ -99,7 +99,7 @@ export function draftV2CreatedResponse(body: unknown): Response {
  *
  * Reroll is the one WRAPPED V2 draft response, because it reports information a
  * bare snapshot cannot carry. The body matches the frozen
- * `SheetDraftRerollResponseV2Schema` and the live V1 reroll response shape, so
+ * `SheetDraftRerollResponseV2Schema` and the previous reroll response shape, so
  * the client contract for reroll does not change at the cutover.
  *
  * `DraftRerollResultV2` is a SUCCESS payload, not an error union: it is what

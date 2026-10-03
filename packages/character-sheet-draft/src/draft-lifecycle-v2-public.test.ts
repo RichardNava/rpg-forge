@@ -3,18 +3,13 @@ import {
   CHARACTER_SHEET_DRAFT_V2_VERSION,
   DraftError,
   applyDraftMutationV2,
-  finalizeDraft,
   finalizeDraftV2,
-  initialDraftVersion,
   initialDraftVersionV2,
   parseDraftMutationV2,
-  rerollLockedDraftValues,
   rerollLockedDraftValuesV2,
   validateDraftV2,
-  type CharacterSheetDraft,
   type CharacterSheetDraftV2,
   type DraftMutationV2,
-  type DraftRerollResult,
   type DraftRerollResultV2,
   type InitialCharacterSheetDraftV2,
 } from "./index";
@@ -428,66 +423,5 @@ describe("public V2 lifecycle boundary — BLOCK F confirmation contract", () =>
       version: rerolled.draft.version,
       confirmed: false,
     }).toEqual(rerolled.draft);
-  });
-});
-
-describe("public V2 lifecycle boundary — BLOCK G V1 coexistence", () => {
-  const V1_INITIAL: Omit<CharacterSheetDraft, "version" | "baseVersion"> = {
-    schemaVersion: "1",
-    draftId: "draft.lifecycle.v1",
-    sessionId: "session.lifecycle.v1",
-    mode: "pc",
-    characterName: "Aria Stone",
-    rulesContextId: null,
-    fields: [
-      { key: "character_name", label: "Name", type: "text", locked: false },
-      {
-        key: "strength",
-        label: "Strength",
-        type: "number",
-        min: 1,
-        max: 20,
-        locked: true,
-      },
-    ],
-    sections: [],
-    values: { character_name: "Aria Stone", strength: 12 },
-    source: { sourceSheetId: "sheet.0001", sourceRunId: null },
-    confirmed: false,
-  };
-
-  it("keeps the V1 lifecycle callable from the package root", () => {
-    const created: CharacterSheetDraft = initialDraftVersion(V1_INITIAL);
-    const rerolled: DraftRerollResult = rerollLockedDraftValues(
-      created,
-      REROLL_SEED,
-    );
-    const confirmed = finalizeDraft(rerolled.draft);
-    expect(created.version).toBe(1);
-    expect(created.baseVersion).toBe(1);
-    expect(rerolled.rerolledKeys).toEqual(["strength"]);
-    expect(confirmed.version).toBe(2);
-    expect(confirmed.confirmed).toBe(true);
-  });
-
-  it("exposes V1 and V2 lifecycle entries side by side without collision", () => {
-    expect(initialDraftVersion).not.toBe(initialDraftVersionV2);
-    expect(rerollLockedDraftValues).not.toBe(rerollLockedDraftValuesV2);
-    expect(finalizeDraft).not.toBe(finalizeDraftV2);
-    expect(typeof initialDraftVersion).toBe("function");
-    expect(typeof rerollLockedDraftValues).toBe("function");
-    expect(typeof finalizeDraft).toBe("function");
-  });
-
-  it("runs the V1 and V2 lifecycles independently from the same root", () => {
-    const v1Confirmed = finalizeDraft(
-      rerollLockedDraftValues(initialDraftVersion(V1_INITIAL), REROLL_SEED)
-        .draft,
-    );
-    const v2Confirmed = runPublicLifecycle().confirmed;
-    expect(v1Confirmed.schemaVersion).toBe("1");
-    expect(v2Confirmed.schemaVersion).toBe("2");
-    expect(v1Confirmed.confirmed).toBe(true);
-    expect(v2Confirmed.confirmed).toBe(true);
   });
 });

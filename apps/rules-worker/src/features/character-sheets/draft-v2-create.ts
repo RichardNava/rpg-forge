@@ -1,5 +1,5 @@
 /**
- * 4E3B4B2 — INTERNAL V2 create orchestration (not wired to any route).
+ * V2 create orchestration for the live draft-create route.
  *
  * Composes the D1 head port with the atomic V2 initial-snapshot primitive.
  *
@@ -35,7 +35,7 @@ import type { CharacterSheetDraftStoreV2 } from "@repo/character-sheet-draft";
 
 /**
  * The create kernel's collaborators. Narrow and explicit rather than
- * `AppDeps`, so it can never reach a live V1 store, a route helper, an HTTP
+ * `AppDeps`, so it can never reach a route helper, an HTTP
  * concern, or time/randomness it does not need. Create has no claim lifecycle
  * and therefore needs neither clock nor crypto.
  */

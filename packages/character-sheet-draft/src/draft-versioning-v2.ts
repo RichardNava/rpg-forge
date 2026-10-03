@@ -13,7 +13,7 @@ export type InitialCharacterSheetDraftV2 = Omit<
 >;
 
 /**
- * V2 equivalent of `initialDraftVersion`: the first snapshot of a draft.
+ * The first snapshot of a draft.
  *
  * Assigns `version = 1` and `baseVersion = 1` and preserves every other
  * supplied lifecycle/content property as given (including `confirmed`; whether
@@ -37,7 +37,7 @@ export function initialDraftVersionV2(
 }
 
 /**
- * V2 equivalent of `bumpDraftVersion`: a generic version transition.
+ * A generic version transition.
  *
  * Increments `version` exactly once through `nextDraftVersion` (so malformed
  * versions are rejected with `invalid_draft` by that single owner) and leaves

@@ -1,12 +1,15 @@
-import type { SheetDraftSaveStatus } from "../state/sheet-store-types";
+import type { SheetDraftSaveStatus } from "../state/sheet-workshop-types";
 
 /**
- * Minimal structural draft shape shared by the V1 and V2 workshops. Only the
+ * Minimal structural draft shape consumed by the V2 workshop toolbar. Only the
  * title, save affordances and read-only state are read here; narrowing to
- * this shape (instead of a V1|V2 union) keeps one toolbar for both runtimes.
+ * this shape keeps the toolbar decoupled from the full draft contract.
  */
 export interface WorkshopToolbarDraft {
-  readonly fields: ReadonlyArray<{ readonly key: string; readonly locked: boolean }>;
+  readonly fields: ReadonlyArray<{
+    readonly key: string;
+    readonly locked: boolean;
+  }>;
   readonly values: Readonly<Record<string, unknown>>;
   readonly characterName: string | null;
   readonly confirmed: boolean;

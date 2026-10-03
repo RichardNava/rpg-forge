@@ -9,8 +9,8 @@ export interface LocalSheetDocumentExtractionV2Options {
 const EXTRACTION_DELAY_MS = 900;
 
 /**
- * Explicit local-development double for the V2 extraction boundary. Like its
- * V1 counterpart it must never invent a draft from a file name.
+ * Explicit local-development double for the V2 extraction boundary. It must
+ * never invent a draft from a file name.
  */
 export function createLocalSheetDocumentExtractionServiceV2(
   options: LocalSheetDocumentExtractionV2Options = {},

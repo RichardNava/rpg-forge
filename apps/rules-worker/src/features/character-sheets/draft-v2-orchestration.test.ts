@@ -61,8 +61,8 @@ describe("draft-v2-orchestration egress serialization", () => {
       makeV2Draft(),
     ).json()) as Record<string, unknown>;
 
-    // Frozen 4D policy, and the deliberate correction to the live V1 confirm
-    // route which wraps as { draft: ... }.
+    // Frozen 4D policy, and the deliberate correction to the previous confirm
+    // route which wrapped as { draft: ... }.
     expect(body.schemaVersion).toBe("2");
     expect(body).not.toHaveProperty("draft");
   });

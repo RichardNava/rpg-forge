@@ -9,9 +9,7 @@ import {
   buildDraftStructuralReadModelV2,
   finalizeDraftV2,
   parseCanonicalCharacterSheetDraft,
-  projectDraftToSpec,
   projectDraftV2ToSpec,
-  writebackDraftToSpec,
   type CharacterSheetDraft,
   type CharacterSheetDraftV2,
   type DraftFieldReadNodeV2,
@@ -488,53 +486,6 @@ describe("4C3 public V2 boundary — historical V1 compatibility", () => {
     ]);
     expect(spec.metadata.title).toBe("Keeper");
     expect(spec.mode).toBe("npc");
-  });
-});
-
-describe("4C3 public V2 boundary — V1/V2 coexistence", () => {
-  it("18. V1 projectDraftToSpec remains callable", () => {
-    const v1 = makeHistoricalV1Draft();
-    const spec = projectDraftToSpec(v1);
-    expectSpecValid(spec);
-    // The V1 projection keeps its own V1-specific behaviour, including its own
-    // root Section for Fields that belong to no V1 Section.
-    expect(spec.sections.map((section) => section.title)).toEqual([
-      "Attributes",
-      "Attributes · Sub",
-      "NPC",
-    ]);
-  });
-
-  it("19. V1 writebackDraftToSpec remains exported", () => {
-    expect(typeof writebackDraftToSpec).toBe("function");
-    // writeback still overlays a draft's values onto an existing base spec.
-    const v1 = makeHistoricalV1Draft();
-    const baseSpec = projectDraftToSpec(v1);
-    const edited: CharacterSheetDraft = {
-      ...v1,
-      values: { ...v1.values, str: 18 },
-    };
-    const spec = writebackDraftToSpec(edited, baseSpec);
-    expectSpecValid(spec);
-    expect(spec.values.str).toBe(18);
-    expect(spec.sections).toEqual(baseSpec.sections);
-  });
-
-  it("20. V1 and V2 projection symbols coexist without collision", async () => {
-    const index = await import("./index");
-    expect(index.projectDraftToSpec).toBe(projectDraftToSpec);
-    expect(index.projectDraftV2ToSpec).toBe(projectDraftV2ToSpec);
-    // Distinct functions: no rename, no overload, no replacement.
-    expect(index.projectDraftToSpec).not.toBe(index.projectDraftV2ToSpec);
-    expect(typeof index.writebackDraftToSpec).toBe("function");
-
-    // Each API keeps its own input type, and both work in the same process.
-    const v1Spec = projectDraftToSpec(makeHistoricalV1Draft());
-    const v2Spec = projectDraftV2ToSpec(
-      parseCanonicalCharacterSheetDraft(makeHistoricalV1Draft()),
-    );
-    expectSpecValid(v1Spec);
-    expectSpecValid(v2Spec);
   });
 });
 

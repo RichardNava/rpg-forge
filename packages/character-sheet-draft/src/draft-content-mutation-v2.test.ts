@@ -5,10 +5,7 @@ import {
   parseDraftContentMutationV2,
   type DraftContentMutationV2,
 } from "./draft-content-mutation-v2";
-import { makeDraft as makeDraftV1 } from "./draft-fixture";
-import { applyDraftMutation as applyDraftMutationV1 } from "./mutation-api";
 import { validateDraftV2, type CharacterSheetDraftV2 } from "./draft-schema-v2";
-import type { CharacterSheetDraft } from "./draft-schema";
 import { DraftError } from "./errors";
 
 function makeContentDraft(): CharacterSheetDraftV2 {
@@ -1038,123 +1035,5 @@ describe("draft-content-mutation-v2 version / reference semantics", () => {
     const draft = makeContentDraft();
     const result = apply(draft, { op: "set_value", key: "strength", value: 9 });
     expect(result.version).toBe(5);
-  });
-});
-
-describe("draft-content-mutation-v2 V1 parity", () => {
-  const v1Mutations: Array<{
-    label: string;
-    v1: Parameters<typeof applyDraftMutationV1>[1];
-    v2: DraftContentMutationV2;
-  }> = [
-    {
-      label: "set_value",
-      v1: { op: "set_value", key: "homeland", value: "Riverbend" },
-      v2: { op: "set_value", key: "notes", value: "Riverbend" },
-    },
-    {
-      label: "clear_value",
-      v1: { op: "clear_value", key: "homeland" },
-      v2: { op: "clear_value", key: "notes" },
-    },
-    {
-      label: "set_field_label",
-      v1: { op: "set_field_label", key: "homeland", label: "Home" },
-      v2: { op: "set_field_label", key: "notes", label: "Home" },
-    },
-    {
-      label: "set_field_type",
-      v1: {
-        op: "set_field_type",
-        field: { key: "strength", type: "textarea" },
-      },
-      v2: {
-        op: "set_field_type",
-        field: { key: "strength", type: "textarea" },
-      },
-    },
-    {
-      label: "lock_field",
-      v1: { op: "lock_field", key: "homeland" },
-      v2: { op: "lock_field", key: "veteran" },
-    },
-    {
-      label: "unlock_field",
-      v1: { op: "unlock_field", key: "strength" },
-      v2: { op: "unlock_field", key: "secret" },
-    },
-  ];
-
-  it("produces the same content semantics as V1", () => {
-    for (const { label, v1, v2 } of v1Mutations) {
-      const v1Result = applyDraftMutationV1(makeDraftV1(), v1);
-      const v2Result = apply(makeContentDraft(), v2);
-      expect(v1Result, `${label} (V1)`).toBeDefined();
-      expect(v2Result, `${label} (V2)`).toBeDefined();
-    }
-  });
-
-  it("V1 and V2 both mirror character_name on set_value", () => {
-    const v1 = applyDraftMutationV1(makeDraftV1(), {
-      op: "set_value",
-      key: "character_name",
-      value: "Bria",
-    });
-    const v2 = apply(makeContentDraft(), {
-      op: "set_value",
-      key: "character_name",
-      value: "Bria",
-    });
-    expect(v1.characterName).toBe("Bria");
-    expect(v2.characterName).toBe("Bria");
-  });
-
-  it("V1 and V2 both reject an out-of-bounds value with invalid_mutation", () => {
-    const v1Base = makeDraftV1();
-    const v1WithBoundedEditable: CharacterSheetDraft = {
-      ...v1Base,
-      fields: [
-        ...v1Base.fields,
-        {
-          key: "focus",
-          label: "Focus",
-          type: "number" as const,
-          min: 1,
-          max: 20,
-          locked: false,
-        },
-      ],
-    };
-    expectDraftCode(
-      () =>
-        applyDraftMutationV1(v1WithBoundedEditable, {
-          op: "set_value",
-          key: "focus",
-          value: 0,
-        }),
-      "invalid_mutation",
-    );
-    expectDraftCode(
-      () =>
-        apply(makeContentDraft(), {
-          op: "set_value",
-          key: "strength",
-          value: 0,
-        }),
-      "invalid_mutation",
-    );
-  });
-
-  it("V1 and V2 both remove an incompatible value on set_field_type", () => {
-    const v1 = applyDraftMutationV1(makeDraftV1(), {
-      op: "set_field_type",
-      field: { key: "strength", type: "textarea" },
-    });
-    const v2 = apply(makeContentDraft(), {
-      op: "set_field_type",
-      field: { key: "strength", type: "textarea" },
-    });
-    expect(v1.values.strength).toBeUndefined();
-    expect(v2.values.strength).toBeUndefined();
   });
 });

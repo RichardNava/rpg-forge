@@ -1,5 +1,5 @@
 /**
- * 4E3B3 — INTERNAL V2 reroll orchestration (not wired to any route).
+ * V2 reroll orchestration for the live reroll route.
  *
  * Composes the 4E3B1 runtime kernel with the V2 reroll domain authority.
  *

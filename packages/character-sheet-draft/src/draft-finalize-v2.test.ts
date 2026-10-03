@@ -12,8 +12,6 @@ import {
   parseDraftMutationV2,
   type DraftMutationV2,
 } from "./draft-mutation-v2";
-import { finalizeDraft } from "./finalize";
-import { makeDraft as makeDraftV1 } from "./draft-fixture";
 import { DraftError } from "./errors";
 
 /**
@@ -484,47 +482,6 @@ describe("finalizeDraftV2 — determinism", () => {
     const draft = makeEditableDraft();
     finalizeDraftV2(draft);
     expect(draft.confirmed).toBe(false);
-  });
-});
-
-describe("finalizeDraftV2 — V1 lifecycle parity", () => {
-  it("flips confirmed false to true in both V1 and V2", () => {
-    const v1 = finalizeDraft(makeDraftV1());
-    const v2 = finalizeDraftV2(makeEditableDraft());
-    expect(v1.confirmed).toBe(true);
-    expect(v2.confirmed).toBe(true);
-  });
-
-  it("increments the version by exactly one in both V1 and V2", () => {
-    const v1Input = makeDraftV1();
-    const v2Input = makeEditableDraft();
-    const v1 = finalizeDraft(v1Input);
-    const v2 = finalizeDraftV2(v2Input);
-    expect(v1.version).toBe(v1Input.version + 1);
-    expect(v2.version).toBe(v2Input.version + 1);
-  });
-
-  it("keeps baseVersion unchanged in both V1 and V2", () => {
-    const v1Input = makeDraftV1({ baseVersion: 3 });
-    const v2Input = makeEditableDraft(7, 3);
-    expect(finalizeDraft(v1Input).baseVersion).toBe(v1Input.baseVersion);
-    expect(finalizeDraftV2(v2Input).baseVersion).toBe(v2Input.baseVersion);
-  });
-
-  it("preserves content in both V1 and V2", () => {
-    const v1Input = makeDraftV1();
-    const v2Input = makeEditableDraft();
-    expect(finalizeDraft(v1Input).values).toEqual(v1Input.values);
-    expect(finalizeDraftV2(v2Input).values).toEqual(v2Input.values);
-    expect(finalizeDraft(v1Input).characterName).toBe(v1Input.characterName);
-    expect(finalizeDraftV2(v2Input).characterName).toBe(v2Input.characterName);
-  });
-
-  it("rejects an already-confirmed draft in both V1 and V2", () => {
-    const v1 = finalizeDraft(makeDraftV1());
-    const v2 = finalizeDraftV2(makeEditableDraft());
-    expect(errorCodeOf(() => finalizeDraft(v1))).toBe("draft_confirmed");
-    expect(errorCodeOf(() => finalizeDraftV2(v2))).toBe("draft_confirmed");
   });
 });
 

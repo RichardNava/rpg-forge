@@ -3,7 +3,7 @@
 import type {
   CharacterTypePreference,
   ThreatLevelPreference,
-} from "../state/sheet-store-types";
+} from "../state/sheet-workshop-types";
 import {
   CHARACTER_TYPE_LABEL,
   CHARACTER_TYPE_OPTIONS,
@@ -42,7 +42,10 @@ export function WorkshopIdentitySelector({
   onChange,
 }: WorkshopIdentitySelectorProps) {
   return (
-    <div className="character-workshop__identity" aria-label="Character identity">
+    <div
+      className="character-workshop__identity"
+      aria-label="Character identity"
+    >
       <div className="character-workshop__identity-field">
         <span
           className="character-workshop__identity-label"

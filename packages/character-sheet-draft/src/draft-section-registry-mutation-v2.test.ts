@@ -10,8 +10,6 @@ import {
   type CharacterSheetDraftV2,
   type DraftPlacement,
 } from "./draft-schema-v2";
-import { makeDraft as makeDraftV1 } from "./draft-fixture";
-import { applyDraftMutation as applyDraftMutationV1 } from "./mutation-api";
 import { DraftError } from "./errors";
 
 function makeRichContentDraft(): CharacterSheetDraftV2 {
@@ -1108,85 +1106,5 @@ describe("draft-section-registry-mutation-v2 structural guarantees", () => {
           placement.parentKey === "core" || placement.key === "core",
       ),
     ).toEqual(subtree);
-  });
-});
-
-describe("draft-section-registry-mutation-v2 V1 parity", () => {
-  it("adds a Section with the same registry metadata as V1", () => {
-    const v1Result = applyDraftMutationV1(makeDraftV1(), {
-      op: "add_section",
-      section: { key: "background", title: "Background", fieldKeys: [] },
-    });
-    const v2Result = apply(makeRichContentDraft(), {
-      op: "add_section",
-      section: { key: "background", title: "Background" },
-    });
-    const v1Section = v1Result.sections?.slice(-1)[0];
-    const v2Section = v2Result.sections[v2Result.sections.length - 1];
-    expect(v1Section).toMatchObject({ key: "background", title: "Background" });
-    expect(v2Section).toMatchObject({ key: "background", title: "Background" });
-  });
-
-  it("rejects a duplicate Section with the same code as V1", () => {
-    expectDraftCode(
-      () =>
-        applyDraftMutationV1(
-          makeDraftV1({
-            sections: [{ key: "core", title: "Core", fieldKeys: [] }],
-          }),
-          {
-            op: "add_section",
-            section: { key: "core", title: "Core", fieldKeys: [] },
-          },
-        ),
-      "invalid_mutation",
-    );
-    expectDraftCode(
-      () =>
-        apply(makeRichContentDraft(), {
-          op: "add_section",
-          section: { key: "core", title: "Core" },
-        }),
-      "invalid_mutation",
-    );
-  });
-
-  it("renames a Section like V1", () => {
-    const v1Result = applyDraftMutationV1(
-      makeDraftV1({
-        sections: [{ key: "core", title: "Core", fieldKeys: [] }],
-      }),
-      { op: "rename_section", key: "core", title: "Core Playbook" },
-    );
-    const v2Result = apply(makeRichContentDraft(), {
-      op: "rename_section",
-      key: "core",
-      title: "Core Playbook",
-    });
-    const v1Renamed = v1Result.sections?.find((entry) => entry.key === "core");
-    const v2Renamed = v2Result.sections.find((entry) => entry.key === "core");
-    expect(v1Renamed?.title).toBe("Core Playbook");
-    expect(v2Renamed?.title).toBe("Core Playbook");
-  });
-
-  it("rejects an unknown rename with the same code as V1", () => {
-    expectDraftCode(
-      () =>
-        applyDraftMutationV1(makeDraftV1(), {
-          op: "rename_section",
-          key: "ghost",
-          title: "Ghost",
-        }),
-      "invalid_mutation",
-    );
-    expectDraftCode(
-      () =>
-        apply(makeRichContentDraft(), {
-          op: "rename_section",
-          key: "ghost",
-          title: "Ghost",
-        }),
-      "invalid_mutation",
-    );
   });
 });
