@@ -21,6 +21,7 @@ export interface R2BucketLike {
     key: string,
     value: string | Uint8Array,
     options?: {
+      onlyIf?: Headers;
       httpMetadata?: {
         contentType?: string;
         cacheControl?: string;

@@ -48,6 +48,38 @@ export function createR2CharacterSheetDraftStoreV2(
   bucket: R2BucketLike,
 ): CharacterSheetDraftStoreV2 {
   return {
+    async putInitialDraftIfAbsent(draft) {
+      // The gate runs BEFORE any bucket call, so an invalid or V1 snapshot can
+      // never reach storage.
+      const validated = validateDraftV2(draft);
+      const key = getDraftSnapshotKey(
+        validated.sessionId,
+        validated.draftId,
+        validated.version,
+      );
+      try {
+        const result = await bucket.put(key, JSON.stringify(validated), {
+          onlyIf: new Headers({ "If-None-Match": "*" }),
+          httpMetadata: {
+            contentType: DRAFT_CONTENT_TYPE,
+            cacheControl: CACHE_CONTROL_NO_STORE,
+          },
+        });
+        if (result === null) {
+          return { kind: "already_exists" };
+        }
+        return { kind: "created" };
+      } catch (error) {
+        if (error instanceof DraftError) {
+          throw error;
+        }
+        throw draftError(
+          "storage_unavailable",
+          "Character sheet draft storage is unavailable.",
+        );
+      }
+    },
+
     async putDraft(draft) {
       // The gate runs BEFORE any bucket call, so an invalid or V1 snapshot can
       // never reach storage.

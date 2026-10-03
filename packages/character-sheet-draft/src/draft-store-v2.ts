@@ -47,6 +47,26 @@ export interface CharacterSheetDraftStoreV2 {
   putDraft(draft: CharacterSheetDraftV2): Promise<void>;
 
   /**
+   * Atomically creates an initial draft snapshot only when the key is absent.
+   *
+   * This is a create-only primitive for the first version of a draft. It uses
+   * an atomic R2 conditional put (If-None-Match: *) so that concurrent creates
+   * for the same sessionId/draftId/version cannot overwrite each other.
+   *
+   * Returns `{ kind: "created" }` when the object was written.
+   * Returns `{ kind: "already_exists" }` when the key already existed.
+   *
+   * The draft must be a valid canonical V2 snapshot. Version and baseVersion
+   * are NOT enforced here; those are Worker create-policy concerns.
+   */
+  putInitialDraftIfAbsent(
+    draft: CharacterSheetDraftV2,
+  ): Promise<{ kind: "created" } | { kind: "already_exists" }>;
+
+  /** Persists one immutable canonical V2 snapshot under its derived key. */
+  putDraft(draft: CharacterSheetDraftV2): Promise<void>;
+
+  /**
    * Reads one exact immutable snapshot version. Accepts stored V1 or V2 and
    * always resolves to canonical V2. A missing snapshot is `null`, never a
    * corruption error.

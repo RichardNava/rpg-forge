@@ -196,6 +196,7 @@ function makeHarness(head: DraftHead | null = makeHead()): Harness {
       },
     },
     store: {
+      putInitialDraftIfAbsent: (draft) => store.putInitialDraftIfAbsent(draft),
       putDraft: async (draft) => {
         events.push("put");
         return store.putDraft(draft);
