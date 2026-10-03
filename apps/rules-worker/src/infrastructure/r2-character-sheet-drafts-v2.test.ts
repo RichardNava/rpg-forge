@@ -337,8 +337,6 @@ describe("4E1 R2 V2 character sheet draft store", () => {
       );
     });
   });
-  });
-
   describe("CREATE — conditional initial draft", () => {
     it("A. absent key: putInitialDraftIfAbsent returns created and stores exactly one object", async () => {
       const bucket = new FakeR2Bucket();
@@ -349,39 +347,60 @@ describe("4E1 R2 V2 character sheet draft store", () => {
 
       expect(result).toEqual({ kind: "created" });
       expect(bucket.putKeys).toHaveLength(1);
-      expect(bucket.objects.has(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))).toBe(true);
+      expect(
+        bucket.objects.has(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1)),
+      ).toBe(true);
     });
 
-    it("B. existing same key: returns already_exists and leaves bytes unchanged", async () => {
+    it("B. existing same content: returns already_exists and leaves bytes unchanged", async () => {
       const bucket = new FakeR2Bucket();
       const store = createR2CharacterSheetDraftStoreV2(bucket);
-      const draft = makeValidDraftV2({ version: 1, characterName: "Original", values: { character_name: "Original" } });
+      const draft = makeValidDraftV2({
+        version: 1,
+        characterName: "Original",
+        values: { character_name: "Original" },
+      });
       await store.putInitialDraftIfAbsent(draft);
-      const originalBytes = bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))?.bytes;
+      const originalBytes = bucket.objects.get(
+        getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
+      )?.bytes;
 
-      // Second call with same key but different content
-      const draft2 = makeValidDraftV2({ version: 1, characterName: "Different", values: { character_name: "Different" } });
+      // Second call with the EXACT SAME draft object (same content)
+      const result = await store.putInitialDraftIfAbsent(draft);
+
+      expect(result).toEqual({ kind: "already_exists" });
+      // Original bytes unchanged
+      expect(
+        bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))?.bytes,
+      ).toEqual(originalBytes);
+    });
+
+    it("C. existing different content: returns already_exists and leaves bytes unchanged", async () => {
+      const bucket = new FakeR2Bucket();
+      const store = createR2CharacterSheetDraftStoreV2(bucket);
+      const draft = makeValidDraftV2({
+        version: 1,
+        characterName: "First",
+        values: { character_name: "First" },
+      });
+      await store.putInitialDraftIfAbsent(draft);
+      const originalBytes = bucket.objects.get(
+        getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
+      )?.bytes;
+
+      // Try to create with different content (different characterName and values)
+      const draft2 = makeValidDraftV2({
+        version: 1,
+        characterName: "Second",
+        values: { character_name: "Second" },
+      });
       const result = await store.putInitialDraftIfAbsent(draft2);
 
       expect(result).toEqual({ kind: "already_exists" });
       // Original bytes unchanged
-      expect(bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))?.bytes).toEqual(originalBytes);
-    });
-
-    it("C. existing different bytes: returns already_exists and leaves bytes unchanged", async () => {
-      const bucket = new FakeR2Bucket();
-      const store = createR2CharacterSheetDraftStoreV2(bucket);
-      const draft = makeValidDraftV2({ version: 1, characterName: "First", values: { character_name: "First" } });
-      await store.putInitialDraftIfAbsent(draft);
-      const originalBytes = bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))?.bytes;
-
-      // Try to create with different content
-      const draft2 = makeValidDraftV2({ version: 1, characterName: "Second", values: { character_name: "Second" } });
-      const result = await store.putInitialDraftIfAbsent(draft2);
-
-      expect(result).toEqual({ kind: "already_exists" });
-      // Original bytes unchanged
-      expect(bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))?.bytes).toEqual(originalBytes);
+      expect(
+        bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1))?.bytes,
+      ).toEqual(originalBytes);
     });
 
     it("D. conditional PUT uses If-None-Match: *", async () => {
@@ -401,7 +420,10 @@ describe("4E1 R2 V2 character sheet draft store", () => {
       const broken = { ...makeValidDraftV2(), values: { unknown_field: 1 } };
 
       await expectDraftErrorCode(
-        () => store.putInitialDraftIfAbsent(broken as unknown as CharacterSheetDraftV2),
+        () =>
+          store.putInitialDraftIfAbsent(
+            broken as unknown as CharacterSheetDraftV2,
+          ),
         "invalid_draft",
       );
       expect(bucket.putKeys).toHaveLength(0);
@@ -413,7 +435,8 @@ describe("4E1 R2 V2 character sheet draft store", () => {
       const v1 = makeValidDraftV1();
 
       await expectDraftErrorCode(
-        () => store.putInitialDraftIfAbsent(v1 as unknown as CharacterSheetDraftV2),
+        () =>
+          store.putInitialDraftIfAbsent(v1 as unknown as CharacterSheetDraftV2),
         "invalid_draft",
       );
       expect(bucket.putKeys).toHaveLength(0);
@@ -434,17 +457,27 @@ describe("4E1 R2 V2 character sheet draft store", () => {
     it("H. ordinary putDraft remains unconditional and can overwrite same version", async () => {
       const bucket = new FakeR2Bucket();
       const store = createR2CharacterSheetDraftStoreV2(bucket);
-      const draft = makeValidDraftV2({ version: 1, characterName: "First", values: { character_name: "First" } });
+      const draft = makeValidDraftV2({
+        version: 1,
+        characterName: "First",
+        values: { character_name: "First" },
+      });
       await store.putInitialDraftIfAbsent(draft);
 
       // Now use ordinary putDraft to overwrite
-      const draft2 = makeValidDraftV2({ version: 1, characterName: "Second", values: { character_name: "Second" } });
+      const draft2 = makeValidDraftV2({
+        version: 1,
+        characterName: "Second",
+        values: { character_name: "Second" },
+      });
       await store.putDraft(draft2);
 
       // Should have two putKeys (one from initial create, one from putDraft)
       expect(bucket.putKeys).toHaveLength(2);
       // The stored object should be the second one
-      const stored = bucket.objects.get(getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1));
+      const stored = bucket.objects.get(
+        getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
+      );
       expect(stored).toBeDefined();
       const parsed = JSON.parse(new TextDecoder().decode(stored!.bytes));
       expect(parsed.characterName).toBe("Second");
@@ -462,7 +495,9 @@ describe("4E1 R2 V2 character sheet draft store", () => {
       );
 
       // Create should fail because key exists
-      const result = await store.putInitialDraftIfAbsent(makeValidDraftV2({ version: 1 }));
+      const result = await store.putInitialDraftIfAbsent(
+        makeValidDraftV2({ version: 1 }),
+      );
       expect(result).toEqual({ kind: "already_exists" });
 
       // But read should still canonicalize V1 to V2
@@ -875,18 +910,19 @@ describe("4E1 R2 V2 character sheet draft store", () => {
         version: 1,
       });
     });
-
-    it("32. the V2 adapter and the V1 adapter do not leak into each other", async () => {
-      const bucket = new FakeR2Bucket();
-      const v2Store: CharacterSheetDraftStoreV2 =
-        createR2CharacterSheetDraftStoreV2(bucket);
-
-      // The V2 adapter writes V2 bytes; the V1 adapter is never invoked by it,
-      // so no V1-shaped put happens.
-      await v2Store.putDraft(makeValidDraftV2({ version: 1 }));
-
-      expect(bucket.putKeys).toEqual([
-        getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
-      ]);
-    });
   });
+
+  it("32. the V2 adapter and the V1 adapter do not leak into each other", async () => {
+    const bucket = new FakeR2Bucket();
+    const v2Store: CharacterSheetDraftStoreV2 =
+      createR2CharacterSheetDraftStoreV2(bucket);
+
+    // The V2 adapter writes V2 bytes; the V1 adapter is never invoked by it,
+    // so no V1-shaped put happens.
+    await v2Store.putDraft(makeValidDraftV2({ version: 1 }));
+
+    expect(bucket.putKeys).toEqual([
+      getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
+    ]);
+  });
+});

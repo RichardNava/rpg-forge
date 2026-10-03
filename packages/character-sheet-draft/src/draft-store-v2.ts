@@ -43,9 +43,6 @@ import type { CharacterSheetDraftIdentity } from "./draft-store";
  * type appears here.
  */
 export interface CharacterSheetDraftStoreV2 {
-  /** Persists one immutable canonical V2 snapshot under its derived key. */
-  putDraft(draft: CharacterSheetDraftV2): Promise<void>;
-
   /**
    * Atomically creates an initial draft snapshot only when the key is absent.
    *

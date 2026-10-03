@@ -66,16 +66,6 @@ class RecordingBucket implements R2BucketLike {
     return undefined;
   }
 
-  async putInitialDraftIfAbsent(
-    key: string,
-    value: string | Uint8Array,
-  ): Promise<unknown | null> {
-    if (this.objects.has(key)) {
-      return null;
-    }
-    return this.put(key, value);
-  }
-
   async get(key: string): Promise<{
     text(): Promise<string>;
     bytes(): Promise<Uint8Array>;
