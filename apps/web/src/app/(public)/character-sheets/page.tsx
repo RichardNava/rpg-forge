@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CharacterWorkshop } from "@/features/character-sheets/components/CharacterWorkshop";
+import { CharacterWorkshopV2Host } from "@/features/character-sheets/components/CharacterWorkshopV2Host";
 
 export const metadata: Metadata = {
   title: "Character Sheet Workshop",
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function CharacterSheetsPage() {
   return (
     <main className="character-workshop">
-      <CharacterWorkshop />
+      <CharacterWorkshopV2Host />
     </main>
   );
 }

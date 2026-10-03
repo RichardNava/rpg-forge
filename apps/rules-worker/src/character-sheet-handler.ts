@@ -1,22 +1,35 @@
 import {
   createSheetSession,
   authorizeSheetSession,
-  type DraftHeadIdentity,
   type SheetSession,
 } from "@repo/character-sheet-session";
 import {
-  applyDraftMutation,
-  rerollLockedDraftValues,
-  finalizeDraft,
-  bumpDraftVersion,
   DraftError,
-  validateDraft,
-  type CharacterSheetDraft,
+  SheetDraftCreateRequestV2Schema,
   type CharacterSheetDraftIdentity,
-  type CharacterSheetDraftStore,
+  type CharacterSheetDraftStoreV2,
+  type CharacterSheetDraftV2,
 } from "@repo/character-sheet-draft";
+import { createDraftV2 } from "./features/character-sheets/draft-v2-create.js";
+import { mutateDraftV2 } from "./features/character-sheets/draft-v2-mutation.js";
+import { rerollDraftV2 } from "./features/character-sheets/draft-v2-reroll.js";
+import { confirmDraftV2 } from "./features/character-sheets/draft-v2-confirm.js";
+import {
+  readCurrentDraftV2,
+  type DraftV2Runtime,
+} from "./features/character-sheets/draft-v2-runtime.js";
+import {
+  parseDraftV2ConfirmRequest,
+  parseDraftV2MutationRequest,
+  parseDraftV2RerollRequest,
+} from "./features/character-sheets/draft-v2-transport.js";
+import {
+  draftV2CreatedResponse,
+  draftV2RerollResponse,
+  draftV2SnapshotResponse,
+} from "./features/character-sheets/draft-v2-orchestration.js";
 import type { ExtractedCharacterNode } from "./features/character-sheets/extraction/extracted-character-structure.js";
-import { compileExtractedCharacterStructure } from "./features/character-sheets/extraction/compile-extracted-character-structure.js";
+import { compileExtractedCharacterStructureV2 } from "./features/character-sheets/extraction/compile-extracted-character-structure-v2.js";
 import { ObservationError } from "./infrastructure/sheet-visual-extraction.js";
 import {
   parseBearerToken,
@@ -27,7 +40,6 @@ import {
 import { errorResponse, jsonResponse } from "./transport/errors.js";
 import {
   CreateSessionRequestSchema,
-  SheetDraftRerollRequestSchema,
   SheetSessionCreateResponseSchema,
   SheetSessionViewSchema,
   type SheetSessionView,
@@ -258,15 +270,15 @@ async function handleExtractSheetDocument(
           observedFields: countObservedFields(observed.nodes),
         });
       }
-      const draft = compileExtractedCharacterStructure({
+      const draft = compileExtractedCharacterStructureV2({
         structure: observed,
         sessionId: auth.sessionId,
         sourceSheetId: deriveDocumentSourceId(document.name),
       });
       console.info("character-sheet draft compiled", {
-        compiledSectionCount: draft.sections?.length ?? 0,
+        compiledSectionCount: draft.sections.length,
         compiledFieldCount: draft.fields.length,
-        ungroupedFieldCount: countUngroupedFields(draft),
+        rootFieldCount: countRootFieldsV2(draft),
       });
       traceSheetDraft(deps, "extraction response", draft);
       return jsonResponse(200, draft);
@@ -296,18 +308,22 @@ function countObservedFields(nodes: readonly ExtractedCharacterNode[]): number {
   );
 }
 
-function countUngroupedFields(draft: CharacterSheetDraft): number {
-  const assigned = new Set(
-    draft.sections?.flatMap((section) => section.fieldKeys) ?? [],
-  );
-  return draft.fields.filter((field) => !assigned.has(field.key)).length;
+function countRootFieldsV2(draft: CharacterSheetDraftV2): number {
+  return draft.structure.filter(
+    (placement) => placement.kind === "field" && placement.parentKey === null,
+  ).length;
 }
 
 /** Debugging deliberately records only aggregate draft metadata, never content. */
 function traceSheetDraft(
   deps: AppDeps,
   title: string,
-  draft: CharacterSheetDraft,
+  draft: {
+    readonly fields: ReadonlyArray<unknown>;
+    readonly sections?: ReadonlyArray<unknown> | null | undefined;
+    readonly values: Readonly<Record<string, unknown>>;
+    readonly confirmed: boolean;
+  },
 ): void {
   if (!deps.debugSheetDrafts) return;
   console.info(`[character-sheet] ${title}`, {
@@ -487,61 +503,32 @@ async function handleCreateDraft(
     );
   }
 
-  let snapshot: CharacterSheetDraft;
-  try {
-    snapshot = validateDraft(body);
-  } catch {
+  const parsed = SheetDraftCreateRequestV2Schema.safeParse(body);
+  if (!parsed.success) {
     return errorResponse("SHEET_DRAFT_INVALID");
   }
 
-  if (snapshot.sessionId !== auth.sessionId) {
-    return errorResponse(
-      "SHEET_DRAFT_INVALID",
-      "The session id does not match the draft session id.",
-    );
-  }
-
-  if (snapshot.version !== 1) {
-    return errorResponse(
-      "SHEET_DRAFT_INVALID",
-      "A new draft must start at version 1.",
-    );
-  }
-
-  const headIdentity: DraftHeadIdentity = {
-    sessionId: auth.sessionId,
-    draftId: snapshot.draftId,
-  };
-
-  if (deps.sheetDraftStore === undefined) {
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
     return draftStorageUnavailable();
   }
 
-  // An existing head means this draft already exists. The client reconciles
-  // with a GET; we never overwrite or delete committed R2 snapshots on a retry.
-  const existingHead =
-    await deps.sheetDraftHeadRepository.getHead(headIdentity);
-  if (existingHead !== null) {
-    return errorResponse("SHEET_DRAFT_ALREADY_EXISTS");
-  }
-
-  // R2 write first, then the atomic D1 head create owns the draft. Only in a
-  // concurrent duplicate-create race does the create lose after a successful
-  // R2 write; the orphaned snapshot is left to the session sweep because the
-  // version slot may already hold the winning writer's committed data.
+  let created;
   try {
-    await deps.sheetDraftStore.putDraft(snapshot);
-  } catch {
-    return draftStorageUnavailable();
+    created = await createDraftV2(
+      { heads: runtime.heads, store: runtime.store },
+      auth.sessionId,
+      parsed.data,
+    );
+  } catch (error) {
+    return draftErrorToResponse(error);
   }
-
-  const headCreated = await deps.sheetDraftHeadRepository.create(headIdentity);
-  if (headCreated.kind === "already_exists") {
+  if (created.kind === "already_exists") {
     return errorResponse("SHEET_DRAFT_ALREADY_EXISTS");
   }
 
-  traceSheetDraft(deps, "draft create response", snapshot);
-  return jsonResponse(201, snapshot);
+  traceSheetDraft(deps, "draft create response", created.draft);
+  return draftV2CreatedResponse(created.draft);
 }
 
 async function handleGetDraft(
@@ -560,7 +547,8 @@ async function handleGetDraft(
     draftId,
   };
   const versionParam = url.searchParams.get("version");
-  if (deps.sheetDraftStore === undefined) {
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
     return draftStorageUnavailable();
   }
 
@@ -577,11 +565,7 @@ async function handleGetDraft(
 
   // If a specific version is requested, serve it directly (no head-read needed).
   if (version !== null) {
-    const read = await readDraftSnapshot(
-      deps.sheetDraftStore,
-      identity,
-      version,
-    );
+    const read = await readDraftSnapshotV2(runtime.store, identity, version);
     if (read.kind === "error") {
       return read.response;
     }
@@ -589,31 +573,21 @@ async function handleGetDraft(
       return errorResponse("SHEET_DRAFT_NOT_FOUND");
     }
     traceSheetDraft(deps, "draft version response", read.draft);
-    return jsonResponse(200, read.draft);
+    return draftV2SnapshotResponse(read.draft);
   }
 
   // No version requested: resolve through the draft head.
-  const head = await deps.sheetDraftHeadRepository.getStable({
-    sessionId: auth.sessionId,
-    draftId,
-  });
-  if (head === null) {
-    return errorResponse("SHEET_DRAFT_NOT_FOUND");
+  let current;
+  try {
+    current = await readCurrentDraftV2(runtime, identity);
+  } catch (error) {
+    return draftErrorToResponse(error);
   }
-
-  const current = await readDraftSnapshot(
-    deps.sheetDraftStore,
-    identity,
-    head.currentVersion,
-  );
-  if (current.kind === "error") {
-    return current.response;
-  }
-  if (current.draft === null) {
+  if (current === null || current.draft === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
   traceSheetDraft(deps, "draft current response", current.draft);
-  return jsonResponse(200, current.draft);
+  return draftV2SnapshotResponse(current.draft);
 }
 
 async function handleMutateDraft(
@@ -638,55 +612,40 @@ async function handleMutateDraft(
     );
   }
 
-  if (deps.sheetDraftStore === undefined) {
-    return draftStorageUnavailable();
+  const parsed = parseDraftV2MutationRequest(body);
+  if (parsed.kind === "invalid") {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "The request body must contain an expectedVersion and a mutation.",
+    );
   }
 
-  const headIdentity: DraftHeadIdentity = {
-    sessionId: auth.sessionId,
-    draftId,
-  };
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
+    return draftStorageUnavailable();
+  }
   const draftIdentity: CharacterSheetDraftIdentity = {
     sessionId: auth.sessionId,
     draftId,
   };
 
-  const head = await deps.sheetDraftHeadRepository.getHead(headIdentity);
-  if (head === null) {
-    return errorResponse("SHEET_DRAFT_NOT_FOUND");
-  }
-
-  const currentRead = await readDraftSnapshot(
-    deps.sheetDraftStore,
-    draftIdentity,
-    head.currentVersion,
-  );
-  if (currentRead.kind === "error") {
-    return currentRead.response;
-  }
-  if (currentRead.draft === null) {
-    return errorResponse("SHEET_DRAFT_NOT_FOUND");
-  }
-  const currentDraft = currentRead.draft;
-
-  let mutated: CharacterSheetDraft;
+  let mutated;
   try {
-    mutated = applyDraftMutation(currentDraft, body);
+    mutated = await mutateDraftV2(
+      runtime,
+      draftIdentity,
+      parsed.value.expectedVersion,
+      parsed.value.mutation,
+    );
   } catch (error) {
     return draftErrorToResponse(error);
   }
-
-  const nextVersion = bumpDraftVersion(mutated);
-  const committed = await claimCommitDraft(
-    { headIdentity, head, nextVersion },
-    deps,
-  );
-  if (committed.kind === "error") {
-    return committed.response;
+  if (mutated === null) {
+    return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  traceSheetDraft(deps, "draft mutation response", committed.draft);
-  return jsonResponse(200, committed.draft);
+  traceSheetDraft(deps, "draft mutation response", mutated);
+  return draftV2SnapshotResponse(mutated);
 }
 
 async function handleRerollDraft(
@@ -711,64 +670,40 @@ async function handleRerollDraft(
     );
   }
 
-  if (deps.sheetDraftStore === undefined) {
-    return draftStorageUnavailable();
-  }
-
-  const parsedSeed = SheetDraftRerollRequestSchema.safeParse(body);
-  if (!parsedSeed.success) {
+  const parsed = parseDraftV2RerollRequest(body);
+  if (parsed.kind === "invalid") {
     return errorResponse(
       "INVALID_REQUEST",
-      "The request body must contain a seed string.",
+      "The request body must contain an expectedVersion and a seed string.",
     );
   }
-  const seed = parsedSeed.data.seed;
 
-  const headIdentity: DraftHeadIdentity = {
-    sessionId: auth.sessionId,
-    draftId,
-  };
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
+    return draftStorageUnavailable();
+  }
   const draftIdentity: CharacterSheetDraftIdentity = {
     sessionId: auth.sessionId,
     draftId,
   };
 
-  const head = await deps.sheetDraftHeadRepository.getHead(headIdentity);
-  if (head === null) {
+  let rerolled;
+  try {
+    rerolled = await rerollDraftV2(
+      runtime,
+      draftIdentity,
+      parsed.value.expectedVersion,
+      parsed.value.seed,
+    );
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+  if (rerolled === null) {
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  const currentRead = await readDraftSnapshot(
-    deps.sheetDraftStore,
-    draftIdentity,
-    head.currentVersion,
-  );
-  if (currentRead.kind === "error") {
-    return currentRead.response;
-  }
-  if (currentRead.draft === null) {
-    return errorResponse("SHEET_DRAFT_NOT_FOUND");
-  }
-
-  const { draft: rerolledDraft, rerolledKeys } = rerollLockedDraftValues(
-    currentRead.draft,
-    seed,
-  );
-
-  const nextVersion = bumpDraftVersion(rerolledDraft);
-  const committed = await claimCommitDraft(
-    { headIdentity, head, nextVersion },
-    deps,
-  );
-  if (committed.kind === "error") {
-    return committed.response;
-  }
-
-  traceSheetDraft(deps, "draft confirmation response", committed.draft);
-  return jsonResponse(200, {
-    draft: committed.draft,
-    rerolledKeys,
-  });
+  traceSheetDraft(deps, "draft reroll response", rerolled.draft);
+  return draftV2RerollResponse(rerolled);
 }
 
 async function handleConfirmDraft(
@@ -782,83 +717,83 @@ async function handleConfirmDraft(
     return auth.response;
   }
 
-  if (deps.sheetDraftStore === undefined) {
-    return draftStorageUnavailable();
+  if (!hasJsonContentType(request)) {
+    return errorResponse("INVALID_REQUEST", "Expected application/json.");
+  }
+  const body = await readBoundedJson(request);
+  if (body === null) {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "Request body is malformed or too large.",
+    );
+  }
+  const parsed = parseDraftV2ConfirmRequest(body);
+  if (parsed.kind === "invalid") {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "The request body must contain an expectedVersion.",
+    );
   }
 
-  const headIdentity: DraftHeadIdentity = {
-    sessionId: auth.sessionId,
-    draftId,
-  };
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
+    return draftStorageUnavailable();
+  }
   const draftIdentity: CharacterSheetDraftIdentity = {
     sessionId: auth.sessionId,
     draftId,
   };
 
-  const head = await deps.sheetDraftHeadRepository.getHead(headIdentity);
-  if (head === null) {
-    return errorResponse("SHEET_DRAFT_NOT_FOUND");
-  }
-
-  const headRead = await readDraftSnapshot(
-    deps.sheetDraftStore,
-    draftIdentity,
-    head.currentVersion,
-  );
-  if (headRead.kind === "error") {
-    return headRead.response;
-  }
-  if (headRead.draft === null) {
-    return errorResponse("SHEET_DRAFT_NOT_FOUND");
-  }
-  const headDraft = headRead.draft;
-
-  let confirmedDraft: CharacterSheetDraft;
+  let confirmed;
   try {
-    confirmedDraft = finalizeDraft(headDraft);
+    confirmed = await confirmDraftV2(
+      runtime,
+      draftIdentity,
+      parsed.value.expectedVersion,
+    );
   } catch (error) {
     return draftErrorToResponse(error);
   }
-
-  const committed = await claimCommitDraft(
-    { headIdentity, head, nextVersion: confirmedDraft },
-    deps,
-  );
-  if (committed.kind === "error") {
-    return committed.response;
+  if (confirmed === null) {
+    return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
-  return jsonResponse(200, {
-    draft: committed.draft,
-  });
+  traceSheetDraft(deps, "draft confirmation response", confirmed);
+  return draftV2SnapshotResponse(confirmed);
 }
 
-type ClaimCommitOutcome =
-  | { kind: "ok"; draft: CharacterSheetDraft }
+type DraftV2ReadOutcome =
+  | { kind: "ok"; draft: CharacterSheetDraftV2 | null }
   | { kind: "error"; response: Response };
 
-type DraftReadOutcome =
-  | { kind: "ok"; draft: CharacterSheetDraft | null }
-  | { kind: "error"; response: Response };
+/**
+ * Builds the route-independent V2 runtime from live dependencies, or `null`
+ * when the V2 store binding is unavailable. Callers fail closed with the
+ * existing storage-unavailable response.
+ */
+function v2DraftRuntime(deps: AppDeps): DraftV2Runtime | null {
+  if (deps.sheetDraftStoreV2 === undefined) {
+    return null;
+  }
+  return {
+    heads: deps.sheetDraftHeadRepository,
+    store: deps.sheetDraftStoreV2,
+    clock: deps.clock,
+    crypto: deps.crypto,
+  };
+}
 
 /**
  * Reads one immutable snapshot through the shared `DraftError` translation.
  *
- * 4E3A — every `getDraftVersion` call site previously invoked the store
- * directly, so a `corrupt_draft` or `storage_unavailable` raised by the R2
- * adapter escaped the handler as an unhandled rejection (a non-contract Worker
- * 500) instead of a mapped error response. Routing reads through one helper keeps
- * the new `corrupt_draft` mapping reachable and keeps the translation in a
- * single place instead of five `try`/`catch` blocks.
- *
  * A missing snapshot is `null`, never an error: absence is a routing decision
  * (`SHEET_DRAFT_NOT_FOUND`), not a storage failure.
  */
-async function readDraftSnapshot(
-  store: CharacterSheetDraftStore,
+async function readDraftSnapshotV2(
+  store: CharacterSheetDraftStoreV2,
   identity: CharacterSheetDraftIdentity,
   version: number,
-): Promise<DraftReadOutcome> {
+): Promise<DraftV2ReadOutcome> {
   try {
     return {
       kind: "ok",
@@ -867,125 +802,6 @@ async function readDraftSnapshot(
   } catch (error) {
     return { kind: "error", response: draftErrorToResponse(error) };
   }
-}
-
-async function claimCommitDraft(
-  input: {
-    headIdentity: DraftHeadIdentity;
-    head: {
-      currentVersion: number;
-      pendingVersion: number | null;
-      pendingClaimId: string | null;
-    };
-    nextVersion: CharacterSheetDraft;
-  },
-  deps: AppDeps,
-): Promise<ClaimCommitOutcome> {
-  const { headIdentity, nextVersion } = input;
-  const { currentVersion, pendingClaimId, pendingVersion } = input.head;
-
-  if (deps.sheetDraftStore === undefined) {
-    return { kind: "error", response: draftStorageUnavailable() };
-  }
-
-  if (pendingVersion !== null || pendingClaimId !== null) {
-    return {
-      kind: "error",
-      response: errorResponse("SHEET_DRAFT_INFLIGHT"),
-    };
-  }
-
-  const claimId = deps.crypto.uuid();
-  const now = deps.clock.now();
-  const claimed = await deps.sheetDraftHeadRepository.claim(
-    headIdentity,
-    currentVersion,
-    claimId,
-    now,
-  );
-
-  if (claimed.kind === "already_pending") {
-    return {
-      kind: "error",
-      response: errorResponse("SHEET_DRAFT_INFLIGHT"),
-    };
-  }
-  if (claimed.kind === "version_conflict") {
-    return {
-      kind: "error",
-      response: errorResponse("SHEET_DRAFT_VERSION_CONFLICT"),
-    };
-  }
-  if (claimed.kind === "not_found") {
-    return {
-      kind: "error",
-      response: errorResponse("SHEET_DRAFT_NOT_FOUND"),
-    };
-  }
-
-  try {
-    await deps.sheetDraftStore.putDraft(nextVersion);
-  } catch {
-    try {
-      await deps.sheetDraftHeadRepository.release(
-        headIdentity,
-        claimId,
-        claimed.claimedVersion,
-        deps.clock.now(),
-      );
-    } catch {
-      // Best-effort compensation; stale-claim recovery covers residual claims.
-    }
-    return { kind: "error", response: draftStorageUnavailable() };
-  }
-
-  const committed = await deps.sheetDraftHeadRepository.commit(
-    headIdentity,
-    claimId,
-    currentVersion,
-    deps.clock.now(),
-  );
-
-  if (committed.kind === "wrong_claim" || committed.kind === "not_found") {
-    // R2 snapshot was written but the D1 commit failed to match ownership.
-    // Release our claim so the next writer can proceed.
-    try {
-      await deps.sheetDraftHeadRepository.release(
-        headIdentity,
-        claimId,
-        claimed.claimedVersion,
-        deps.clock.now(),
-      );
-    } catch {
-      // Best-effort compensation.
-    }
-    return {
-      kind: "error",
-      response: errorResponse(
-        "SHEET_DRAFT_VERSION_CONFLICT",
-        "The draft version changed during the save.",
-      ),
-    };
-  }
-
-  if (committed.kind === "version_conflict") {
-    try {
-      await deps.sheetDraftHeadRepository.release(
-        headIdentity,
-        claimId,
-        claimed.claimedVersion,
-        deps.clock.now(),
-      );
-    } catch {
-      // Best-effort compensation.
-    }
-    return {
-      kind: "error",
-      response: errorResponse("SHEET_DRAFT_VERSION_CONFLICT"),
-    };
-  }
-
-  return { kind: "ok", draft: nextVersion };
 }
 
 /**
@@ -1005,6 +821,12 @@ async function claimCommitDraft(
  * `storage_unavailable` is added in the same change because making the store-read
  * paths below reachable is what exposes it: without this arm, a transient R2 read
  * failure on those newly-translated paths would report 422 instead of 503.
+ *
+ * 4E5 completes the taxonomy for the V2 live runtime: `invalid_draft` and
+ * `invalid_draft_identity` map to `SHEET_DRAFT_INVALID` (400),
+ * `invalid_mutation` maps explicitly to `SHEET_DRAFT_MUTATION_INVALID` (422),
+ * `cleanup_failed` maps to storage-unavailable (503), and
+ * `projection_invalid` / `writeback_invalid` map to `INTERNAL_ERROR` (500).
  *
  * No existing arm was removed or re-statused.
  */
@@ -1031,6 +853,16 @@ function draftErrorToResponse(error: unknown): Response {
         return errorResponse("SHEET_DRAFT_VERSION_CONFLICT", error.message);
       case "storage_unavailable":
         return draftStorageUnavailable();
+      case "invalid_draft":
+      case "invalid_draft_identity":
+        return errorResponse("SHEET_DRAFT_INVALID", error.message);
+      case "invalid_mutation":
+        return errorResponse("SHEET_DRAFT_MUTATION_INVALID", error.message);
+      case "cleanup_failed":
+        return draftStorageUnavailable();
+      case "projection_invalid":
+      case "writeback_invalid":
+        return errorResponse("INTERNAL_ERROR", error.message);
     }
     return errorResponse("SHEET_DRAFT_MUTATION_INVALID", error.message);
   }

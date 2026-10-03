@@ -19,7 +19,7 @@
  *     +--> finalizeDraftV2          (package domain)
  *     +--> persistNextDraftV2       (4E3B1 runtime kernel)
  *     v
- * Future HTTP handler             (not here)
+ * Live HTTP handler               (character-sheet-handler.ts)
  */
 import {
   finalizeDraftV2,

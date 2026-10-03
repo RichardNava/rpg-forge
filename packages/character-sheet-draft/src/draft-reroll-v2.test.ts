@@ -720,6 +720,28 @@ describe("rerollLockedDraftValuesV2 — characterName mirror", () => {
     expect(next.characterName).toBe("Aria Stone");
   });
 
+  it("43b. never rerolls a locked bounded-number character_name", () => {
+    const hostileName: DraftField[] = [
+      {
+        key: "character_name",
+        label: "Name",
+        type: "number",
+        min: 1,
+        max: 6,
+        locked: true,
+      },
+    ];
+    const draft = makeRerollDraft(5, 2, hostileName);
+    const { draft: next, rerolledKeys } = rerollLockedDraftValuesV2(
+      draft,
+      "hostile-name-seed",
+    );
+    expect(rerolledKeys).not.toContain("character_name");
+    expect(next.values["character_name"]).toBe(draft.values["character_name"]);
+    expect(next.characterName).toBe(draft.characterName);
+    expect(() => validateDraftV2(next)).not.toThrow();
+  });
+
   it("44. keeps characterName null when there is no character_name value", () => {
     const { draft } = rerollLockedDraftValuesV2(
       makeNoCharacterNameDraft(),

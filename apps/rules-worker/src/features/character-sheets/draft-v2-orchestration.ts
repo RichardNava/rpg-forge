@@ -54,9 +54,10 @@
  *   without touching `version`, so the no-op distinction stays observable to the
  *   handler, which is where the "no claim, no R2 write" bypass belongs.
  *
- * ## Not connected to live routes
+ * ## Live since the 4E5 cutover
  *
- * Nothing here is imported by a live handler. Wiring it up is 4E3B.
+ * The live character-sheet handlers import these serializers for every
+ * success response.
  */
 import {
   SheetDraftRerollResponseV2Schema,
@@ -69,9 +70,9 @@ import { jsonResponse } from "../../transport/errors.js";
  * Success response for a V2 draft snapshot: the RAW canonical V2 draft with no
  * envelope, per the frozen 4D response policy.
  *
- * This is the deliberate correction to the live V1 confirm route, which wraps
- * the draft as `{ draft: ... }`. That V1 wrapper is a known pre-existing
- * integration defect; correcting live behavior belongs to 4E3B, not here.
+ * This is the deliberate correction to the old V1 confirm route, which wrapped
+ * the draft as `{ draft: ... }`. That wrapper was a pre-existing integration
+ * defect; the 4E5 cutover made the raw snapshot live.
  *
  * The frozen schema is applied first, so a snapshot that is not canonical V2
  * fails loudly here instead of reaching a client. That is a programmer defect,

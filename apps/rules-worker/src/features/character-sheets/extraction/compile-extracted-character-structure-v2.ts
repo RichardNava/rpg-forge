@@ -23,9 +23,9 @@ type DraftPlacement = CharacterSheetDraftV2["structure"][number];
  * 4E2 — DIRECT V2 draft producer.
  *
  * This is the V2 counterpart of `compileExtractedCharacterStructure`. The V1
- * producer is left exactly as it is and remains the one wired into
- * `character-sheet-handler.ts`; nothing in this module is reachable from the
- * live runtime yet. The runtime switch is 4E3.
+ * producer is retained only as transitional compatibility code for the 4E6
+ * cleanup; the live extraction route now calls this module directly since the
+ * 4E5 cutover.
  *
  * ## Direct production, not migrate-after-V1
  *

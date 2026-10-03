@@ -647,13 +647,57 @@ describe("draft-content-mutation-v2 labels / types / locks", () => {
     expect(result.values.strength).toBeUndefined();
   });
 
-  it("set_field_type removing character_name restores the mirror", () => {
-    const result = apply(makeContentDraft(), {
+  it("set_field_type character_name to number is rejected", () => {
+    expectDraftCode(
+      () =>
+        apply(makeContentDraft(), {
+          op: "set_field_type",
+          field: { key: "character_name", type: "number", min: 1, max: 6 },
+        }),
+      "invalid_mutation",
+    );
+  });
+
+  it("set_field_type character_name to choice is rejected", () => {
+    expectDraftCode(
+      () =>
+        apply(makeContentDraft(), {
+          op: "set_field_type",
+          field: { key: "character_name", type: "choice", options: ["a"] },
+        }),
+      "invalid_mutation",
+    );
+  });
+
+  it("set_field_type character_name to checkbox is rejected", () => {
+    expectDraftCode(
+      () =>
+        apply(makeContentDraft(), {
+          op: "set_field_type",
+          field: { key: "character_name", type: "checkbox" },
+        }),
+      "invalid_mutation",
+    );
+  });
+
+  it("set_field_type character_name to textarea is rejected", () => {
+    expectDraftCode(
+      () =>
+        apply(makeContentDraft(), {
+          op: "set_field_type",
+          field: { key: "character_name", type: "textarea" },
+        }),
+      "invalid_mutation",
+    );
+  });
+
+  it("set_field_type character_name to text is accepted", () => {
+    const draft = makeContentDraft();
+    const result = apply(draft, {
       op: "set_field_type",
-      field: { key: "character_name", type: "checkbox" },
+      field: { key: "character_name", type: "text" },
     });
-    expect(result.values.character_name).toBeUndefined();
-    expect(result.characterName).toBeNull();
+    expect(result).toBe(draft);
   });
 
   it("set_field_type choice requires options", () => {

@@ -20,7 +20,7 @@
  *     +--> DraftHeadRepositoryPort        (duplicate check, head creation)
  *     +--> CharacterSheetDraftStoreV2     (atomic initial snapshot)
  *     v
- * Future HTTP handler             (not here)
+ * Live HTTP handler               (character-sheet-handler.ts)
  */
 import {
   draftError,
@@ -46,7 +46,7 @@ export interface DraftV2CreateDeps {
 
 /**
  * Route-independent create outcome. A duplicate is a value, not an error, so
- * the future handler can map `{ kind: "already_exists" }` to
+ * the live handler maps `{ kind: "already_exists" }` to
  * `SHEET_DRAFT_ALREADY_EXISTS` without inventing a 404-only DraftError.
  */
 export type DraftV2CreateResult =

@@ -294,6 +294,12 @@ function applySetFieldType(
   mutation: DraftSetFieldTypeMutationV2,
 ): CharacterSheetDraftV2 {
   const current = assertFieldExists(draft, mutation.field.key);
+  if (current.key === "character_name" && mutation.field.type !== "text") {
+    throw draftError(
+      "invalid_mutation",
+      "The character_name field must stay a text field.",
+    );
+  }
   const replacement = fieldForTypeChangeV2(current, mutation);
 
   const currentValue = draft.values[current.key];

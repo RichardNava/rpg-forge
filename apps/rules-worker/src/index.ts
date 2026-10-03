@@ -5,6 +5,7 @@ import {
 import { createAppDeps } from "./deps.js";
 import { type Env } from "./env.js";
 import { handleRequest } from "./handler.js";
+import { recoverStaleSheetDraftClaims } from "./scheduled-draft-recovery.js";
 export { RulebookIngestionWorkflow } from "./rulebook-ingestion-workflow.js";
 export { RulesAnalysisWorkflow } from "./rules-analysis-workflow.js";
 
@@ -26,6 +27,7 @@ export default {
         `rules-analysis cleanup: ${result.failed.length}/${result.processed} sessions failed`,
       );
     }
+    await recoverStaleSheetDraftClaims(deps);
     const sheetCandidates = await deps.sheetSessionRepository.findCleanupCandidates(
       deps.clock.now(),
       MAX_CLEANUP_BATCH_SIZE,

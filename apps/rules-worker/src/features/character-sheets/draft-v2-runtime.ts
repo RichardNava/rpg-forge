@@ -21,7 +21,7 @@
  * ## Layering
  *
  * ```text
- * HTTP handler            [4E3B2/3/4 — NOT here]
+ * Live HTTP handler       (character-sheet-handler.ts)
  *     v
  * THIS MODULE             D1 + R2 orchestration core
  *     +--> DraftHeadRepositoryPort        (version coordination only)

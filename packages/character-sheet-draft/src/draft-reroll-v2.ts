@@ -53,6 +53,12 @@ export function rerollLockedDraftValuesV2(
   const rerolledKeys: string[] = [];
 
   for (const field of draft.fields) {
+    // `character_name` is display identity, never a draw target: the V2
+    // contract requires a string-or-null name, so a locked bounded
+    // `character_name` field must not be rerolled even if one is constructed.
+    if (field.key === "character_name") {
+      continue;
+    }
     if (!field.locked) {
       continue;
     }
