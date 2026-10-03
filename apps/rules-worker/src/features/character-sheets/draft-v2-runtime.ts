@@ -82,6 +82,8 @@ import type {
 import type { Clock, SessionCrypto } from "@repo/rules-analysis-session";
 import type { CharacterSheetDraftStoreV2 } from "@repo/character-sheet-draft";
 
+export type { DraftHeadIdentity };
+
 /**
  * The kernel's collaborators. Narrow and explicit rather than `AppDeps`, so it
  * can never reach a live V1 store, a route helper or an HTTP concern.
