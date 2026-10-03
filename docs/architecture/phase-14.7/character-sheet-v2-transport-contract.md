@@ -25,6 +25,12 @@ not a description of implemented runtime behavior. As of this document:
 
 Nothing in this document may be read as a claim that V2 already serves traffic.
 
+As of 4E3, route-independent V2 persistence and orchestration (the V2 store
+adapter, the runtime kernel, and the mutation/reroll/confirm/create
+orchestration plus egress serializers) exist in parallel and are covered by
+tests. Live Worker routes, the Web client/store, and extraction producers
+remain V1.
+
 For current product behavior see `docs/features/character-sheets.md` (ACTIVE).
 For the delivered 14.7 architecture see
 `docs/architecture/phase-14.7/character-sheet-integration.md`.
@@ -251,9 +257,18 @@ Confirming an already-confirmed draft is an idempotence **error**
 - body validates as canonical V2;
 - `sessionId` must match the authorized session;
 - `version` must equal 1;
+- `baseVersion` must equal 1;
+- `confirmed` may be `true` or `false`; no new `confirmed: false` rule exists;
 - no `expectedVersion`;
 - existing-head duplicate behavior retained (`SHEET_DRAFT_ALREADY_EXISTS`);
-- immutable R2 snapshot written, then the D1 head created;
+- the initial R2 snapshot is written with an atomic create-if-absent
+  (`If-None-Match: *`), then the D1 head is created;
+- ordinary `N+1` snapshots continue to use the unconditional `putDraft`, which
+  stays retry-compatible after a lost D1 commit;
+- an R2 version-1 object that already exists is never overwritten: an equal
+  canonical orphan with no head may be recovered by creating the D1 head,
+  while a different orphan is a duplicate conflict;
+- the R2 object is never deleted merely because the D1 create loses a race;
 - success is the raw V2 snapshot.
 
 The transport schema deliberately does **not** assert `version === 1`; that is
@@ -351,29 +366,25 @@ own every family-level semantic rule — notably `add_field`'s full
 `DraftFieldSchema` validation. That failure is
 `SHEET_DRAFT_MUTATION_INVALID` / 422, not 400.
 
-### 4E REQUIRED CHANGE — `version_conflict` mapping gap
+### `version_conflict` mapping — implemented in 4E3A
 
-The current rules-worker `draftErrorToResponse(...)` does **not** explicitly map
-`version_conflict`, and therefore falls through to:
-
-```
-SHEET_DRAFT_MUTATION_INVALID / 422
-```
-
-This is safe **only** because the current V1 runtime cannot produce that domain
-error — V1 always bumps the version internally, so the version precondition
-never fires. 4E activates exactly that path, so the mapping must be added
-**before** any V2 route becomes reachable:
+The rules-worker `draftErrorToResponse(...)` now explicitly maps:
 
 ```
 version_conflict → SHEET_DRAFT_VERSION_CONFLICT / 409
 ```
 
-Without it, every stale-write rejection would report "your mutation is invalid"
-instead of "retry against the current version". The same fallthrough also
-mis-reports `invalid_draft`, `corrupt_draft`, `storage_unavailable`,
-`invalid_draft_identity`, `cleanup_failed`, `projection_invalid` and
-`writeback_invalid`; 4E should add explicit cases for all of them.
+alongside the other V2-reachable arms (`field_read_locked`,
+`surface_out_of_bounds`, `draft_confirmed`, `draft_inflight`,
+`draft_session_mismatch` / `session_expired`, `corrupt_draft`, and
+`storage_unavailable`).
+
+Remaining fallthrough is future cutover debt for live V2 paths:
+`invalid_draft`, `invalid_draft_identity`, `cleanup_failed`,
+`projection_invalid`, and `writeback_invalid` still fall through to
+`SHEET_DRAFT_MUTATION_INVALID` / 422 (`invalid_mutation` also reaches that
+code through the default arm, which matches its table row). These must be
+given explicit, correct mappings before V2 routes serve traffic.
 
 ## 12. Pre-existing V1 integration mismatch — 4E resolution
 
@@ -403,7 +414,9 @@ domain evaluation. Frozen outcomes:
 | --------------------------------- | ----------------------------------------------------------------- |
 | `already_pending`                 | `SHEET_DRAFT_INFLIGHT` / 409                                      |
 | `version_conflict`                | `SHEET_DRAFT_VERSION_CONFLICT` / 409                              |
-| `not_found`                       | `SHEET_DRAFT_NOT_FOUND` / 404                                     |
+| `not_found` on initial open       | `SHEET_DRAFT_NOT_FOUND` / 404                                     |
+| `not_found` on claim/commit after | `SHEET_DRAFT_VERSION_CONFLICT` / 409                              |
+| a verified open                   |                                                                   |
 | commit wrong ownership or version | `SHEET_DRAFT_VERSION_CONFLICT` / 409                              |
 | R2 write failure                  | release best-effort, then `SHEET_DRAFT_STORAGE_UNAVAILABLE` / 503 |
 

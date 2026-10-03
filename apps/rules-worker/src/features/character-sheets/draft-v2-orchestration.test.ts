@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import type { CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
 import {
+  draftV2CreatedResponse,
   draftV2RerollResponse,
   draftV2SnapshotResponse,
 } from "./draft-v2-orchestration.js";
@@ -121,6 +122,22 @@ describe("draft-v2-orchestration egress serialization", () => {
     // it fails loudly rather than becoming a 4xx.
     expect(() =>
       draftV2SnapshotResponse({ schemaVersion: "2", draftId: "draft.abc" }),
+    ).toThrow();
+  });
+
+  it("emits a created snapshot as raw V2 with HTTP 201", async () => {
+    const draft = makeV2Draft();
+    const response = draftV2CreatedResponse(draft);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(201);
+    expect(body.schemaVersion).toBe("2");
+    expect(body).not.toHaveProperty("draft");
+  });
+
+  it("rejects a non-canonical create body loudly instead of emitting it", () => {
+    expect(() =>
+      draftV2CreatedResponse({ schemaVersion: "2", draftId: "draft.abc" }),
     ).toThrow();
   });
 });

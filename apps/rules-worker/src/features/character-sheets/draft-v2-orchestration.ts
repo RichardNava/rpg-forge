@@ -4,7 +4,7 @@
  * ## Scope
  *
  * This module owns exactly one concern: turning a successful V2 domain result
- * into an HTTP 200 `Response` that is validated against the FROZEN package
+ * into an HTTP success `Response` that is validated against the FROZEN package
  * contract before it leaves the Worker.
  *
  * ## What was removed, and why
@@ -79,6 +79,18 @@ import { jsonResponse } from "../../transport/errors.js";
  */
 export function draftV2SnapshotResponse(body: unknown): Response {
   return jsonResponse(200, SheetDraftSnapshotResponseV2Schema.parse(body));
+}
+
+/**
+ * Success response for a V2 create: the RAW canonical V2 draft with no
+ * envelope, per the frozen 4D response policy, with HTTP 201 Created.
+ *
+ * The frozen schema is applied first, so a snapshot that is not canonical V2
+ * fails loudly here instead of reaching a client. That is a programmer defect,
+ * not a client condition, so it is deliberately NOT translated into a 4xx.
+ */
+export function draftV2CreatedResponse(body: unknown): Response {
+  return jsonResponse(201, SheetDraftSnapshotResponseV2Schema.parse(body));
 }
 
 /**

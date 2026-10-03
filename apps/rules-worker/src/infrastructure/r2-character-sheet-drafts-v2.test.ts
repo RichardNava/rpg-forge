@@ -910,19 +910,19 @@ describe("4E1 R2 V2 character sheet draft store", () => {
         version: 1,
       });
     });
-  });
 
-  it("32. the V2 adapter and the V1 adapter do not leak into each other", async () => {
-    const bucket = new FakeR2Bucket();
-    const v2Store: CharacterSheetDraftStoreV2 =
-      createR2CharacterSheetDraftStoreV2(bucket);
+    it("32. the V2 adapter and the V1 adapter do not leak into each other", async () => {
+      const bucket = new FakeR2Bucket();
+      const v2Store: CharacterSheetDraftStoreV2 =
+        createR2CharacterSheetDraftStoreV2(bucket);
 
-    // The V2 adapter writes V2 bytes; the V1 adapter is never invoked by it,
-    // so no V1-shaped put happens.
-    await v2Store.putDraft(makeValidDraftV2({ version: 1 }));
+      // The V2 adapter writes V2 bytes; the V1 adapter is never invoked by it,
+      // so no V1-shaped put happens.
+      await v2Store.putDraft(makeValidDraftV2({ version: 1 }));
 
-    expect(bucket.putKeys).toEqual([
-      getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
-    ]);
+      expect(bucket.putKeys).toEqual([
+        getDraftSnapshotKey(SESSION_ID, DRAFT_ID, 1),
+      ]);
+    });
   });
 });
