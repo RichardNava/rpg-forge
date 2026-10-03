@@ -1,5 +1,16 @@
-import type { CharacterSheetDraft } from "@repo/character-sheet-draft";
 import type { SheetDraftSaveStatus } from "../state/sheet-store-types";
+
+/**
+ * Minimal structural draft shape shared by the V1 and V2 workshops. Only the
+ * title, save affordances and read-only state are read here; narrowing to
+ * this shape (instead of a V1|V2 union) keeps one toolbar for both runtimes.
+ */
+export interface WorkshopToolbarDraft {
+  readonly fields: ReadonlyArray<{ readonly key: string; readonly locked: boolean }>;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly characterName: string | null;
+  readonly confirmed: boolean;
+}
 
 const SAVE_STATUS_LABEL: Record<SheetDraftSaveStatus, string> = {
   idle: "Not saved",
@@ -9,7 +20,7 @@ const SAVE_STATUS_LABEL: Record<SheetDraftSaveStatus, string> = {
 };
 
 interface WorkshopToolbarProps {
-  draft: CharacterSheetDraft;
+  draft: WorkshopToolbarDraft;
   saveStatus: SheetDraftSaveStatus;
   busy: boolean;
   onRename(title: string): void;
