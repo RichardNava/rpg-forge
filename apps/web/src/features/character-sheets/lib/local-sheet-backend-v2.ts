@@ -23,7 +23,7 @@ export interface LocalSheetBackendV2Options {
 /**
  * In-memory `SheetApiClientV2Port` used in development when no rules-worker is
  * available. It exercises the real V2 domain rules (the same validation,
- * mutation, reroll and finalize functions the future Worker V2 handlers call),
+ * mutation, reroll and finalize functions the live Worker V2 handlers call),
  * but keeps snapshots in the browser tab instead of R2/D1. Production wiring
  * replaces this with `SheetApiClientV2`; the store and UI are identical either
  * way.

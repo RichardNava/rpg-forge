@@ -10,6 +10,7 @@ import type { DraftAddFieldV2Input } from "./AddFieldDialog";
 import { SheetApiClientV2 } from "../api/sheet-api-client-v2";
 import type { SheetApiClientV2Port } from "../api/sheet-api-client-v2";
 import { createLocalSheetBackendV2 } from "../lib/local-sheet-backend-v2";
+import { resolveSheetBackendMode } from "../lib/sheet-backend-mode";
 import {
   createBlankDraftV2,
   createExampleDraftV2,
@@ -51,12 +52,7 @@ export interface CharacterWorkshopV2Props {
   sessionTokenProvider?: SheetV2SessionTokenProvider;
 }
 
-const BACKEND_MODE = (
-  process.env.NEXT_PUBLIC_CHARACTER_SHEET_BACKEND ??
-  (process.env.NODE_ENV === "test" ? "local" : "remote")
-)
-  .trim()
-  .toLowerCase();
+const BACKEND_MODE = resolveSheetBackendMode();
 const LOCAL_TURNSTILE_BYPASS = "local-turnstile-bypass";
 
 /**
@@ -274,8 +270,8 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
 
   /**
    * Narrow UI guard only: `character_name` must stay a text field so a later
-   * reroll can never draw a numeric name. This does NOT replace the
-   * authoritative domain fix, which remains 4E5 pre-activation work.
+   * reroll can never draw a numeric name. The domain enforces the same rule
+   * authoritatively; this guard only surfaces it early in the editor.
    */
   const handleSetFieldTypeGuarded = useCallback(
     (field: Extract<DraftMutationV2, { op: "set_field_type" }>["field"]) => {
@@ -415,7 +411,7 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
         <CreationModeSelector
           eyebrow="RPG Forge — Character Workshop"
           title="How do you want to create your character?"
-          subtitle="Turn a document or a blank sheet into a character sheet. Everything stays in your browser until you export it; confirming locks the sheet as read-only."
+          subtitle="Turn a document or a blank sheet into a character sheet. Work stays temporary and tied to this session — nothing is saved permanently. Confirming locks the sheet as read-only before you export it."
           choices={LANDING_CHOICES}
           busy={pending}
           error={transientError ?? state.error?.message ?? null}

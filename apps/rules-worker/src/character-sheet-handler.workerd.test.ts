@@ -1,5 +1,9 @@
 import { webCrypto } from "@repo/rules-analysis-session";
-import type { CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
+import {
+  getDraftSnapshotKey,
+  type CharacterSheetDraft,
+  type CharacterSheetDraftV2,
+} from "@repo/character-sheet-draft";
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "./index.js";
@@ -324,5 +328,136 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
       .bind(sessionId, draftId)
       .first();
     expect(head).toBeNull();
+  });
+
+  describe("historical V1 persistence compatibility bridge", () => {
+    function makeHistoricalV1(
+      sessionId: string,
+      draftId: string,
+    ): CharacterSheetDraft {
+      return {
+        schemaVersion: "1",
+        draftId,
+        sessionId,
+        baseVersion: 1,
+        version: 1,
+        mode: "pc",
+        characterName: "Aria Stone",
+        rulesContextId: null,
+        fields: [
+          {
+            key: "character_name",
+            label: "Character Name",
+            type: "text",
+            locked: false,
+          },
+          {
+            key: "strength",
+            label: "Strength",
+            type: "number",
+            min: 1,
+            max: 20,
+            locked: false,
+          },
+        ],
+        values: { character_name: "Aria Stone", strength: 12 },
+        source: { sourceSheetId: "sheet.0001", sourceRunId: null },
+        confirmed: false,
+      };
+    }
+
+    async function readRawR2(key: string): Promise<string | null> {
+      const object = await bucket().get(key);
+      if (object === null) return null;
+      return object.text();
+    }
+
+    it("V1 stored -> V2 HTTP -> V2 next write, V1 history immutable", async () => {
+      const seeded = await seedSheetSession(db);
+      const { sessionId, accessToken } = seeded;
+      const draftId = crypto.randomUUID();
+      const now = Date.now();
+
+      // 2-3. Seed a valid historical V1 snapshot under the existing R2 v1 key
+      // layout and point the D1 head at it.
+      const historical = makeHistoricalV1(sessionId, draftId);
+      const v1Key = getDraftSnapshotKey(sessionId, draftId, 1);
+      const storedV1 = JSON.stringify(historical);
+      await bucket().put(v1Key, storedV1);
+      await db
+        .prepare(
+          "INSERT INTO sheet_draft_heads (session_id, draft_id, current_version, pending_version, pending_claim_id, pending_since, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, NULL, ?, ?)",
+        )
+        .bind(sessionId, draftId, 1, now, now)
+        .run();
+
+      // 5. GET current serves canonical V2.
+      const current = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+        ),
+        { DB: db, SHEET_ARTIFACTS: bucket() },
+      );
+      expect(current.status).toBe(200);
+      const currentBody = (await current.json()) as CharacterSheetDraftV2;
+      expect(currentBody.schemaVersion).toBe("2");
+      expect(currentBody.version).toBe(1);
+      expect(currentBody.draftId).toBe(draftId);
+      expect(currentBody.sessionId).toBe(sessionId);
+      expect(currentBody.characterName).toBe("Aria Stone");
+      expect(currentBody.values["strength"]).toBe(12);
+
+      // 6. GET the exact historical version serves canonical V2.
+      const historicalGet = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}?version=1`,
+          accessToken,
+        ),
+        { DB: db, SHEET_ARTIFACTS: bucket() },
+      );
+      expect(historicalGet.status).toBe(200);
+      const historicalBody =
+        (await historicalGet.json()) as CharacterSheetDraftV2;
+      expect(historicalBody.schemaVersion).toBe("2");
+      expect(historicalBody.version).toBe(1);
+      expect(historicalBody.values["strength"]).toBe(12);
+
+      // 7. Neither GET rewrote the historical bytes.
+      expect(await readRawR2(v1Key)).toBe(storedV1);
+
+      // 8. Mutate through the live V2 PATCH contract.
+      const patch = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+          {
+            method: "PATCH",
+            body: {
+              expectedVersion: 1,
+              mutation: {
+                op: "set_value",
+                key: "strength",
+                value: 15,
+              },
+            },
+          },
+        ),
+        { DB: db, SHEET_ARTIFACTS: bucket() },
+      );
+      expect(patch.status).toBe(200);
+      const mutated = (await patch.json()) as CharacterSheetDraftV2;
+      expect(mutated.schemaVersion).toBe("2");
+      expect(mutated.version).toBe(2);
+      expect(mutated.values["strength"]).toBe(15);
+
+      // 9-10. The historical version is untouched; the new version is V2.
+      expect(await readRawR2(v1Key)).toBe(storedV1);
+      const v2Raw = await readRawR2(getDraftSnapshotKey(sessionId, draftId, 2));
+      expect(v2Raw).not.toBeNull();
+      expect(
+        (JSON.parse(v2Raw!) as { schemaVersion: unknown }).schemaVersion,
+      ).toBe("2");
+    });
   });
 });

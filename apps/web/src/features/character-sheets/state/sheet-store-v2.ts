@@ -23,8 +23,8 @@ export interface SheetStoreV2Options {
 }
 
 /**
- * Framework-independent vanilla store for the parallel V2 authoring surface.
- * It mirrors the proven V1 store lifecycle with two deliberate differences:
+ * Framework-independent vanilla store for the V2 authoring surface. It
+ * follows the established store lifecycle with two deliberate differences:
  * optimistic previews run through `applyDraftMutationV2` (which owns version
  * production, so the store never bumps), and every post-create request carries
  * the `expectedVersion` captured from the locally authoritative snapshot

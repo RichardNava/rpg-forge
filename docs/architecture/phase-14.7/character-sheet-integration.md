@@ -5,6 +5,12 @@ image/style integration in progress). The phase-14.7 slices are proven by
 committed automated suites; 14.7G adds the first product-facing authoring UI
 driven by an in-memory local backend, with the server-wired (Turnstile +
 rules-worker) path remaining a configuration switch.
+**[CURRENT as of 4F: canonical V2 is the sole live runtime (4E5 cutover
+complete, 4E6 V1 cleanup complete). The public Web path defaults to the remote
+Worker runtime with Turnstile verification; explicit
+`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=local` runs the same V2 UI on the
+in-browser backend for dev/test, including the Playwright browser E2E. See
+`docs/features/character-sheets.md` (ACTIVE) for current behavior.]**
 **Date:** 2026-09-26
 
 **Canonical product spec:** `docs/features/character-sheets.md` (ACTIVE)
@@ -76,7 +82,7 @@ Slice summary (labeled by status):
 
 **Current active work (not in original 14.7 slices):**
 
-- Recursive DnD with before/after/inside targets [TARGET — not implemented]
+- Recursive DnD with before/after/inside targets [TARGET — domain before/after/inside live via `place_node`; editor UI supports `inside` reparenting only, before/after UI not implemented]
 - `remove_section` mutation with safe semantics [TARGET — not implemented]
 - Server-authoritative Undo with `expectedVersion` conflict protection [TARGET — not implemented]
 - Character image (upload/URL/AI generation) [TARGET — not implemented]
@@ -562,8 +568,8 @@ Verified suites (all green in the current Phase 14.7E working tree):
 
 ## Deferred work
 
-- **Server-wired Workshop path** — Turnstile verification widget and the
-  production `SheetApiClient` route to rules-worker. The client-side switch
+- **Server-wired Workshop path [IMPLEMENTED — HISTORICAL TEXT BELOW]** — Turnstile verification widget and the
+  production `SheetApiClient` route to rules-worker. **[CURRENT: the remote Workshop path is live and default; Turnstile is wired end to end and remote fails closed without configuration. Explicit local mode (`createLocalSheetBackendV2`) remains for isolated dev/test only, including the 4F Playwright browser E2E.]** The client-side switch
   exists (`NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=remote`), but rules-worker fails
   closed (`403 HUMAN_VERIFICATION_REQUIRED`) without a configured Turnstile
   secret, so development defaults to the in-memory local backend
@@ -680,6 +686,14 @@ Authoring-semantics highlights:
   and reuse the local-only `SHEET_ARTIFACTS` binding.
 
 ## 14.7G delivered slice [COMPLETED]
+
+**[HISTORICAL: this section describes the V1 workshop as delivered in 14.7G
+(`createSheetStore`, `FieldEditor`, `projectDraftToSpec`, `finalizeDraft`).
+CURRENT: the 4E5 cutover replaced it with the V2 runtime
+(`CharacterWorkshopV2Host` → `CharacterWorkshopV2` → `SheetStoreV2` →
+`SheetApiClientV2`, preview/export via `projectDraftV2ToSpec`), and 4E6 removed
+the V1 runtime. The 4F Playwright E2E proves the V2 workshop on the real public
+page. For current behavior see `docs/features/character-sheets.md` (ACTIVE).]**
 
 Delivered in 14.7G:
 
