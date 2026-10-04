@@ -9,7 +9,12 @@ rules-worker) path remaining a configuration switch.
 complete, 4E6 V1 cleanup complete). The public Web path defaults to the remote
 Worker runtime with Turnstile verification; explicit
 `NEXT_PUBLIC_CHARACTER_SHEET_BACKEND=local` runs the same V2 UI on the
-in-browser backend for dev/test, including the Playwright browser E2E. See
+in-browser backend for dev/test, including the Playwright browser E2E.
+CURRENT as of 14.8: drafts additionally carry optional `DraftLayoutV1`
+spatial intent (`structure[]` stays the sole hierarchy/order authority);
+preview renders nested CSS grids directly; `set_container_layout` /
+`set_node_layout` extend `DraftMutationV2`. See
+`docs/architecture/phase-14.8/character-sheet-spatial-authoring.md` and
 `docs/features/character-sheets.md` (ACTIVE) for current behavior.]**
 **Date:** 2026-09-26
 

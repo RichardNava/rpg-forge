@@ -13,6 +13,11 @@ import {
   type DraftPlacement,
   type DraftSectionV2,
 } from "./draft-schema-v2";
+import {
+  DEFAULT_DRAFT_CONTAINER_LAYOUT_V1,
+  DEFAULT_DRAFT_NODE_LAYOUT_V1,
+  type DraftLayoutV1,
+} from "./draft-layout-v1";
 import { nextDraftVersion } from "./versioning";
 
 const SECTION_MUTATION_KEY_SCHEMA = z
@@ -169,6 +174,7 @@ function applyAddSection(
     ...draft,
     sections: [...draft.sections, section],
     structure: [...draft.structure, newPlacement],
+    layout: withAddedSectionLayout(draft.layout, section.key),
   });
 }
 
@@ -192,6 +198,28 @@ function applyRenameSection(
       entry.key === mutation.key ? { ...entry, title: mutation.title } : entry,
     ),
   });
+}
+
+/**
+ * Layout maintenance for add_section: an explicit layout gains the default
+ * node entry plus the default single-column container entry for the new
+ * Section; a layoutless draft stays layoutless (never partial).
+ */
+function withAddedSectionLayout(
+  layout: DraftLayoutV1 | undefined,
+  key: string,
+): DraftLayoutV1 | undefined {
+  if (layout === undefined) {
+    return undefined;
+  }
+  return {
+    ...layout,
+    sections: {
+      ...layout.sections,
+      [key]: { ...DEFAULT_DRAFT_CONTAINER_LAYOUT_V1 },
+    },
+    nodes: { ...layout.nodes, [key]: { ...DEFAULT_DRAFT_NODE_LAYOUT_V1 } },
+  };
 }
 
 function parseSectionDefinition(input: unknown): DraftSectionV2 {

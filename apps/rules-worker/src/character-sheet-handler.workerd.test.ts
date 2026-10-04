@@ -330,6 +330,246 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
     expect(head).toBeNull();
   });
 
+  describe("spatial layout round-trip through the live routes (14.8)", () => {
+    function makeLayoutDraft(
+      sessionId: string,
+      draftId: string,
+    ): CharacterSheetDraftV2 {
+      const base = makeDraft(sessionId, draftId);
+      return {
+        ...base,
+        layout: {
+          schemaVersion: "1",
+          root: { columns: 2 },
+          sections: {},
+          nodes: {
+            character_name: {
+              columnStart: 1,
+              columnSpan: 1,
+              rowSpan: 1,
+              breakBefore: false,
+            },
+            strength: {
+              columnStart: 2,
+              columnSpan: 1,
+              rowSpan: 1,
+              breakBefore: false,
+            },
+            homeland: {
+              columnStart: 1,
+              columnSpan: 1,
+              rowSpan: 1,
+              breakBefore: false,
+            },
+            weapon: {
+              columnStart: 1,
+              columnSpan: 1,
+              rowSpan: 1,
+              breakBefore: false,
+            },
+          },
+        },
+      };
+    }
+
+    async function readRawR2(key: string): Promise<string | null> {
+      const object = await bucket().get(key);
+      if (object === null) return null;
+      return object.text();
+    }
+
+    it("creates with layout, patches container and node layout, confirms", async () => {
+      const seeded = await seedSheetSession(db);
+      const { sessionId, accessToken } = seeded;
+      const draftId = crypto.randomUUID();
+      const withEnv = { DB: db, SHEET_ARTIFACTS: bucket() };
+
+      const create = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts`,
+          accessToken,
+          { method: "POST", body: makeLayoutDraft(sessionId, draftId) },
+        ),
+        withEnv,
+      );
+      expect(create.status).toBe(201);
+      expect(
+        ((await create.json()) as CharacterSheetDraftV2).layout?.root.columns,
+      ).toBe(2);
+
+      const get = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+        ),
+        withEnv,
+      );
+      expect(get.status).toBe(200);
+      expect(
+        ((await get.json()) as CharacterSheetDraftV2).layout?.nodes["strength"],
+      ).toEqual({
+        columnStart: 2,
+        columnSpan: 1,
+        rowSpan: 1,
+        breakBefore: false,
+      });
+
+      const containerPatch = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+          {
+            method: "PATCH",
+            body: {
+              expectedVersion: 1,
+              mutation: {
+                op: "set_container_layout",
+                containerKey: null,
+                columns: 3,
+              },
+            },
+          },
+        ),
+        withEnv,
+      );
+      expect(containerPatch.status).toBe(200);
+      const afterContainer =
+        (await containerPatch.json()) as CharacterSheetDraftV2;
+      expect(afterContainer.version).toBe(2);
+      expect(afterContainer.layout?.root.columns).toBe(3);
+
+      const nodePatch = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+          {
+            method: "PATCH",
+            body: {
+              expectedVersion: 2,
+              mutation: {
+                op: "set_node_layout",
+                key: "homeland",
+                placement: {
+                  columnStart: 1,
+                  columnSpan: 2,
+                  rowSpan: 2,
+                  breakBefore: true,
+                },
+              },
+            },
+          },
+        ),
+        withEnv,
+      );
+      expect(nodePatch.status).toBe(200);
+      const afterNode = (await nodePatch.json()) as CharacterSheetDraftV2;
+      expect(afterNode.version).toBe(3);
+      expect(afterNode.layout?.nodes["homeland"]).toEqual({
+        columnStart: 1,
+        columnSpan: 2,
+        rowSpan: 2,
+        breakBefore: true,
+      });
+
+      const history = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}?version=1`,
+          accessToken,
+        ),
+        withEnv,
+      );
+      expect(history.status).toBe(200);
+      expect(
+        ((await history.json()) as CharacterSheetDraftV2).layout?.root.columns,
+      ).toBe(2);
+
+      const confirm = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}/confirm`,
+          accessToken,
+          { method: "POST", body: { expectedVersion: 3 } },
+        ),
+        withEnv,
+      );
+      expect(confirm.status).toBe(200);
+      const confirmed = (await confirm.json()) as CharacterSheetDraftV2;
+      expect(confirmed.confirmed).toBe(true);
+      expect(confirmed.layout?.nodes["homeland"]).toEqual({
+        columnStart: 1,
+        columnSpan: 2,
+        rowSpan: 2,
+        breakBefore: true,
+      });
+    });
+
+    it("layoutless history gains explicit layout without rewriting history", async () => {
+      const seeded = await seedSheetSession(db);
+      const { sessionId, accessToken } = seeded;
+      const draftId = crypto.randomUUID();
+      const withEnv = { DB: db, SHEET_ARTIFACTS: bucket() };
+
+      const create = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts`,
+          accessToken,
+          { method: "POST", body: makeDraft(sessionId, draftId) },
+        ),
+        withEnv,
+      );
+      expect(create.status).toBe(201);
+      expect(
+        ((await create.json()) as CharacterSheetDraftV2).layout,
+      ).toBeUndefined();
+
+      const v1Key = getDraftSnapshotKey(sessionId, draftId, 1);
+      const storedV1 = await readRawR2(v1Key);
+      expect(storedV1).not.toBeNull();
+
+      const get = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+        ),
+        withEnv,
+      );
+      expect(get.status).toBe(200);
+      expect(
+        ((await get.json()) as CharacterSheetDraftV2).layout,
+      ).toBeUndefined();
+      expect(await readRawR2(v1Key)).toBe(storedV1);
+
+      const patch = await worker.fetch(
+        request(
+          `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
+          accessToken,
+          {
+            method: "PATCH",
+            body: {
+              expectedVersion: 1,
+              mutation: {
+                op: "set_container_layout",
+                containerKey: null,
+                columns: 2,
+              },
+            },
+          },
+        ),
+        withEnv,
+      );
+      expect(patch.status).toBe(200);
+      const mutated = (await patch.json()) as CharacterSheetDraftV2;
+      expect(mutated.version).toBe(2);
+      expect(mutated.layout?.root.columns).toBe(2);
+      expect(Object.keys(mutated.layout?.nodes ?? {}).sort()).toEqual([
+        "character_name",
+        "homeland",
+        "strength",
+        "weapon",
+      ]);
+      expect(await readRawR2(v1Key)).toBe(storedV1);
+    });
+  });
+
   describe("historical V1 persistence compatibility bridge", () => {
     function makeHistoricalV1(
       sessionId: string,

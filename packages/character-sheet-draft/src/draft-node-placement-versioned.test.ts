@@ -612,3 +612,115 @@ describe("draft-node-placement-versioned (2B1)", () => {
     });
   });
 });
+
+describe("place_node layout geometry preservation (14.8)", () => {
+  function makeLayoutDraft(): CharacterSheetDraftV2 {
+    return {
+      schemaVersion: "2" as const,
+      draftId: "draft.place-layout",
+      sessionId: "session.place-layout",
+      baseVersion: 1,
+      version: 1,
+      mode: "pc" as const,
+      characterName: "Test",
+      rulesContextId: null,
+      fields: [
+        {
+          key: "character_name",
+          label: "Name",
+          type: "text" as const,
+          locked: false,
+        },
+        { key: "A", label: "A", type: "text" as const, locked: false },
+      ],
+      sections: [
+        { key: "wide", title: "Wide" },
+        { key: "narrow", title: "Narrow" },
+      ],
+      structure: [
+        { kind: "field" as const, key: "character_name", parentKey: null },
+        { kind: "section" as const, key: "wide", parentKey: null },
+        { kind: "section" as const, key: "narrow", parentKey: null },
+        { kind: "field" as const, key: "A", parentKey: null },
+      ],
+      values: { character_name: "Test", A: "A" },
+      source: { sourceSheetId: null, sourceRunId: null },
+      confirmed: false,
+      layout: {
+        schemaVersion: "1",
+        root: { columns: 2 },
+        sections: { wide: { columns: 2 }, narrow: { columns: 1 } },
+        nodes: {
+          character_name: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+          wide: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+          narrow: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+          A: { columnStart: 2, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        },
+      },
+    };
+  }
+
+  function draftErrorCodeOf(fn: () => unknown): string {
+    try {
+      fn();
+    } catch (error) {
+      return (error as DraftError).code;
+    }
+    return "none";
+  }
+
+  it("preserves valid geometry when moving within fitting containers", () => {
+    const draft = makeLayoutDraft();
+    // A sits at column 2 of the 2-column Root; moving it inside the 2-column
+    // wide section keeps its geometry valid.
+    const result = applyDraftNodePlacementV2(draft, "A", {
+      position: "inside",
+      parentKey: "wide",
+    });
+    expect(result).not.toBe(draft);
+    expect(result.layout?.nodes["A"]).toEqual(draft.layout?.nodes["A"]);
+    expect(() => validateDraftV2(result)).not.toThrow();
+  });
+
+  it("rejects a move whose preserved geometry no longer fits", () => {
+    const draft = makeLayoutDraft();
+    // A sits at column 2; the narrow section has a single column, so the
+    // preserved geometry cannot fit and the move must reject, never clamp.
+    expect(
+      draftErrorCodeOf(() =>
+        applyDraftNodePlacementV2(draft, "A", {
+          position: "inside",
+          parentKey: "narrow",
+        }),
+      ),
+    ).toBe("invalid_mutation");
+  });
+
+  it("moves freely when the draft is layoutless", () => {
+    const draft = makeLayoutDraft();
+    const { layout: _layout, ...layoutless } = draft;
+    const result = applyDraftNodePlacementV2(layoutless, "A", {
+      position: "inside",
+      parentKey: "narrow",
+    });
+    expect(result.layout).toBeUndefined();
+    expect(result.structure.find((entry) => entry.key === "A")?.parentKey).toBe(
+      "narrow",
+    );
+  });
+});

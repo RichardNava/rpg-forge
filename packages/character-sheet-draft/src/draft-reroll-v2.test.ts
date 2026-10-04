@@ -5,6 +5,7 @@ import {
 } from "./draft-reroll-v2";
 import { validateDraftV2, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { bumpDraftVersionV2 } from "./draft-versioning-v2";
+import { defaultDraftLayoutV1 } from "./draft-layout-v1";
 import type { DraftField } from "./draft-schema";
 import { DraftError } from "./errors";
 
@@ -892,5 +893,14 @@ describe("rerollLockedDraftValuesV2 — 4B1 integration", () => {
     const rerolled = rerollLockedDraftValuesV2(input, "integration-seed");
     expect(rerolled.draft.baseVersion).toBe(5);
     expect(bumpDraftVersionV2(input).baseVersion).toBe(5);
+  });
+});
+
+describe("reroll preserves explicit layout exactly (14.8)", () => {
+  it("carries the layout reference through unchanged", () => {
+    const base = makeRerollDraft();
+    const input = { ...base, layout: defaultDraftLayoutV1(base) };
+    const rerolled = rerollLockedDraftValuesV2(input, "layout-seed");
+    expect(rerolled.draft.layout).toBe(input.layout);
   });
 });

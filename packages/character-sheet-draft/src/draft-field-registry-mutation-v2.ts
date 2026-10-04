@@ -16,6 +16,10 @@ import {
   type CharacterSheetDraftV2,
   type DraftPlacement,
 } from "./draft-schema-v2";
+import {
+  DEFAULT_DRAFT_NODE_LAYOUT_V1,
+  type DraftLayoutV1,
+} from "./draft-layout-v1";
 import { nextDraftVersion } from "./versioning";
 
 const REGISTRY_MUTATION_KEY_SCHEMA = z
@@ -194,6 +198,7 @@ function applyAddField(
     ...draft,
     fields: [...draft.fields, field],
     structure: [...draft.structure, newPlacement],
+    layout: withAddedNodeLayout(draft.layout, field.key),
   });
 }
 
@@ -222,6 +227,12 @@ function applyRemoveField(
   }
   const characterName =
     field.key === "character_name" ? null : draft.characterName;
+  const layout = draft.layout === undefined ? undefined : { ...draft.layout };
+  if (layout !== undefined) {
+    const nodes = { ...layout.nodes };
+    delete nodes[field.key];
+    layout.nodes = nodes;
+  }
   return commitV2(draft, {
     ...draft,
     fields: draft.fields.filter((entry) => entry.key !== field.key),
@@ -231,7 +242,26 @@ function applyRemoveField(
     ),
     values,
     characterName,
+    layout,
   });
+}
+
+/**
+ * Layout maintenance for add_field: an explicit layout gains the default node
+ * entry for the new Field; a layoutless draft stays layoutless (never
+ * partial).
+ */
+function withAddedNodeLayout(
+  layout: DraftLayoutV1 | undefined,
+  key: string,
+): DraftLayoutV1 | undefined {
+  if (layout === undefined) {
+    return undefined;
+  }
+  return {
+    ...layout,
+    nodes: { ...layout.nodes, [key]: { ...DEFAULT_DRAFT_NODE_LAYOUT_V1 } },
+  };
 }
 
 function parseFieldDefinition(input: unknown): DraftField {

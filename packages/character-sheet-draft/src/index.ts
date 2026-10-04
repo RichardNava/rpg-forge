@@ -64,6 +64,45 @@ export {
 export type { DraftMutationV2 } from "./draft-mutation-v2";
 export { initialDraftVersionV2 } from "./draft-versioning-v2";
 export type { InitialCharacterSheetDraftV2 } from "./draft-versioning-v2";
+
+/**
+ * 14.8 spatial layout boundary.
+ *
+ * `DraftLayoutV1` is the independently-versioned spatial contract carried by
+ * the optional `draft.layout` field (`layout.schemaVersion === "1"` while the
+ * draft stays `schemaVersion === "2"`). Only the contract, the effective
+ * defaults resolver, and the spatial mutation family are public — layout
+ * validation internals stay behind `validateDraftV2` and the mutation gates.
+ */
+export {
+  DRAFT_LAYOUT_V1_VERSION,
+  DRAFT_LAYOUT_MIN_COLUMNS,
+  DRAFT_LAYOUT_MAX_COLUMNS,
+  DRAFT_LAYOUT_MIN_ROW_SPAN,
+  DRAFT_LAYOUT_MAX_ROW_SPAN,
+  DEFAULT_DRAFT_CONTAINER_LAYOUT_V1,
+  DEFAULT_DRAFT_NODE_LAYOUT_V1,
+  DraftLayoutContainerV1Schema,
+  DraftLayoutNodeV1Schema,
+  DraftLayoutV1Schema,
+  defaultDraftLayoutV1,
+  resolveEffectiveDraftLayoutV1,
+} from "./draft-layout-v1";
+export type {
+  DraftLayoutContainerV1,
+  DraftLayoutNodeV1,
+  DraftLayoutV1,
+} from "./draft-layout-v1";
+export {
+  DraftLayoutMutationV2Schema,
+  parseDraftLayoutMutationV2,
+  applyDraftLayoutMutationWithExpectedVersionV2,
+} from "./draft-layout-mutation-v2";
+export type {
+  DraftLayoutMutationV2,
+  DraftSetContainerLayoutMutationV2,
+  DraftSetNodeLayoutMutationV2,
+} from "./draft-layout-mutation-v2";
 export { rerollLockedDraftValuesV2 } from "./draft-reroll-v2";
 export type { DraftRerollResultV2 } from "./draft-reroll-v2";
 export { finalizeDraftV2 } from "./draft-finalize-v2";

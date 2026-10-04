@@ -54,6 +54,8 @@ describe("WorkshopSidebarV2", () => {
       onSetFieldType: vi.fn(),
       onRenameSection: vi.fn(),
       onPlaceNode: vi.fn(),
+      onSetContainerLayout: vi.fn(),
+      onSetNodeLayout: vi.fn(),
       onAddField: vi.fn(),
     };
   }
@@ -146,5 +148,76 @@ describe("WorkshopSidebarV2", () => {
       position: "inside",
       parentKey: "attributes",
     });
+  });
+
+  it("dispatches root columns through set_container_layout", () => {
+    const cb = callbacks();
+    const { container } = render(
+      <WorkshopSidebarV2 draft={makeDraft()} disabled={false} callbacks={cb} />,
+    );
+    const select = container.querySelector(
+      'select[aria-label="Sheet columns"]',
+    ) as unknown as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    fireEvent.change(select, { target: { value: "3" } });
+    expect(cb.onSetContainerLayout).toHaveBeenCalledWith(null, 3);
+  });
+
+  it("dispatches section columns and node geometry", () => {
+    const cb = callbacks();
+    const { container } = render(
+      <WorkshopSidebarV2 draft={makeDraft()} disabled={false} callbacks={cb} />,
+    );
+    const columns = container.querySelector(
+      'select[aria-label="Columns for Physical"]',
+    ) as unknown as HTMLSelectElement;
+    expect(columns).toBeTruthy();
+    fireEvent.change(columns, { target: { value: "2" } });
+    expect(cb.onSetContainerLayout).toHaveBeenCalledWith("physical", 2);
+
+    const span = container.querySelector(
+      'input[aria-label="Column span for Physical"]',
+    ) as unknown as HTMLInputElement;
+    fireEvent.change(span, { target: { value: "2" } });
+    expect(cb.onSetNodeLayout).toHaveBeenCalledWith("physical", {
+      columnStart: 1,
+      columnSpan: 2,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+  });
+
+  it("dispatches field node geometry", () => {
+    const cb = callbacks();
+    const { container } = render(
+      <WorkshopSidebarV2 draft={makeDraft()} disabled={false} callbacks={cb} />,
+    );
+    const start = container.querySelector(
+      'input[aria-label="Column start for strength"]',
+    ) as unknown as HTMLInputElement;
+    expect(start).toBeTruthy();
+    fireEvent.change(start, { target: { value: "2" } });
+    expect(cb.onSetNodeLayout).toHaveBeenCalledWith("strength", {
+      columnStart: 2,
+      columnSpan: 1,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+  });
+
+  it("hides layout controls for a confirmed draft", () => {
+    const cb = callbacks();
+    const { container } = render(
+      <WorkshopSidebarV2 draft={makeDraft()} disabled={true} callbacks={cb} />,
+    );
+    expect(
+      container.querySelector('select[aria-label="Sheet columns"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('select[aria-label="Columns for Physical"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('input[aria-label="Column span for strength"]'),
+    ).toBeNull();
   });
 });

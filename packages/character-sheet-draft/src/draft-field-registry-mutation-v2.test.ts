@@ -1167,3 +1167,90 @@ describe("draft-field-registry-mutation-v2 structural invariants", () => {
     expect(() => validateDraftV2(result)).not.toThrow();
   });
 });
+
+describe("field registry layout maintenance (14.8)", () => {
+  function makeExplicitDraft(): CharacterSheetDraftV2 {
+    return {
+      schemaVersion: "2",
+      draftId: "draft.layout-fields",
+      sessionId: "session.layout-fields",
+      baseVersion: 1,
+      version: 4,
+      mode: "pc",
+      characterName: null,
+      rulesContextId: null,
+      fields: [
+        { key: "alpha", label: "Alpha", type: "text", locked: false },
+        { key: "beta", label: "Beta", type: "text", locked: false },
+      ],
+      sections: [],
+      structure: [
+        { kind: "field", key: "alpha", parentKey: null },
+        { kind: "field", key: "beta", parentKey: null },
+      ],
+      values: {},
+      source: { sourceSheetId: null, sourceRunId: null },
+      confirmed: false,
+      layout: {
+        schemaVersion: "1",
+        root: { columns: 2 },
+        sections: {},
+        nodes: {
+          alpha: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+          beta: {
+            columnStart: 2,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+        },
+      },
+    };
+  }
+
+  it("add_field adds the default node layout to an explicit layout", () => {
+    const draft = makeExplicitDraft();
+    const result = apply(draft, {
+      op: "add_field",
+      field: { key: "gamma", label: "Gamma", type: "text", locked: false },
+    });
+    expect(result.layout?.nodes["gamma"]).toEqual({
+      columnStart: 1,
+      columnSpan: 1,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+    expect(result.layout?.nodes["alpha"]).toEqual(draft.layout?.nodes["alpha"]);
+    expect(() => validateDraftV2(result)).not.toThrow();
+  });
+
+  it("add_field keeps a layoutless draft layoutless", () => {
+    const draft = makeSingleFieldDraft();
+    const result = apply(draft, {
+      op: "add_field",
+      field: { key: "second", label: "Second", type: "text", locked: false },
+    });
+    expect(result.layout).toBeUndefined();
+  });
+
+  it("remove_field deletes the node layout entry", () => {
+    const draft = makeExplicitDraft();
+    const result = apply(draft, { op: "remove_field", key: "beta" });
+    expect(result.layout?.nodes["beta"]).toBeUndefined();
+    expect(result.layout?.nodes["alpha"]).toEqual(draft.layout?.nodes["alpha"]);
+    expect(Object.keys(result.layout?.nodes ?? {}).sort()).toEqual(["alpha"]);
+    expect(() => validateDraftV2(result)).not.toThrow();
+  });
+
+  it("remove_field keeps a layoutless draft layoutless", () => {
+    const draft = makeExplicitDraft();
+    const { layout: _layout, ...layoutless } = draft;
+    const result = apply(layoutless, { op: "remove_field", key: "beta" });
+    expect(result.layout).toBeUndefined();
+  });
+});

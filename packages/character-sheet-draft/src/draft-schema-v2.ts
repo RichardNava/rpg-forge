@@ -23,6 +23,10 @@ import {
   DraftSourceSchema,
   type DraftSource,
 } from "./draft-schema";
+import {
+  DraftLayoutV1Schema,
+  assertDraftLayoutComplete,
+} from "./draft-layout-v1";
 
 export const CHARACTER_SHEET_DRAFT_V2_VERSION = "2" as const;
 
@@ -96,6 +100,13 @@ export const CharacterSheetDraftV2Schema = z
       }),
     source: DraftSourceSchema,
     confirmed: z.boolean().default(false),
+    /**
+     * Optional independently-versioned spatial layout (14.8). Absent on all
+     * historical snapshots; when present it must be COMPLETE for the current
+     * structure (checked below). `strictObject` plus `.optional()` keeps
+     * layoutless V2 valid with no cutover.
+     */
+    layout: DraftLayoutV1Schema.optional(),
   })
   .superRefine((draft, context) => {
     const fieldKeys = new Set(draft.fields.map((f) => f.key));
@@ -243,6 +254,20 @@ export const CharacterSheetDraftV2Schema = z
         code: z.ZodIssueCode.custom,
         message: "characterName must mirror the character_name value.",
       });
+    }
+
+    if (draft.layout !== undefined) {
+      try {
+        assertDraftLayoutComplete(draft, draft.layout);
+      } catch (error) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            error instanceof Error
+              ? `Invalid draft layout: ${error.message}`
+              : "Invalid draft layout.",
+        });
+      }
     }
   });
 export type CharacterSheetDraftV2 = z.infer<typeof CharacterSheetDraftV2Schema>;

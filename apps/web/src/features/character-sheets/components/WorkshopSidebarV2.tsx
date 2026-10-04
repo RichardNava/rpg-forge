@@ -13,8 +13,10 @@ import {
 } from "@dnd-kit/core";
 import {
   buildDraftStructuralReadModelV2,
+  DEFAULT_DRAFT_NODE_LAYOUT_V1,
   type CharacterSheetDraftV2,
   type DraftField,
+  type DraftLayoutNodeV1,
   type DraftMutationV2,
   type DraftReadNodeV2,
   type DraftValue,
@@ -33,6 +35,8 @@ export interface WorkshopSidebarV2Callbacks {
     key: string,
     destination: Extract<DraftMutationV2, { op: "place_node" }>["destination"],
   ): void;
+  onSetContainerLayout(containerKey: string | null, columns: number): void;
+  onSetNodeLayout(key: string, placement: DraftLayoutNodeV1): void;
   onAddField(): void;
   onOpenAddSection?(): void;
 }
@@ -77,6 +81,27 @@ export function WorkshopSidebarV2({
           <h2 className="character-workshop__panel-title">Sheet fields</h2>
           <p>{draft.fields.length} of 192 fields</p>
         </div>
+        {!disabled && (
+          <label className="character-workshop__editor-columns">
+            <span>Sheet columns</span>
+            <select
+              aria-label="Sheet columns"
+              value={draft.layout?.root.columns ?? 1}
+              onChange={(event) =>
+                callbacks.onSetContainerLayout(
+                  null,
+                  Number(event.currentTarget.value),
+                )
+              }
+            >
+              {[1, 2, 3, 4].map((columns) => (
+                <option key={columns} value={columns}>
+                  {columns}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {!disabled && callbacks.onOpenAddSection !== undefined && (
           <div className="character-workshop__editor-actions">
             <button
@@ -169,6 +194,94 @@ function GroupedNodes({
         )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+/**
+ * Durable numeric layout controls (14.8 spatial foundation, not throwaway
+ * UI): precise numeric editing that stays useful as an accessibility fallback
+ * after Phase 14.9 adds direct Canvas manipulation. Every change dispatches
+ * through the authoritative store/domain mutation path; there is no
+ * local-only geometry state.
+ */
+function NodeLayoutControls({
+  nameFor,
+  geometry,
+  onChange,
+}: {
+  /** Stable accessible name basis (section title or field key). */
+  nameFor: string;
+  geometry: DraftLayoutNodeV1;
+  onChange(placement: DraftLayoutNodeV1): void;
+}) {
+  function commitNumber(
+    field: "columnStart" | "columnSpan" | "rowSpan",
+    raw: string,
+    min: number,
+    max: number,
+  ) {
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+      return;
+    }
+    if (parsed === geometry[field]) {
+      return;
+    }
+    onChange({ ...geometry, [field]: parsed });
+  }
+  return (
+    <>
+      <label className="character-workshop__form-field">
+        <span>Column start</span>
+        <input
+          type="number"
+          aria-label={`Column start for ${nameFor}`}
+          min={1}
+          max={4}
+          value={geometry.columnStart}
+          onChange={(event) =>
+            commitNumber("columnStart", event.currentTarget.value, 1, 4)
+          }
+        />
+      </label>
+      <label className="character-workshop__form-field">
+        <span>Column span</span>
+        <input
+          type="number"
+          aria-label={`Column span for ${nameFor}`}
+          min={1}
+          max={4}
+          value={geometry.columnSpan}
+          onChange={(event) =>
+            commitNumber("columnSpan", event.currentTarget.value, 1, 4)
+          }
+        />
+      </label>
+      <label className="character-workshop__form-field">
+        <span>Row span</span>
+        <input
+          type="number"
+          aria-label={`Row span for ${nameFor}`}
+          min={1}
+          max={12}
+          value={geometry.rowSpan}
+          onChange={(event) =>
+            commitNumber("rowSpan", event.currentTarget.value, 1, 12)
+          }
+        />
+      </label>
+      <label className="character-workshop__form-field">
+        <span>Break before</span>
+        <input
+          type="checkbox"
+          aria-label={`Break before for ${nameFor}`}
+          checked={geometry.breakBefore}
+          onChange={(event) =>
+            onChange({ ...geometry, breakBefore: event.currentTarget.checked })
+          }
+        />
+      </label>
+    </>
   );
 }
 
@@ -372,6 +485,36 @@ function SectionEditorV2({
                     ))}
                 </select>
               </label>
+              <label className="character-workshop__form-field">
+                <span>Columns</span>
+                <select
+                  aria-label={`Columns for ${node.section.title}`}
+                  value={draft.layout?.sections[node.key]?.columns ?? 1}
+                  onChange={(event) =>
+                    callbacks.onSetContainerLayout(
+                      node.key,
+                      Number(event.currentTarget.value),
+                    )
+                  }
+                >
+                  {[1, 2, 3, 4].map((columns) => (
+                    <option key={columns} value={columns}>
+                      {columns}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <NodeLayoutControls
+                nameFor={node.section.title}
+                geometry={
+                  draft.layout?.nodes[node.key] ?? {
+                    ...DEFAULT_DRAFT_NODE_LAYOUT_V1,
+                  }
+                }
+                onChange={(placement) =>
+                  callbacks.onSetNodeLayout(node.key, placement)
+                }
+              />
             </div>
           </details>
         )}
@@ -488,6 +631,17 @@ function FieldCardV2({
             value={label}
             onChange={(event) => setLabel(event.currentTarget.value)}
             onBlur={commitLabel}
+          />
+          <NodeLayoutControls
+            nameFor={field.key}
+            geometry={
+              draft.layout?.nodes[field.key] ?? {
+                ...DEFAULT_DRAFT_NODE_LAYOUT_V1,
+              }
+            }
+            onChange={(placement) =>
+              callbacks.onSetNodeLayout(field.key, placement)
+            }
           />
           <button
             type="button"

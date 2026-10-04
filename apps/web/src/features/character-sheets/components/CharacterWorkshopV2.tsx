@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import type {
   CharacterSheetDraftV2,
+  DraftLayoutNodeV1,
   DraftMutationV2,
   DraftValue,
 } from "@repo/character-sheet-draft";
@@ -340,6 +341,20 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     [applyMutation],
   );
 
+  const handleSetContainerLayout = useCallback(
+    (containerKey: string | null, columns: number) => {
+      void applyMutation({ op: "set_container_layout", containerKey, columns });
+    },
+    [applyMutation],
+  );
+
+  const handleSetNodeLayout = useCallback(
+    (key: string, placement: DraftLayoutNodeV1) => {
+      void applyMutation({ op: "set_node_layout", key, placement });
+    },
+    [applyMutation],
+  );
+
   const handleAddField = useCallback(
     async (field: DraftAddFieldV2Input): Promise<string | null> => {
       const outcome = await store.applyMutation({ op: "add_field", field });
@@ -464,6 +479,8 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
               onSetFieldType: handleSetFieldTypeGuarded,
               onRenameSection: handleRenameSection,
               onPlaceNode: handlePlaceNode,
+              onSetContainerLayout: handleSetContainerLayout,
+              onSetNodeLayout: handleSetNodeLayout,
               onAddField: () => setModal("add-field"),
               onOpenAddSection: () => setModal("add-section"),
             }}

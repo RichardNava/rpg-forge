@@ -310,6 +310,37 @@ describe("geometry and pages", () => {
       )[0]?.pageIndex,
     ).toBe(2);
   });
+
+  it("honors spec column placement: column 2 starts right of column 1", async () => {
+    // The abilities section is a 2-column grid in the base fixture. Placing
+    // dexterity at columnStart 2 must render its widget right of strength.
+    const base = buildBaseSpec();
+    const spec = CharacterSheetSpecSchema.parse({
+      ...base,
+      fields: base.fields.map((field) =>
+        field.id === "dexterity"
+          ? {
+              ...field,
+              placement: { ...field.placement, columnStart: 2 },
+            }
+          : field,
+      ),
+    } as unknown as CharacterSheetSpec);
+    const { bytes } = await renderCharacterSheetPdf({ spec });
+    const { form } = await loadForm(bytes);
+
+    const left = form
+      .getTextField("rpgforge.strength")
+      .acroField.getWidgets()[0]
+      ?.getRectangle();
+    const right = form
+      .getTextField("rpgforge.dexterity")
+      .acroField.getWidgets()[0]
+      ?.getRectangle();
+    expect(left).toBeDefined();
+    expect(right).toBeDefined();
+    expect(right!.x).toBeGreaterThan(left!.x);
+  });
 });
 
 describe("determinism", () => {

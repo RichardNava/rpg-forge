@@ -296,3 +296,165 @@ describe("createSheetStoreV2", () => {
     expect(state.accessToken).toBeNull();
   });
 });
+
+describe("createSheetStoreV2 spatial layout mutations (14.8)", () => {
+  function makeLayoutDraft(
+    overrides: Partial<CharacterSheetDraftV2> = {},
+  ): CharacterSheetDraftV2 {
+    return makeDraftV2({
+      layout: {
+        schemaVersion: "1",
+        root: { columns: 2 },
+        sections: {},
+        nodes: {
+          character_name: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+          strength: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+          veteran: {
+            columnStart: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+            breakBefore: false,
+          },
+        },
+      },
+      ...overrides,
+    });
+  }
+
+  it("Q. optimistic set_container_layout previews before commit", async () => {
+    let resolveMutate!: (draft: CharacterSheetDraftV2) => void;
+    const mutateDraft = vi.fn(
+      () =>
+        new Promise<CharacterSheetDraftV2>((resolve) => {
+          resolveMutate = resolve;
+        }),
+    );
+    const { store } = await readyStore({ mutateDraft }, makeLayoutDraft());
+    const outcome = store.applyMutation({
+      op: "set_container_layout",
+      containerKey: null,
+      columns: 3,
+    });
+    expect(store.getState().draft?.layout?.root.columns).toBe(3);
+    expect(store.getState().saveStatus).toBe("saving");
+    resolveMutate(makeLayoutDraft({ version: 4, layout: undefined }));
+    await outcome;
+    expect(store.getState().draft?.version).toBe(4);
+  });
+
+  it("R. optimistic set_node_layout previews geometry before commit", async () => {
+    let resolveMutate!: (draft: CharacterSheetDraftV2) => void;
+    const mutateDraft = vi.fn(
+      () =>
+        new Promise<CharacterSheetDraftV2>((resolve) => {
+          resolveMutate = resolve;
+        }),
+    );
+    const { store } = await readyStore({ mutateDraft }, makeLayoutDraft());
+    const outcome = store.applyMutation({
+      op: "set_node_layout",
+      key: "strength",
+      placement: {
+        columnStart: 2,
+        columnSpan: 1,
+        rowSpan: 2,
+        breakBefore: true,
+      },
+    });
+    expect(store.getState().draft?.layout?.nodes["strength"]).toEqual({
+      columnStart: 2,
+      columnSpan: 1,
+      rowSpan: 2,
+      breakBefore: true,
+    });
+    resolveMutate(makeLayoutDraft({ version: 4 }));
+    await outcome;
+  });
+
+  it("S. spatial semantic no-op keeps the local version", async () => {
+    const mutateDraft = vi.fn(async () => makeLayoutDraft());
+    const { store } = await readyStore({ mutateDraft }, makeLayoutDraft());
+    const outcome = await store.applyMutation({
+      op: "set_container_layout",
+      containerKey: null,
+      columns: 2,
+    });
+    expect(outcome.kind).toBe("ok");
+    expect(store.getState().draft?.version).toBe(3);
+  });
+
+  it("T. server rejection surfaces as a rejected outcome", async () => {
+    const { store } = await readyStore(undefined, makeLayoutDraft());
+    const outcome = await store.applyMutation({
+      op: "set_node_layout",
+      key: "ghost",
+      placement: {
+        columnStart: 1,
+        columnSpan: 1,
+        rowSpan: 1,
+        breakBefore: false,
+      },
+    });
+    expect(outcome.kind).toBe("rejected");
+  });
+
+  it("U. confirmed draft rejects spatial mutations", async () => {
+    const { store } = await readyStore(
+      undefined,
+      makeLayoutDraft({ confirmed: true }),
+    );
+    const outcome = await store.applyMutation({
+      op: "set_container_layout",
+      containerKey: null,
+      columns: 3,
+    });
+    expect(outcome.kind).toBe("rejected");
+    if (outcome.kind !== "rejected") throw new Error("unreachable");
+    expect(outcome.code).toBe("draft_confirmed");
+  });
+
+  it("V. layoutless draft materializes defaults through the normal path", async () => {
+    let seen: unknown;
+    const mutateDraft = vi.fn(
+      async (_s: string, _t: string, _d: string, request: unknown) => {
+        seen = request;
+        return makeDraftV2({ version: 4 });
+      },
+    );
+    const { store } = await readyStore({ mutateDraft });
+    const outcome = await store.applyMutation({
+      op: "set_node_layout",
+      key: "strength",
+      placement: {
+        columnStart: 1,
+        columnSpan: 1,
+        rowSpan: 2,
+        breakBefore: false,
+      },
+    });
+    expect(outcome.kind).toBe("ok");
+    expect(seen).toEqual({
+      expectedVersion: 3,
+      mutation: {
+        op: "set_node_layout",
+        key: "strength",
+        placement: {
+          columnStart: 1,
+          columnSpan: 1,
+          rowSpan: 2,
+          breakBefore: false,
+        },
+      },
+    });
+  });
+});

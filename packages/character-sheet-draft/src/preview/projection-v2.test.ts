@@ -1265,3 +1265,101 @@ describe("projection-v2 BLOCK O scope guarantees", () => {
     expectSchemaAndDomainValid(spec);
   });
 });
+
+describe("projection-v2 spatial fidelity (14.8)", () => {
+  function makeSpatialDraft(): CharacterSheetDraftV2 {
+    return makeDraft({
+      fields: [
+        textField("a"),
+        { key: "n", label: "n", type: "number", locked: false },
+        textField("b"),
+      ],
+      sections: [{ key: "s", title: "Stats" }],
+      structure: [
+        { kind: "field", key: "a", parentKey: null },
+        { kind: "section", key: "s", parentKey: null },
+        { kind: "field", key: "n", parentKey: "s" },
+        { kind: "field", key: "b", parentKey: null },
+      ],
+    });
+  }
+
+  function withLayout(
+    draft: CharacterSheetDraftV2,
+    layout: CharacterSheetDraftV2["layout"],
+  ): CharacterSheetDraftV2 {
+    return { ...draft, layout };
+  }
+
+  it("projects field geometry and context columns from the effective layout", () => {
+    const spec = projectDraftV2ToSpec(
+      withLayout(makeSpatialDraft(), {
+        schemaVersion: "1",
+        root: { columns: 2 },
+        sections: { s: { columns: 2 } },
+        nodes: {
+          a: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          s: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          n: { columnStart: 2, columnSpan: 1, rowSpan: 2, breakBefore: true },
+          b: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        },
+      }),
+    );
+    const byId = new Map(spec.fields.map((field) => [field.id, field]));
+    expect(byId.get("n")?.placement).toMatchObject({
+      columnStart: 2,
+      columnSpan: 1,
+      rowSpan: 2,
+      breakBefore: true,
+    });
+    expect(byId.get("a")?.placement).toMatchObject({
+      columnStart: 1,
+      columnSpan: 1,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+    // Root-context flat sections carry Root columns; the section-context
+    // section carries the section container columns.
+    const rootSection = spec.sections.find((section) =>
+      section.fieldIds.includes("a"),
+    );
+    const nestedSection = spec.sections.find((section) =>
+      section.fieldIds.includes("n"),
+    );
+    expect(rootSection?.layout.columns).toBe(2);
+    expect(nestedSection?.layout.columns).toBe(2);
+    expectSchemaAndDomainValid(spec);
+  });
+
+  it("projects defaults for a layoutless draft exactly as before", () => {
+    const spec = projectDraftV2ToSpec(makeSpatialDraft());
+    const byId = new Map(spec.fields.map((field) => [field.id, field]));
+    expect(byId.get("n")?.placement).toMatchObject({
+      columnStart: 1,
+      columnSpan: 1,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+    for (const section of spec.sections) {
+      expect(section.layout.columns).toBe(1);
+    }
+  });
+
+  it("fails closed on non-default Section-node geometry", () => {
+    const base = makeSpatialDraft();
+    const layout: NonNullable<CharacterSheetDraftV2["layout"]> = {
+      schemaVersion: "1",
+      root: { columns: 2 },
+      sections: { s: { columns: 2 } },
+      nodes: {
+        a: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        s: { columnStart: 1, columnSpan: 2, rowSpan: 1, breakBefore: false },
+        n: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        b: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+      },
+    };
+    expect(
+      errorCodeOf(() => projectDraftV2ToSpec(withLayout(base, layout))),
+    ).toBe("projection_invalid");
+  });
+});

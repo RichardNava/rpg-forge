@@ -5,7 +5,7 @@
  *
  * Responsibilities:
  * - Open current state via the 4E3B1 barrier (expectedVersion + pending check)
- * - Delegate to applyDraftMutationV2 for all 11 mutation operations
+ * - Delegate to applyDraftMutationV2 for all 13 mutation operations
  * - Handle semantic no-op by returning current without persistence
  * - Persist real mutations (N -> N+1) via persistNextDraftV2
  * - Propagate DraftError unchanged (version_conflict, draft_confirmed, etc.)

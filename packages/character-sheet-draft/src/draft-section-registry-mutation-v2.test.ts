@@ -99,6 +99,37 @@ function makeConfirmedRichContentDraft(): CharacterSheetDraftV2 {
   return validateDraftV2({ ...draft, confirmed: true });
 }
 
+function makeExplicitLayoutDraft(): CharacterSheetDraftV2 {
+  return {
+    schemaVersion: "2",
+    draftId: "draft.layout-sections",
+    sessionId: "session.layout-sections",
+    baseVersion: 1,
+    version: 4,
+    mode: "pc",
+    characterName: null,
+    rulesContextId: null,
+    fields: [{ key: "only", label: "Only", type: "text", locked: false }],
+    sections: [{ key: "core", title: "Core" }],
+    structure: [
+      { kind: "section", key: "core", parentKey: null },
+      { kind: "field", key: "only", parentKey: "core" },
+    ],
+    values: {},
+    source: { sourceSheetId: null, sourceRunId: null },
+    confirmed: false,
+    layout: {
+      schemaVersion: "1",
+      root: { columns: 2 },
+      sections: { core: { columns: 2 } },
+      nodes: {
+        core: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        only: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+      },
+    },
+  };
+}
+
 function makeMaxSectionsDraft(): CharacterSheetDraftV2 {
   const sections = Array.from({ length: MAX_DRAFT_SECTIONS }, (_, index) => ({
     key: `sec_${index}`,
@@ -1106,5 +1137,44 @@ describe("draft-section-registry-mutation-v2 structural guarantees", () => {
           placement.parentKey === "core" || placement.key === "core",
       ),
     ).toEqual(subtree);
+  });
+});
+
+describe("section registry layout maintenance (14.8)", () => {
+  it("add_section adds default node and container entries", () => {
+    const draft = makeExplicitLayoutDraft();
+    const result = apply(draft, {
+      op: "add_section",
+      section: { key: "extra", title: "Extra" },
+    });
+    expect(result.layout?.nodes["extra"]).toEqual({
+      columnStart: 1,
+      columnSpan: 1,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+    expect(result.layout?.sections["extra"]).toEqual({ columns: 1 });
+    expect(result.layout?.sections["core"]).toEqual({ columns: 2 });
+    expect(() => validateDraftV2(result)).not.toThrow();
+  });
+
+  it("add_section keeps a layoutless draft layoutless", () => {
+    const draft = makeExplicitLayoutDraft();
+    const { layout: _layout, ...layoutless } = draft;
+    const result = apply(layoutless, {
+      op: "add_section",
+      section: { key: "extra", title: "Extra" },
+    });
+    expect(result.layout).toBeUndefined();
+  });
+
+  it("rename_section leaves layout unchanged", () => {
+    const draft = makeExplicitLayoutDraft();
+    const result = apply(draft, {
+      op: "rename_section",
+      key: "core",
+      title: "Core Playbook",
+    });
+    expect(result.layout).toEqual(draft.layout);
   });
 });

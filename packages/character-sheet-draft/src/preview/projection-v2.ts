@@ -14,6 +14,13 @@ import {
 import type { DraftField, DraftValue } from "../draft-schema";
 import { MAX_DRAFT_TEXT_VALUE_CHARS } from "../draft-schema";
 import type { CharacterSheetDraftV2 } from "../draft-schema-v2";
+import {
+  DEFAULT_DRAFT_NODE_LAYOUT_V1,
+  draftNodeLayoutsEqual,
+  resolveEffectiveDraftLayoutV1,
+  type DraftLayoutNodeV1,
+  type DraftLayoutV1,
+} from "../draft-layout-v1";
 import { draftError } from "../errors";
 
 /**
@@ -41,17 +48,19 @@ const MAX_FLAT_SECTIONS = MAX_PAGES * MAX_SECTIONS_PER_PAGE;
 
 const SECTION_LAYOUT = {
   mode: "flow",
-  columns: 1,
   emphasis: null,
 } as const;
 
 /**
  * One canonical Field run: consecutive Fields of the same structural context
- * that are not separated by an intervening Section boundary.
+ * that are not separated by an intervening Section boundary. `columns` is the
+ * effective container width of that context, so the flat section preserves
+ * the draft's grid intent.
  */
 type ProjectedFieldRun = {
   readonly title: string;
   readonly fieldKeys: string[];
+  readonly columns: number;
 };
 
 /**
@@ -85,9 +94,13 @@ export function projectDraftV2ToSpec(
 ): CharacterSheetSpec {
   // First structural operation: resolve the canonical draft through 4C1.
   const readModel = buildDraftStructuralReadModelV2(draft);
+  // Effective spatial intent: explicit layout, or deterministic defaults for
+  // layoutless history (identical to pre-14.8 behavior).
+  const layout = resolveEffectiveDraftLayoutV1(draft);
+  assertSectionNodesProjectable(readModel, layout);
 
   const canonicalFieldKeys = fieldKeysInCanonicalOrder(readModel);
-  const runs = buildProjectedFieldRuns(draft, readModel);
+  const runs = buildProjectedFieldRuns(draft, readModel, layout);
   const sections = chunkRunsIntoSections(runs);
 
   if (sections.length > MAX_FLAT_SECTIONS) {
@@ -122,7 +135,8 @@ export function projectDraftV2ToSpec(
         `Canonical field "${key}" was not projected into any section.`,
       );
     }
-    return draftFieldToSpecField(node.field, order);
+    const geometry = layout.nodes[key] ?? DEFAULT_DRAFT_NODE_LAYOUT_V1;
+    return draftFieldToSpecField(node.field, order, geometry);
   });
 
   const values: Record<string, DraftValue> = {};
@@ -164,6 +178,29 @@ export function projectDraftV2ToSpec(
   return validateProjectedSpec(spec);
 }
 
+/**
+ * Section-node fidelity gate. The flat target stacks sections full-width, so
+ * a Section's own node geometry is representable only when it carries no
+ * spatial intent of its own (exact defaults). Anything else fails closed
+ * instead of silently flattening the user's spatial design.
+ */
+function assertSectionNodesProjectable(
+  readModel: DraftStructuralReadModelV2,
+  layout: DraftLayoutV1,
+): void {
+  for (const node of readModel.preorder) {
+    if (node.kind !== "section") {
+      continue;
+    }
+    const geometry = layout.nodes[node.key] ?? DEFAULT_DRAFT_NODE_LAYOUT_V1;
+    if (!draftNodeLayoutsEqual(geometry, DEFAULT_DRAFT_NODE_LAYOUT_V1)) {
+      throw draftError(
+        "projection_invalid",
+        `Section "${node.key}" carries non-default node geometry which the flat CharacterSheetSpec cannot represent.`,
+      );
+    }
+  }
+}
 /** Canonical global Field order, derived from the read model preorder only. */
 function fieldKeysInCanonicalOrder(
   readModel: DraftStructuralReadModelV2,
@@ -181,11 +218,13 @@ function fieldKeysInCanonicalOrder(
  * structural context. A Section placement always ends the open run, so a
  * nested Section interrupts its parent and the parent resumes as a new run
  * afterwards. Empty runs never materialize, which is how empty V2 Sections are
- * omitted from the flat projection.
+ * omitted from the flat projection. Each run inherits its context container's
+ * effective column count so grid intent survives flattening.
  */
 function buildProjectedFieldRuns(
   draft: CharacterSheetDraftV2,
   readModel: DraftStructuralReadModelV2,
+  layout: DraftLayoutV1,
 ): ProjectedFieldRun[] {
   const runs: ProjectedFieldRun[] = [];
   let openContextKey: string | null | undefined;
@@ -205,6 +244,7 @@ function buildProjectedFieldRuns(
       openRun = {
         title: contextTitle(draft, readModel, contextKey, titleCache),
         fieldKeys: [],
+        columns: contextColumns(layout, contextKey),
       };
       openContextKey = contextKey;
       runs.push(openRun);
@@ -213,6 +253,17 @@ function buildProjectedFieldRuns(
   }
 
   return runs;
+}
+
+/** Effective column count of a run's structural context. */
+function contextColumns(
+  layout: DraftLayoutV1,
+  contextKey: string | null,
+): number {
+  if (contextKey === null) {
+    return layout.root.columns;
+  }
+  return layout.sections[contextKey]?.columns ?? 1;
 }
 
 /**
@@ -256,7 +307,8 @@ function contextTitle(
 /**
  * Flattens runs into `CharacterSheetSpec` Sections, splitting any run that
  * exceeds the flat per-section fieldId capacity. Field order and semantics are
- * preserved exactly; only capacity is applied.
+ * preserved exactly; only capacity is applied. Each flat section inherits its
+ * run's context columns so the renderer keeps the draft's grid intent.
  */
 function chunkRunsIntoSections(
   runs: ProjectedFieldRun[],
@@ -272,7 +324,7 @@ function chunkRunsIntoSections(
         id: `draft.v2.section.${sections.length}`,
         title: run.title,
         // `order` is assigned during pagination and must be unique per page.
-        layout: { ...SECTION_LAYOUT, order: 0 },
+        layout: { ...SECTION_LAYOUT, columns: run.columns, order: 0 },
         fieldIds: run.fieldKeys.slice(
           offset,
           offset + MAX_FIELD_IDS_PER_SECTION,
@@ -300,7 +352,7 @@ function chunkSectionsIntoPages(
   ) {
     const pageSections = sections.slice(offset, offset + MAX_SECTIONS_PER_PAGE);
     for (const [pageOrder, section] of pageSections.entries()) {
-      section.layout = { ...SECTION_LAYOUT, order: pageOrder };
+      section.layout = { ...section.layout, order: pageOrder };
     }
     pages.push({
       id: `draft.v2.page.${pages.length}`,
@@ -317,13 +369,14 @@ function chunkSectionsIntoPages(
 function draftFieldToSpecField(
   field: DraftField,
   order: number,
+  geometry: DraftLayoutNodeV1,
 ): CharacterSheetField {
   const placement = {
     order,
-    columnStart: 1,
-    columnSpan: 1,
-    rowSpan: 1,
-    breakBefore: false,
+    columnStart: geometry.columnStart,
+    columnSpan: geometry.columnSpan,
+    rowSpan: geometry.rowSpan,
+    breakBefore: geometry.breakBefore,
   } as const;
   switch (field.type) {
     case "text":

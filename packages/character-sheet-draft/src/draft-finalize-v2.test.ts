@@ -6,6 +6,7 @@ import {
   type DraftPlacement,
 } from "./draft-schema-v2";
 import { bumpDraftVersionV2 } from "./draft-versioning-v2";
+import { defaultDraftLayoutV1 } from "./draft-layout-v1";
 import { rerollLockedDraftValuesV2 } from "./draft-reroll-v2";
 import {
   applyDraftMutationV2,
@@ -555,5 +556,15 @@ describe("finalizeDraftV2 — 4B2 lifecycle integration", () => {
     const rerolled = rerollLockedDraftValuesV2(editable, "lifecycle-seed");
     expect([...rerolled.rerolledKeys].sort()).toEqual(["strength", "weapon"]);
     finalizeDraftV2(rerolled.draft);
+  });
+});
+
+describe("confirm preserves explicit layout exactly (14.8)", () => {
+  it("carries the layout reference through unchanged", () => {
+    const base = makeEditableDraft(7, 3);
+    const input = { ...base, layout: defaultDraftLayoutV1(base) };
+    const confirmed = finalizeDraftV2(input);
+    expect(confirmed.layout).toBe(input.layout);
+    expect(confirmed.confirmed).toBe(true);
   });
 });

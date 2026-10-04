@@ -112,6 +112,13 @@ test("manual authoring happy path: create, edit, reparent, confirm, export, rest
   await page.getByLabel("Parent section for Extras").selectOption("");
   await expect(extrasSection).toBeVisible();
 
+  // 14.8 layout authoring: root columns, section columns, node geometry.
+  await page.getByLabel("Sheet columns").selectOption("2");
+  await abilitiesSection.getByText(/section settings for abilities/i).click();
+  await page.getByLabel("Columns for Abilities").selectOption("2");
+  await page.getByLabel("Column span for agility").fill("2");
+  await page.getByLabel("Row span for agility").fill("2");
+
   // 11. PC/NPC preference + threat level.
   await page
     .getByRole("button", { name: "Player character", exact: true })
@@ -141,7 +148,29 @@ test("manual authoring happy path: create, edit, reparent, confirm, export, rest
   ).toBeHidden();
   await expect(page.getByLabel("Sheet title")).toBeHidden();
   await expect(page.getByRole("button", { name: "Move Agility" })).toBeHidden();
+  await expect(page.getByLabel("Sheet columns")).toBeHidden();
   await expect(page.getByText("E2E Hero").first()).toBeVisible();
+
+  // 14.8 preview reflects the authored grid directly from the draft.
+  const preview = page.getByLabel("Sheet preview");
+  await expect(preview).toBeVisible();
+  const abilitiesPreview = preview.locator(
+    'section[aria-labelledby="preview-section-abilities"]',
+  );
+  await expect(abilitiesPreview).toBeVisible();
+  await expect(
+    abilitiesPreview.locator("div.character-workshop__preview-section-fields"),
+  ).toHaveAttribute("style", /repeat\(2,/);
+  const agilityPreview = abilitiesPreview.locator(
+    "div.character-workshop__preview-field",
+    { hasText: "Agility" },
+  );
+  // The browser serializes gridColumn/gridRow into the grid-area shorthand:
+  // row span 2, column 1 span 2.
+  await expect(agilityPreview).toHaveAttribute(
+    "style",
+    /grid-area: span 2 \/ 1 \/ auto \/ span 2/,
+  );
 
   // 15-16. PDF download occurs with a PDF filename.
   const downloadPromise = page.waitForEvent("download");

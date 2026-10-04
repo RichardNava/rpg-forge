@@ -1,4 +1,5 @@
 import {
+  defaultDraftLayoutV1,
   initialDraftVersionV2,
   type CharacterSheetDraftV2,
   type DraftField,
@@ -136,6 +137,10 @@ export function compileExtractedCharacterStructureV2(input: {
 
   const nameValue = values["character_name"];
 
+  // The extraction contract carries hierarchy but no reliable grid geometry,
+  // so extracted drafts compile with the deterministic default layout (single
+  // column, 1x1 nodes). Spatial enrichment stays future work for when
+  // extraction evidence actually supports it; geometry is never invented here.
   return initialDraftVersionV2({
     schemaVersion: "2",
     draftId: crypto.randomUUID(),
@@ -148,6 +153,7 @@ export function compileExtractedCharacterStructureV2(input: {
     fields,
     sections,
     structure: structurePlacements,
+    layout: defaultDraftLayoutV1({ sections, structure: structurePlacements }),
     values,
     source: { sourceSheetId: input.sourceSheetId, sourceRunId: null },
     confirmed: false,

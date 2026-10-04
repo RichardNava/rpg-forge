@@ -1,4 +1,5 @@
 import {
+  defaultDraftLayoutV1,
   initialDraftVersionV2,
   type CharacterSheetDraftV2,
   type DraftField,
@@ -12,6 +13,10 @@ import {
  * inference. Production real usage starts from a blank manual layout.
  */
 export function createBlankDraftV2(sessionId: string): CharacterSheetDraftV2 {
+  const sections: CharacterSheetDraftV2["sections"] = [];
+  const structure: CharacterSheetDraftV2["structure"] = [
+    { kind: "field", key: "character_name", parentKey: null },
+  ];
   return initialDraftVersionV2({
     schemaVersion: "2",
     draftId: crypto.randomUUID(),
@@ -20,8 +25,9 @@ export function createBlankDraftV2(sessionId: string): CharacterSheetDraftV2 {
     characterName: null,
     rulesContextId: null,
     fields: [blankNameField()],
-    sections: [],
-    structure: [{ kind: "field", key: "character_name", parentKey: null }],
+    sections,
+    structure,
+    layout: defaultDraftLayoutV1({ sections, structure }),
     values: {},
     source: { sourceSheetId: null, sourceRunId: null },
     confirmed: false,
@@ -30,6 +36,12 @@ export function createBlankDraftV2(sessionId: string): CharacterSheetDraftV2 {
 
 export function createExampleDraftV2(sessionId: string): CharacterSheetDraftV2 {
   const fields = exampleFields();
+  const sections: CharacterSheetDraftV2["sections"] = [];
+  const structure: CharacterSheetDraftV2["structure"] = fields.map((field) => ({
+    kind: "field" as const,
+    key: field.key,
+    parentKey: null,
+  }));
   return initialDraftVersionV2({
     schemaVersion: "2",
     draftId: crypto.randomUUID(),
@@ -38,12 +50,9 @@ export function createExampleDraftV2(sessionId: string): CharacterSheetDraftV2 {
     characterName: "Wayfarer of the Ash Fen",
     rulesContextId: null,
     fields,
-    sections: [],
-    structure: fields.map((field) => ({
-      kind: "field" as const,
-      key: field.key,
-      parentKey: null,
-    })),
+    sections,
+    structure,
+    layout: defaultDraftLayoutV1({ sections, structure }),
     values: {
       character_name: "Wayfarer of the Ash Fen",
       homeland: "Coastal Marshes",

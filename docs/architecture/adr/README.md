@@ -59,3 +59,4 @@ Los ADR conservan una numeración histórica estable. Un ADR sustituido no se el
 - [`055-section-title-degeneracy-personas`](055-section-title-degeneracy-personas.md) — ADR-055 — Section-plan title degeneracy: contract levers and personas
 - [`056-deterministic-sheet-construction`](056-deterministic-sheet-construction.md) — ADR-056 — Deterministic character-sheet final construction
 - [`057-draft-surface-rehydration`](057-draft-surface-rehydration.md) — ADR-057 — Editable character-sheet drafts (surface model + rehydration snapshots)
+- [`058-spatial-draft-layout`](058-spatial-draft-layout.md) — ADR-058 — Character Sheet Spatial Draft Layout

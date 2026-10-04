@@ -6,6 +6,7 @@ import {
   type DraftContentMutationV2,
 } from "./draft-content-mutation-v2";
 import { validateDraftV2, type CharacterSheetDraftV2 } from "./draft-schema-v2";
+import { defaultDraftLayoutV1 } from "./draft-layout-v1";
 import { DraftError } from "./errors";
 
 function makeContentDraft(): CharacterSheetDraftV2 {
@@ -1035,5 +1036,18 @@ describe("draft-content-mutation-v2 version / reference semantics", () => {
     const draft = makeContentDraft();
     const result = apply(draft, { op: "set_value", key: "strength", value: 9 });
     expect(result.version).toBe(5);
+  });
+});
+
+describe("content mutations preserve explicit layout (14.8)", () => {
+  it("set_value carries the layout reference through unchanged", () => {
+    const base = makeContentDraft();
+    const draft = { ...base, layout: defaultDraftLayoutV1(base) };
+    const result = apply(draft, {
+      op: "set_value",
+      key: "strength",
+      value: 9,
+    });
+    expect(result.layout).toBe(draft.layout);
   });
 });
