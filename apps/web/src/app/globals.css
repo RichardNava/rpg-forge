@@ -178,6 +178,10 @@
   --workshop-backdrop: #1c110b;
   --workshop-focus: #a9773d;
   --workshop-danger: #8a3c31;
+  --workshop-selection: #6e5223;
+  --workshop-drop-valid: #4a6b3a;
+  --workshop-drop-invalid: #8a3c31;
+  --workshop-canvas-grid: #bda06f;
   min-height: 100dvh;
   overflow-x: clip;
   color: var(--workshop-ink);
@@ -501,16 +505,365 @@
   padding: 0.45rem 0.7rem;
 }
 
+.character-workshop__drag-overlay-kind {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-metal-dark) 60%, transparent);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--workshop-ink-soft);
+}
+
+/* 14.9 visual Canvas: parchment sheet surface, metal/ink interaction
+   accents, danger semantics for invalid targets. Inline styles carry only
+   dynamic grid geometry; all color, spacing, and state live here. */
+.character-workshop__inspector-column {
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-metal-dark) 45%, transparent);
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    175deg,
+    var(--workshop-parchment),
+    color-mix(in srgb, var(--workshop-parchment) 82%, white)
+  );
+  color: var(--workshop-ink);
+  padding: 0.85rem 0.95rem;
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+  position: sticky;
+  top: 0.75rem;
+}
+
+.character-workshop__canvas-scroll {
+  overflow-x: auto;
+}
+
+.character-workshop__canvas-scroll {
+  overflow-x: auto;
+}
+
+.canvas-card,
+.canvas-section {
+  position: relative;
+}
+
+.canvas-card--selected,
+.canvas-section--selected {
+  outline: 2px solid var(--workshop-selection);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+.canvas-grid.canvas-guides-on,
+.canvas-guides-on .canvas-grid,
+.canvas-grid--active {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--workshop-canvas-grid) 55%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: calc(100% / var(--canvas-cols, 1)) 100%;
+}
+
+.canvas-section-body {
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-parchment-edge) 60%, transparent);
+  border-radius: 0.45rem;
+  padding: 0.55rem;
+  min-height: 6rem;
+  grid-auto-rows: minmax(6rem, auto);
+}
+
+.canvas-section-body--over-valid {
+  border-color: var(--workshop-drop-valid);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in srgb, var(--workshop-drop-valid) 55%, transparent);
+}
+
+.canvas-section-body--over-invalid {
+  border-color: var(--workshop-drop-invalid);
+  box-shadow: inset 0 0 0 2px
+    color-mix(in srgb, var(--workshop-drop-invalid) 55%, transparent);
+}
+
+.canvas-section-body--invalid {
+  border-style: dashed;
+  border-color: color-mix(
+    in srgb,
+    var(--workshop-drop-invalid) 55%,
+    transparent
+  );
+}
+
+.canvas-empty-hint {
+  margin: 0.25rem 0;
+  font-size: 0.82rem;
+  color: var(--workshop-muted);
+  text-align: center;
+}
+
+.canvas-rail {
+  min-height: 6px;
+  border-radius: 3px;
+  margin: 2px 0;
+  transition:
+    min-height 120ms ease,
+    background-color 120ms ease;
+}
+
+.canvas-guides-on .canvas-rail {
+  min-height: 12px;
+  border: 1px dashed
+    color-mix(in srgb, var(--workshop-parchment-edge) 70%, transparent);
+}
+
+.canvas-rail--over-valid {
+  min-height: 12px;
+  background: color-mix(in srgb, var(--workshop-drop-valid) 65%, transparent);
+}
+
+.canvas-rail--over-invalid {
+  min-height: 12px;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--workshop-drop-invalid) 55%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.canvas-rail--invalid {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--workshop-drop-invalid) 30%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.canvas-root-zone {
+  border: 1px dashed
+    color-mix(in srgb, var(--workshop-parchment-edge) 70%, transparent);
+  border-radius: 0.45rem;
+  color: var(--workshop-muted);
+  font-size: 0.85rem;
+  margin-top: 0.6rem;
+  min-height: 2.75rem;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0.55rem;
+}
+
+.canvas-root-zone--over-valid {
+  border-style: solid;
+  border-color: var(--workshop-drop-valid);
+  background: color-mix(in srgb, var(--workshop-drop-valid) 14%, transparent);
+  color: var(--workshop-ink);
+}
+
+.canvas-root-zone--over-invalid {
+  border-color: var(--workshop-drop-invalid);
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--workshop-drop-invalid) 22%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+  color: var(--workshop-ink);
+}
+
+.canvas-root-zone--invalid {
+  border-color: color-mix(
+    in srgb,
+    var(--workshop-drop-invalid) 55%,
+    transparent
+  );
+}
+
+.canvas-resize {
+  position: absolute;
+  z-index: 2;
+  min-width: 24px;
+  min-height: 24px;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.canvas-resize::after {
+  content: "";
+  display: block;
+  background: color-mix(in srgb, var(--workshop-metal-dark) 75%, transparent);
+  border: 1px solid var(--workshop-parchment);
+  border-radius: 3px;
+}
+
+.canvas-resize--east {
+  right: -8px;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  cursor: ew-resize;
+}
+
+.canvas-resize--east::after {
+  width: 8px;
+  height: 28px;
+}
+
+.canvas-resize--south {
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  cursor: ns-resize;
+}
+
+.canvas-resize--south::after {
+  width: 28px;
+  height: 8px;
+}
+
+.canvas-resize--southeast {
+  right: -8px;
+  bottom: -8px;
+  width: 24px;
+  height: 24px;
+  cursor: nwse-resize;
+}
+
+.canvas-resize--southeast::after {
+  width: 12px;
+  height: 12px;
+}
+
+.canvas-resize:focus-visible {
+  outline: 2px solid var(--workshop-focus);
+  outline-offset: 1px;
+}
+
+.canvas-move-menu {
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-metal-dark) 55%, transparent);
+  border-radius: 0.6rem;
+  background: var(--workshop-parchment);
+  color: var(--workshop-ink);
+  padding: 0.8rem 0.9rem;
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.canvas-move-menu__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.canvas-move-menu__empty {
+  margin: 0;
+  color: var(--workshop-muted);
+}
+
+.canvas-position {
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-parchment-edge) 60%, transparent);
+  border-radius: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.canvas-position legend {
+  padding: 0 0.35rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--workshop-muted);
+}
+
+.canvas-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--mini-columns, 1), minmax(0, 1fr));
+  gap: 0.3rem;
+}
+
+.canvas-mini-cell {
+  min-height: 2.25rem;
+  border: 1px solid
+    color-mix(in srgb, var(--workshop-parchment-edge) 65%, transparent);
+  border-radius: 0.35rem;
+  background: rgb(255 252 242 / 60%);
+  color: var(--workshop-ink-soft);
+  font-size: 0.85rem;
+}
+
+.canvas-mini-cell--occupied {
+  background: linear-gradient(
+    var(--workshop-metal),
+    var(--workshop-metal-dark)
+  );
+  border-color: var(--workshop-metal-dark);
+  color: #fff8e8;
+  font-weight: 700;
+}
+
+.canvas-inspector__hint,
+.canvas-inspector__meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--workshop-muted);
+}
+
+.canvas-move {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.character-workshop__drag-handle:focus-visible,
+.canvas-mini-cell:focus-visible,
+.canvas-move-menu button:focus-visible {
+  outline: 2px solid var(--workshop-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character-workshop__canvas-panel *,
+  .character-workshop__canvas-panel *::before,
+  .character-workshop__canvas-panel *::after {
+    transition-duration: 0.01ms !important;
+    animation: none !important;
+  }
+}
+
+@media (max-width: 40rem) {
+  .character-workshop__inspector-column {
+    position: static;
+  }
+}
+
 @media (max-width: 40rem) {
   .character-workshop__field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
+.character-workshop__section-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 7.5rem;
+}
+
 .character-workshop__field-group {
   display: grid;
-  gap: 0.55rem;
   margin-bottom: 1rem;
+  height: 7.5rem;
 }
 
 .character-workshop__field-group[data-depth="1"] {

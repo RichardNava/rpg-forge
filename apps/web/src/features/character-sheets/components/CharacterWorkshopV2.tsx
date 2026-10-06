@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   CharacterSheetDraftV2,
   DraftLayoutNodeV1,
@@ -28,7 +28,9 @@ import type { SheetStoreV2 } from "../state/sheet-store-v2-types";
 import { useSheetStoreV2 } from "../hooks/use-sheet-store-v2";
 import { CreationModeSelector } from "./CreationModeSelector";
 import { WorkshopToolbar } from "./WorkshopToolbar";
-import { WorkshopSidebarV2 } from "./WorkshopSidebarV2";
+import { SheetCanvasV2 } from "./canvas/SheetCanvasV2";
+import { CanvasInspectorV2 } from "./canvas/CanvasInspectorV2";
+import type { CanvasSelection } from "./canvas/canvas-types";
 import { SheetPreviewV2 } from "./SheetPreviewV2";
 import { AddFieldDialog } from "./AddFieldDialog";
 import {
@@ -136,6 +138,7 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
   const [modal, setModal] = useState<WorkshopModal>("none");
   const [pending, setPending] = useState(false);
   const [transientError, setTransientError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<CanvasSelection>(null);
 
   const draft = state.draft;
 
@@ -394,6 +397,7 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     setModal("none");
     setTransientError(null);
     setPending(false);
+    setSelection(null);
   }, [store]);
 
   const handleDownload = useCallback(async () => {
@@ -418,6 +422,41 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
       store.setWorkshopPreferences(patch);
     },
     [store],
+  );
+
+  const canvasCallbacks = useMemo(
+    () => ({
+      onSetValue: handleSetValue,
+      onClearValue: handleClearValue,
+      onRemoveField: handleRemoveField,
+      onSetFieldLabel: handleSetFieldLabel,
+      onSetFieldType: handleSetFieldTypeGuarded,
+      onRenameSection: handleRenameSection,
+      onPlaceNode: handlePlaceNode,
+      onSetContainerLayout: handleSetContainerLayout,
+      onSetNodeLayout: handleSetNodeLayout,
+      onAddField: () => setModal("add-field"),
+      onOpenAddSection: () => setModal("add-section"),
+    }),
+    [
+      handleSetValue,
+      handleClearValue,
+      handleRemoveField,
+      handleSetFieldLabel,
+      handleSetFieldTypeGuarded,
+      handleRenameSection,
+      handlePlaceNode,
+      handleSetContainerLayout,
+      handleSetNodeLayout,
+    ],
+  );
+
+  const labelOf = useCallback(
+    (key: string): string =>
+      draft?.fields.find((entry) => entry.key === key)?.label ??
+      draft?.sections.find((entry) => entry.key === key)?.title ??
+      key,
+    [draft],
   );
 
   return (
@@ -469,23 +508,24 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
               {transientError}
             </p>
           )}
-          <WorkshopSidebarV2
-            draft={draft}
-            callbacks={{
-              onSetValue: handleSetValue,
-              onClearValue: handleClearValue,
-              onRemoveField: handleRemoveField,
-              onSetFieldLabel: handleSetFieldLabel,
-              onSetFieldType: handleSetFieldTypeGuarded,
-              onRenameSection: handleRenameSection,
-              onPlaceNode: handlePlaceNode,
-              onSetContainerLayout: handleSetContainerLayout,
-              onSetNodeLayout: handleSetNodeLayout,
-              onAddField: () => setModal("add-field"),
-              onOpenAddSection: () => setModal("add-section"),
-            }}
-            disabled={draft.confirmed}
-          />
+          <div className="character-workshop__layout">
+            <SheetCanvasV2
+              draft={draft}
+              callbacks={canvasCallbacks}
+              disabled={draft.confirmed}
+              selection={selection}
+              onSelectionChange={setSelection}
+            />
+            <div className="character-workshop__inspector-column">
+              <CanvasInspectorV2
+                draft={draft}
+                selection={selection}
+                callbacks={canvasCallbacks}
+                disabled={draft.confirmed}
+                labelOf={labelOf}
+              />
+            </div>
+          </div>
         </>
       )}
 

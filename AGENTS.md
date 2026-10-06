@@ -405,3 +405,24 @@ Use them as workflow shortcuts; they do not override `AGENTS.md`, agent permissi
 - Project commands do not pin a model; they inherit the configured agent/model strategy.
 - Do not use command-level shell-output injection for routine workflows. Let the executing agent run approved shell commands through normal permissions.
 - Do not create a custom command with the same name as a built-in OpenCode command unless intentionally overriding that built-in behavior.
+
+## 16. Execution discipline
+
+Before running long verification loops, browser/E2E tests, formatting passes, or recovering from an interrupted OpenCode session, follow:
+
+`docs/opencode/execution-discipline.md`
+
+Key rule:
+
+```text
+targeted test
+→ relevant app/package suite
+→ full quality matrix once at milestone closure
+
+Do not repeatedly rerun expensive full gates while a known targeted blocker remains unresolved. Diagnose failures before rerunning, verify that filtered test commands are actually filtered, preserve existing work after tool/session errors, and remove temporary debug artifacts before final validation.
+
+1. **Targeted → suite del área → full gates una sola vez.**
+2. **Antes de repetir un test, diagnosticar la causa con el error/trace existente.**
+3. **Comprobar siempre que un `--grep` realmente está ejecutando un único test.**
+4. **Un fallo repetido de la misma forma no es “flaky” hasta demostrarlo.**
+5. **Formatting y limpieza de debug van al final, no durante el bucle funcional.**
