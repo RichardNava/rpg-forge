@@ -67,8 +67,6 @@ confirmed state
 - **Explicit intent rails.** Each insertion rail (`before`/`after`) and container (`inside`) is a separate droppable with a stable ID. Geometry is not inferred from pointer position; intent travels via droppable data into announcements and `resolveDropDestination`.
 - **Direct grid resize.** E/S/SE handles on selected node only. Mouse gestures preview locally; ONE `set_node_layout` commit on mouse-up; Escape/mouse-cancel discards preview. Keyboard sliders (arrows/Home/End) on handles + Inspector numerics cover the corner.
 - **Keyboard/non-pointer move flow.** Space/Enter on handle opens modal menu with pre-validated destinations (before/after siblings, inside sections, root). Enter commits, Escape cancels + restores focus. Screen-reader instructions included in dnd-kit accessibility config.
-- **Empty Section pointer drop works.** `grid-auto-rows: minmax(6rem, auto)` on `.canvas-section-body` gives empty sections a measurable rect for `pointerWithin`. The inside droppable ref is on the visual body (`.character-workshop__canvas-scroll`), not the section wrapper.
-- **Empty Section pointer drop is implemented.** `grid-auto-rows: minmax(6rem, auto)` on `.canvas-section-body` gives empty sections a measurable rect for `pointerWithin`. The inside droppable ref is on the visual body (`.character-workshop__canvas-scroll`), not the section wrapper.
 - **Canvas interaction state is ephemeral.** Selection, drag/hover/resize-preview/menu/error are local React state; they never become authority. Drops and resizes commit exactly once; hover commits nothing.
 - **Shared spatial rendering.** Both `SheetPreviewV2` (read-only) and `SheetCanvasV2` (editable) use `useSpatialSurface` → `buildDraftStructuralReadModelV2` + `resolveEffectiveDraftLayoutV1`. Single `SpatialNodes` traversal; nested CSS Grid semantics identical.
 - **Resize is grid-snapped.** `snapColumnSpan` / `snapRowSpan` pure functions convert pointer deltas to integer spans against measured column/row units. Preview updates on `mousemove`; ONE `set_node_layout` on `mouseup`; `Escape` discards preview.
@@ -90,11 +88,6 @@ confirmed state
 ## Explicitly deferred to 14.10+
 
 - `remove_section` mutation (safe semantics: empty Section may be removed, non-empty rejected)
-- Undo (server-authoritative, version-aware, `expectedVersion` conflict protection)
-- Visual style selection / rendering
-- Character image (upload / URL / AI)
-- Preview as modal (currently live preview pane)
-- `remove_section` safe semantics (empty Section may be removed, non-empty rejected)
 - Undo (server-authoritative, version-aware, `expectedVersion` conflict protection)
 - Visual style selection / rendering
 - Character image (upload / URL / AI)

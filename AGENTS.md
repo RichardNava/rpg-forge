@@ -418,11 +418,34 @@ Key rule:
 targeted test
 → relevant app/package suite
 → full quality matrix once at milestone closure
+```
 
 Do not repeatedly rerun expensive full gates while a known targeted blocker remains unresolved. Diagnose failures before rerunning, verify that filtered test commands are actually filtered, preserve existing work after tool/session errors, and remove temporary debug artifacts before final validation.
 
 1. **Targeted → suite del área → full gates una sola vez.**
 2. **Antes de repetir un test, diagnosticar la causa con el error/trace existente.**
 3. **Comprobar siempre que un `--grep` realmente está ejecutando un único test.**
-4. **Un fallo repetido de la misma forma no es “flaky” hasta demostrarlo.**
+4. **Un fallo repetido de la misma forma no es "flaky" hasta demostrarlo.**
 5. **Formatting y limpieza de debug van al final, no durante el bucle funcional.**
+## Bad practices to avoid
+
+Before implementation/debugging loops, read:
+
+`docs/opencode/anti-patterns.md`
+
+It records failure patterns already observed in this repository and is
+mandatory.
+
+Core rule:
+
+```text
+Evidence must change before execution repeats.
+
+Do not test until green, repeatedly rerun unchanged failures, game acceptance
+criteria, oscillate between the same implementations, or expand task scope to
+avoid reporting a blocker.
+When a requested correction cannot be completed safely within the current
+scope:
+STOP
+→ report evidence
+→ await user/reviewer decision

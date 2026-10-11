@@ -36,10 +36,6 @@ E/S/SE handles on the selected node. Mouse gestures preview locally (parent-owne
 
 ### 5. Empty Section pointer targets are first-class
 
-Empty Section bodies have `grid-auto-rows: minmax(6rem, auto)` ensuring a measurable rect for `pointerWithin`. The inside droppable ref lives on the visual body (`.character-workshop__canvas-scroll`), not the section wrapper. Empty Sections are valid drop targets for both Fields and Sections.
-
-### 5. Empty Section pointer targets work reliably
-
 Empty Section bodies have `grid-auto-rows: minmax(6rem, auto)` ensuring a measurable rect for `pointerWithin`. The inside droppable ref lives on the visual body (`.character-workshop__canvas-scroll`), not the section wrapper. Empty Sections are valid drop targets for both Fields and Sections. Pointer drag into empty Sections works reliably.
 
 ### 6. Keyboard/non-pointer move flow is equivalent
@@ -80,7 +76,7 @@ Selection, drag/hover/resize-preview/menu/error are local React state. Drops and
 - Inspector remains as precision/accessibility fallback after Canvas lands.
 - Confirmed state removes all affordances while layout remains visible.
 - No shadow structural state anywhere — Canvas, Inspector, and Preview share the single canonical surface.
-- Phase 14.10 will add `remove_section`, Undo, visual styles, character image, modal preview, and final ornamented PDF.
+- Phase 14.10 adds MVP Field authoring completeness, safe `remove_section`, and server-authoritative version-aware Undo. Visual styles, character image, modal preview, and final ornamented PDF remain deferred to their roadmap phases.
 
 ## Non-goals
 

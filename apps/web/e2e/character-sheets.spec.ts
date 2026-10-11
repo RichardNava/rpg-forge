@@ -144,8 +144,6 @@ test("manual authoring happy path: create, edit, reparent, confirm, export, rest
   await expect(agilityValueInput).toHaveValue("14");
 
   // 9. Reparent the Agility field inside Abilities using keyboard move
-  // (pointer drag into empty section has a known collision detection issue
-  // where the empty section body rect is miscalculated; keyboard flow works).
   const handle = page.getByRole("button", { name: "Move Agility" });
   await handle.focus();
   await page.keyboard.press("Space");
@@ -274,7 +272,33 @@ test("E2E A — complete pointer DnD: before, after, inside, sections, root", as
     "group_b",
   ]);
 
-  // Field before another Field.
+  // Section → EMPTY Section: drag Group B into empty Group A.
+  await dragToIntent(page, "Move Group B", "canvas:inside:group_a");
+  const groupA = page.locator(
+    'section[aria-labelledby="canvas-section-group_a"]',
+  );
+  await expect(groupA.getByRole("heading", { name: "Group B" })).toBeVisible();
+  expect(await canvasOrder(page)).toEqual([
+    "character_name",
+    "field_1",
+    "field_2",
+    "field_3",
+    "group_a",
+    "group_b",
+  ]);
+
+  // Restore Group B to Root.
+  await dragToIntent(page, "Move Group B", "canvas:inside:root");
+  expect(await canvasOrder(page)).toEqual([
+    "character_name",
+    "field_1",
+    "field_2",
+    "field_3",
+    "group_a",
+    "group_b",
+  ]);
+
+  // Field before another Field (original sequence).
   await dragToIntent(page, "Move Field 2", "canvas:before:field:field_1");
   expect(await canvasOrder(page)).toEqual([
     "character_name",
@@ -285,7 +309,7 @@ test("E2E A — complete pointer DnD: before, after, inside, sections, root", as
     "group_b",
   ]);
 
-  // Field after a Section: mixed sibling order at root.
+  // Field after a Section: mixed sibling order at root (original sequence).
   await dragToIntent(page, "Move Field 1", "canvas:after:section:group_a");
   expect(await canvasOrder(page)).toEqual([
     "character_name",
@@ -296,7 +320,7 @@ test("E2E A — complete pointer DnD: before, after, inside, sections, root", as
     "group_b",
   ]);
 
-  // Field inside a Section.
+  // Field → EMPTY Section: drag Field 3 into empty Group A (original sequence).
   await dragToIntent(page, "Move Field 3", "canvas:inside:group_a");
   expect(await canvasOrder(page)).toEqual([
     "character_name",
@@ -307,14 +331,11 @@ test("E2E A — complete pointer DnD: before, after, inside, sections, root", as
     "group_b",
   ]);
 
-  // Section inside a Section: nested hierarchy.
+  // Section inside a Section: nested hierarchy (original sequence).
   await dragToIntent(page, "Move Group B", "canvas:inside:group_a");
-  const groupA = page.locator(
-    'section[aria-labelledby="canvas-section-group_a"]',
-  );
   await expect(groupA.getByRole("heading", { name: "Group B" })).toBeVisible();
 
-  // Section back to Root via the root end zone.
+  // Section back to Root via the root end zone (original sequence).
   await dragToIntent(page, "Move Group B", "canvas:inside:root");
   expect(await canvasOrder(page)).toEqual([
     "character_name",
