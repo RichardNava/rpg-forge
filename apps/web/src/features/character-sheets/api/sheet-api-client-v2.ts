@@ -6,12 +6,14 @@ import {
   SheetDraftRerollRequestV2Schema,
   SheetDraftRerollResponseV2Schema,
   SheetDraftSnapshotResponseV2Schema,
+  SheetDraftUndoRequestV2Schema,
   type CharacterSheetDraftV2,
   type SheetDraftConfirmRequestV2,
   type SheetDraftCreateRequestV2,
   type SheetDraftMutationRequestV2,
   type SheetDraftRerollRequestV2,
   type SheetDraftRerollResponseV2,
+  type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
 import {
   CHARACTER_SHEET_API_PREFIX,
@@ -61,7 +63,11 @@ export interface SheetApiClientV2Port {
     accessToken: string,
     draftId: string,
     request: SheetDraftMutationRequestV2,
-  ): Promise<CharacterSheetDraftV2>;
+  ): Promise<{
+    draft: CharacterSheetDraftV2;
+    undoAvailable: boolean;
+    undoSourceVersion: number | null;
+  }>;
   rerollDraft(
     sessionId: string,
     accessToken: string,
@@ -74,6 +80,16 @@ export interface SheetApiClientV2Port {
     draftId: string,
     request: SheetDraftConfirmRequestV2,
   ): Promise<CharacterSheetDraftV2>;
+  undoDraft(
+    sessionId: string,
+    accessToken: string,
+    draftId: string,
+    request: SheetDraftUndoRequestV2,
+  ): Promise<{
+    draft: CharacterSheetDraftV2;
+    undoAvailable: boolean;
+    undoSourceVersion: number | null;
+  }>;
 }
 
 export class SheetApiClientV2 implements SheetApiClientV2Port {
@@ -149,7 +165,11 @@ export class SheetApiClientV2 implements SheetApiClientV2Port {
     accessToken: string,
     draftId: string,
     request: SheetDraftMutationRequestV2,
-  ): Promise<CharacterSheetDraftV2> {
+  ): Promise<{
+    draft: CharacterSheetDraftV2;
+    undoAvailable: boolean;
+    undoSourceVersion: number | null;
+  }> {
     const validated = SheetDraftMutationRequestV2Schema.safeParse(request);
     if (!validated.success) {
       throw new SheetApiError(
@@ -164,7 +184,17 @@ export class SheetApiClientV2 implements SheetApiClientV2Port {
       accessToken,
       body: validated.data,
     });
-    return parseJsonBody(response, SheetDraftSnapshotResponseV2Schema);
+    const draft = await parseJsonBody(
+      response,
+      SheetDraftSnapshotResponseV2Schema,
+    );
+    const undoAvailable = response.headers.get("X-Undo-Available") === "true";
+    const undoSourceVersion = response.headers.get("X-Undo-Source-Version");
+    return {
+      draft,
+      undoAvailable,
+      undoSourceVersion: undoSourceVersion ? Number(undoSourceVersion) : null,
+    };
   }
 
   async rerollDraft(
@@ -204,13 +234,47 @@ export class SheetApiClientV2 implements SheetApiClientV2Port {
         400,
       );
     }
-    const response = await this.request({
+const response = await this.request({
       method: "POST",
       url: this.confirmUrl(sessionId, draftId),
       accessToken,
       body: validated.data,
     });
     return parseJsonBody(response, SheetDraftSnapshotResponseV2Schema);
+  }
+
+  async undoDraft(
+    sessionId: string,
+    accessToken: string,
+    draftId: string,
+    request: SheetDraftUndoRequestV2,
+  ): Promise<{
+    draft: CharacterSheetDraftV2;
+    undoAvailable: boolean;
+    undoSourceVersion: number | null;
+  }> {
+    const validated = SheetDraftUndoRequestV2Schema.safeParse(request);
+    if (!validated.success) {
+      throw new SheetApiError(
+        "INVALID_REQUEST",
+        "The undo request must carry an expectedVersion.",
+        400,
+      );
+    }
+    const response = await this.request({
+      method: "POST",
+      url: this.undoUrl(sessionId, draftId),
+      accessToken,
+      body: validated.data,
+    });
+    const draft = await parseJsonBody(response, SheetDraftSnapshotResponseV2Schema);
+    const undoAvailable = response.headers.get("X-Undo-Available") === "true";
+    const undoSourceVersion = response.headers.get("X-Undo-Source-Version");
+    return {
+      draft,
+      undoAvailable,
+      undoSourceVersion: undoSourceVersion ? Number(undoSourceVersion) : null,
+    };
   }
 
   private request(input: {
@@ -280,6 +344,12 @@ export class SheetApiClientV2 implements SheetApiClientV2Port {
     assertIdentitySegment(sessionId, "sessionId");
     assertIdentitySegment(draftId, "draftId");
     return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/confirm`;
+  }
+
+  private undoUrl(sessionId: string, draftId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    assertIdentitySegment(draftId, "draftId");
+    return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/undo`;
   }
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CharacterSheetDraftV2,
   DraftField,
@@ -19,6 +19,8 @@ const FIELD_TYPES: Array<{ value: DraftFieldType; label: string }> = [
   { value: "textarea", label: "Text area" },
   { value: "checkbox", label: "Checkbox" },
   { value: "choice", label: "Choice" },
+  { value: "label", label: "Label" },
+  { value: "date", label: "Date" },
 ];
 
 /**
@@ -202,6 +204,57 @@ function FieldInspector({
               ))}
             </select>
           </label>
+          {field.type === "number" && (
+            <div className="character-workshop__form-row">
+              <label className="character-workshop__form-field">
+                <span>Minimum</span>
+                <input
+                  type="number"
+                  aria-label={`Minimum for ${field.label}`}
+                  value={field.min ?? ""}
+                  onChange={(event) => {
+                    const next = event.currentTarget.value;
+                    callbacks.onSetFieldType({
+                      key: field.key,
+                      type: field.type,
+                      min: next === "" ? undefined : Number(next),
+                      max: field.max,
+                    });
+                  }}
+                />
+              </label>
+              <label className="character-workshop__form-field">
+                <span>Maximum</span>
+                <input
+                  type="number"
+                  aria-label={`Maximum for ${field.label}`}
+                  value={field.max ?? ""}
+                  onChange={(event) => {
+                    const next = event.currentTarget.value;
+                    callbacks.onSetFieldType({
+                      key: field.key,
+                      type: field.type,
+                      min: field.min,
+                      max: next === "" ? undefined : Number(next),
+                    });
+                  }}
+                />
+              </label>
+            </div>
+          )}
+          {field.type === "choice" && (
+            <ChoiceOptionsEditor
+              field={field}
+              onChange={(options) =>
+                callbacks.onSetFieldType({
+                  key: field.key,
+                  type: field.type,
+                  options,
+                })
+              }
+              readOnly={readOnly}
+            />
+          )}
         </>
       )}
       <div className="character-workshop__form-field">
@@ -390,6 +443,13 @@ function SectionInspector({
               callbacks.onPlaceNode(sectionKey, destination)
             }
           />
+          <button
+            type="button"
+            className="character-workshop__btn character-workshop__btn--ghost"
+            onClick={() => callbacks.onRemoveSection(sectionKey)}
+          >
+            Remove section
+          </button>
         </>
       )}
     </div>
@@ -561,4 +621,158 @@ function parentColumnsOf(surface: SpatialSurface, key: string): number {
     return surface.layout.root.columns;
   }
   return surface.layout.sections[parentKey]?.columns ?? 1;
+}
+
+/**
+ * Choice options editor for the Inspector (14.10).
+ * Allows adding, editing, removing, and reordering options.
+ */
+function ChoiceOptionsEditor({
+  field,
+  onChange,
+  readOnly,
+}: {
+  field: DraftField;
+  onChange(options: string[]): void;
+  readOnly: boolean;
+}) {
+  const [options, setOptions] = useState<string[]>(field.options ?? []);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  useEffect(() => {
+    setOptions(field.options ?? []);
+  }, [field.options]);
+
+  function commitEdit() {
+    if (editingIndex !== null) {
+      const next = editValue.trim();
+      if (next !== "") {
+        const newOptions = [...options];
+        newOptions[editingIndex] = next;
+        setOptions(newOptions);
+        onChange(newOptions);
+      }
+      setEditingIndex(null);
+      setEditValue("");
+    }
+  }
+
+  return (
+    <fieldset className="canvas-choice-options">
+      <legend>Options</legend>
+      {!readOnly && (
+        <div className="canvas-choice-options__add">
+          <input
+            type="text"
+            aria-label="Add option"
+            placeholder="New option…"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                const next = event.currentTarget.value.trim();
+                if (next !== "") {
+                  const newOptions = [...options, next];
+                  setOptions(newOptions);
+                  onChange(newOptions);
+                  event.currentTarget.value = "";
+                }
+              }
+            }}
+          />
+        </div>
+      )}
+      <div className="canvas-choice-options__list">
+        {options.map((option, index) => (
+          <div key={`${option}-${index}`} className="canvas-choice-option">
+            {editingIndex === index ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={(event) => setEditValue(event.currentTarget.value)}
+                onBlur={commitEdit}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") commitEdit();
+                  if (event.key === "Escape") {
+                    setEditingIndex(null);
+                    setEditValue("");
+                  }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span
+                className="canvas-choice-option__label"
+                onClick={() => {
+                  if (!readOnly) {
+                    setEditingIndex(index);
+                    setEditValue(option);
+                  }
+                }}
+              >
+                {option}
+              </span>
+            )}
+            {!readOnly && (
+              <button
+                type="button"
+                className="canvas-choice-option__remove"
+                aria-label={`Remove option ${option}`}
+                onClick={() => {
+                  const newOptions = options.filter((_, i) => i !== index);
+                  setOptions(newOptions);
+                  onChange(newOptions);
+                }}
+              >
+                ×
+              </button>
+            )}
+            {!readOnly && index > 0 && (
+              <button
+                type="button"
+                className="canvas-choice-option__move"
+                aria-label="Move up"
+                onClick={() => {
+                  const newOptions = [...options];
+                  const current = newOptions[index];
+                  const prev = newOptions[index - 1];
+                  if (current !== undefined && prev !== undefined) {
+                    [newOptions[index - 1], newOptions[index]] = [
+                      current,
+                      prev,
+                    ];
+                    setOptions(newOptions);
+                    onChange(newOptions);
+                  }
+                }}
+              >
+                ↑
+              </button>
+            )}
+            {!readOnly && index < options.length - 1 && (
+              <button
+                type="button"
+                className="canvas-choice-option__move"
+                aria-label="Move down"
+                onClick={() => {
+                  const newOptions = [...options];
+                  const current = newOptions[index];
+                  const next = newOptions[index + 1];
+                  if (current !== undefined && next !== undefined) {
+                    [newOptions[index], newOptions[index + 1]] = [
+                      next,
+                      current,
+                    ];
+                    setOptions(newOptions);
+                    onChange(newOptions);
+                  }
+                }}
+              >
+                ↓
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </fieldset>
+  );
 }

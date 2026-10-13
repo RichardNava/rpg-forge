@@ -52,6 +52,14 @@ export type DraftRenameSectionMutationV2 = z.infer<
   typeof DraftRenameSectionMutationV2Schema
 >;
 
+export const DraftRemoveSectionMutationV2Schema = z.strictObject({
+  op: z.literal("remove_section"),
+  key: SECTION_MUTATION_KEY_SCHEMA,
+});
+export type DraftRemoveSectionMutationV2 = z.infer<
+  typeof DraftRemoveSectionMutationV2Schema
+>;
+
 /**
  * Isolated V2 section registry mutation contract. `op` is the discriminant;
  * `expectedVersion` is deliberately OUT of the payload (pass it to the apply
@@ -61,6 +69,7 @@ export type DraftRenameSectionMutationV2 = z.infer<
 export const DraftSectionRegistryMutationV2Schema = z.discriminatedUnion("op", [
   DraftAddSectionMutationV2Schema,
   DraftRenameSectionMutationV2Schema,
+  DraftRemoveSectionMutationV2Schema,
 ]);
 export type DraftSectionRegistryMutationV2 = z.infer<
   typeof DraftSectionRegistryMutationV2Schema
@@ -117,6 +126,8 @@ export function applyDraftSectionRegistryMutationWithExpectedVersionV2(
       return applyAddSection(draft, mutation);
     case "rename_section":
       return applyRenameSection(draft, mutation);
+    case "remove_section":
+      return applyRemoveSection(draft, mutation);
   }
 }
 
@@ -197,6 +208,52 @@ function applyRenameSection(
     sections: draft.sections.map((entry) =>
       entry.key === mutation.key ? { ...entry, title: mutation.title } : entry,
     ),
+  });
+}
+
+function applyRemoveSection(
+  draft: CharacterSheetDraftV2,
+  mutation: DraftRemoveSectionMutationV2,
+): CharacterSheetDraftV2 {
+  const sectionIndex = draft.sections.findIndex(
+    (entry) => entry.key === mutation.key,
+  );
+  if (sectionIndex === -1) {
+    throw draftError(
+      "invalid_mutation",
+      `Draft section "${mutation.key}" does not exist.`,
+    );
+  }
+
+  // Check if section has any direct children (fields or sections)
+  const hasDirectChildren = draft.structure.some(
+    (placement) => placement.parentKey === mutation.key,
+  );
+  if (hasDirectChildren) {
+    throw draftError(
+      "invalid_mutation",
+      `Section "${mutation.key}" is not empty. Move or remove its contents first.`,
+    );
+  }
+
+  const layout = draft.layout === undefined ? undefined : { ...draft.layout };
+  if (layout !== undefined) {
+    const sections = { ...layout.sections };
+    delete sections[mutation.key];
+    layout.sections = sections;
+    const nodes = { ...layout.nodes };
+    delete nodes[mutation.key];
+    layout.nodes = nodes;
+  }
+
+  return commitV2(draft, {
+    ...draft,
+    sections: draft.sections.filter((entry) => entry.key !== mutation.key),
+    structure: draft.structure.filter(
+      (placement) =>
+        !(placement.kind === "section" && placement.key === mutation.key),
+    ),
+    layout,
   });
 }
 

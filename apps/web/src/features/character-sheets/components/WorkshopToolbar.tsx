@@ -30,6 +30,8 @@ interface WorkshopToolbarProps {
   onAddField(): void;
   onConfirm(): void;
   onRestart(): void;
+  onUndo(): void;
+  undoAvailable: boolean;
 }
 
 export function WorkshopToolbar({
@@ -40,6 +42,8 @@ export function WorkshopToolbar({
   onAddField,
   onConfirm,
   onRestart,
+  onUndo,
+  undoAvailable,
 }: WorkshopToolbarProps) {
   const nameField = draft.fields.find(
     (field) => field.key === "character_name",
@@ -91,6 +95,14 @@ export function WorkshopToolbar({
               disabled={busy}
             >
               Add field
+            </button>
+            <button
+              type="button"
+              className="character-workshop__btn character-workshop__btn--secondary"
+              onClick={onUndo}
+              disabled={busy || !undoAvailable}
+            >
+              Undo
             </button>
             <button
               type="button"

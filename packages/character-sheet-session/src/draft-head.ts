@@ -19,6 +19,11 @@ export interface DraftHeadIdentity {
  * committed version; a pending claim announces `currentVersion + 1` before its
  * R2 snapshot has been written, so readers can never observe a version that
  * does not exist yet.
+ *
+ * Undo metadata (14.10): one-level server-authoritative undo eligibility.
+ * `undoSourceVersion` records the authoritative version that can be restored
+ * via Undo (the version immediately before the last real authoring mutation).
+ * `undoConsumed` prevents a second Undo from acting as Redo.
  */
 export interface DraftHead {
   sessionId: string;
@@ -29,6 +34,10 @@ export interface DraftHead {
   pendingSince: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Version eligible for one-level server-authoritative Undo (14.10). */
+  undoSourceVersion: number | null;
+  /** Whether the one-level Undo has been consumed (14.10). */
+  undoConsumed: boolean;
 }
 
 /** The last committed version, without leaking pending-claim state. */

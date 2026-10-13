@@ -11,6 +11,7 @@ import {
   type SheetDraftMutationRequestV2,
   type SheetDraftRerollRequestV2,
   type SheetDraftRerollResponseV2,
+  type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
 import type { SheetSession, SheetSessionView } from "../api/sheet-api-types";
 import type { SheetApiClientV2Port } from "../api/sheet-api-client-v2";
@@ -41,6 +42,11 @@ export function createLocalSheetBackendV2(
     { sessionId: string; accessToken: string }
   >();
   const drafts = new Map<string, CharacterSheetDraftV2>();
+  const draftHistory = new Map<string, CharacterSheetDraftV2[]>(); // history of drafts for undo
+  const draftHeads = new Map<
+    string,
+    { undoSourceVersion: number | null; undoConsumed: boolean }
+  >();
   const keyOf = (sessionId: string, draftId: string) =>
     `${sessionId}:${draftId}`;
   const now = options.clock ?? (() => new Date());
@@ -61,6 +67,20 @@ export function createLocalSheetBackendV2(
       throw new Error("Draft not found.");
     }
     return draft;
+  }
+
+  function getDraftHistory(key: string): CharacterSheetDraftV2[] {
+    return draftHistory.get(key) ?? [];
+  }
+
+  function addToHistory(key: string, draft: CharacterSheetDraftV2): void {
+    const history = getDraftHistory(key);
+    // Keep only last 10 versions to avoid memory issues
+    if (history.length >= 10) {
+      history.shift();
+    }
+    history.push(draft);
+    draftHistory.set(key, history);
   }
 
   return {
@@ -122,6 +142,7 @@ export function createLocalSheetBackendV2(
         );
       }
       drafts.set(key, draft);
+      draftHeads.set(key, { undoSourceVersion: null, undoConsumed: false });
       return draft;
     },
 
@@ -139,16 +160,44 @@ export function createLocalSheetBackendV2(
       accessToken: string,
       draftId: string,
       request: SheetDraftMutationRequestV2,
-    ): Promise<CharacterSheetDraftV2> {
+    ): Promise<{
+      draft: CharacterSheetDraftV2;
+      undoAvailable: boolean;
+      undoSourceVersion: number | null;
+    }> {
       requireSession(sessionId, accessToken);
       const current = requireOwnedDraft(sessionId, draftId);
       const next = applyDraftMutationV2(
         current,
-        request.mutation,
+        request.mutation as any,
         request.expectedVersion,
       );
-      drafts.set(keyOf(sessionId, draftId), next);
-      return next;
+      const key = keyOf(sessionId, draftId);
+
+      // Update undo metadata: real mutations set undo source to current version
+      if (next.version !== current.version) {
+        const head = draftHeads.get(key) ?? {
+          undoSourceVersion: null,
+          undoConsumed: false,
+        };
+        draftHeads.set(key, {
+          undoSourceVersion: current.version,
+          undoConsumed: false,
+        });
+        // Add current version to history for undo
+        addToHistory(key, current);
+      }
+
+      drafts.set(key, next);
+      const head = draftHeads.get(key) ?? {
+        undoSourceVersion: null,
+        undoConsumed: false,
+      };
+      return {
+        draft: next,
+        undoAvailable: head.undoSourceVersion !== null && !head.undoConsumed,
+        undoSourceVersion: head.undoSourceVersion,
+      };
     },
 
     async rerollDraft(
@@ -187,6 +236,76 @@ export function createLocalSheetBackendV2(
       const confirmed = finalizeDraftV2(current);
       drafts.set(keyOf(sessionId, draftId), confirmed);
       return confirmed;
+    },
+
+    async undoDraft(
+      sessionId: string,
+      accessToken: string,
+      draftId: string,
+      request: SheetDraftUndoRequestV2,
+    ): Promise<{
+      draft: CharacterSheetDraftV2;
+      undoAvailable: boolean;
+      undoSourceVersion: number | null;
+    }> {
+      requireSession(sessionId, accessToken);
+      const current = requireOwnedDraft(sessionId, draftId);
+      if (request.expectedVersion !== current.version) {
+        throw draftError(
+          "version_conflict",
+          `Expected draft version ${request.expectedVersion} but the current version is ${current.version}.`,
+        );
+      }
+      const key = keyOf(sessionId, draftId);
+      const head = draftHeads.get(key);
+      if (!head || head.undoSourceVersion === null) {
+        throw draftError("invalid_mutation", "No undo source version available.");
+      }
+      if (head.undoConsumed) {
+        throw draftError("invalid_mutation", "The one-level Undo has already been consumed.");
+      }
+
+      // Get the undo source version from the head
+      const undoSourceVersion = head.undoSourceVersion;
+
+      // Get the history and find the draft at the undo source version
+      const history = getDraftHistory(key);
+      const undoSourceDraft = history.find(d => d.version === undoSourceVersion);
+      if (!undoSourceDraft) {
+        throw draftError("invalid_mutation", "The undo source snapshot could not be loaded.");
+      }
+
+      // Create the undone draft by restoring from the undo source
+      const nextVersion = current.version + 1;
+      const undoneDraft: CharacterSheetDraftV2 = {
+        ...undoSourceDraft,
+        draftId: current.draftId,
+        sessionId: current.sessionId,
+        baseVersion: current.baseVersion,
+        version: current.version, // undo mutation will bump to V+1
+        mode: current.mode,
+        rulesContextId: current.rulesContextId,
+        source: current.source,
+        characterName: (undoSourceDraft.values["character_name"] as string) ?? null,
+        confirmed: false,
+      };
+
+      // Apply the undo mutation which bumps version to current.version + 1
+      const undoMutation = { op: "undo" } as const;
+      const finalDraft = applyDraftMutationV2(undoneDraft, undoMutation as any, undoneDraft.version);
+
+      // Update the head: mark undo as consumed, keep the same undo source version
+      draftHeads.set(key, {
+        undoSourceVersion: head.undoSourceVersion,
+        undoConsumed: true,
+      });
+
+      drafts.set(key, finalDraft);
+      return {
+        draft: finalDraft,
+        undoAvailable: false,
+        undoSourceVersion: head.undoSourceVersion,
+      };
     },
   };
 }

@@ -77,9 +77,23 @@ import { jsonResponse } from "../../transport/errors.js";
  * The frozen schema is applied first, so a snapshot that is not canonical V2
  * fails loudly here instead of reaching a client. That is a programmer defect,
  * not a client condition, so it is deliberately NOT translated into a 4xx.
+ *
+ * Optional headers parameter for operational metadata (e.g., undo availability).
  */
-export function draftV2SnapshotResponse(body: unknown): Response {
-  return jsonResponse(200, SheetDraftSnapshotResponseV2Schema.parse(body));
+export function draftV2SnapshotResponse(
+  body: unknown,
+  headers?: Record<string, string>,
+): Response {
+  const response = jsonResponse(
+    200,
+    SheetDraftSnapshotResponseV2Schema.parse(body),
+  );
+  if (headers) {
+    for (const [key, value] of Object.entries(headers)) {
+      response.headers.set(key, value);
+    }
+  }
+  return response;
 }
 
 /**

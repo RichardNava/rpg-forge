@@ -62,6 +62,12 @@ export {
   parseDraftMutationV2,
 } from "./draft-mutation-v2";
 export type { DraftMutationV2 } from "./draft-mutation-v2";
+export {
+  DraftUndoMutationV2Schema,
+  parseDraftUndoMutationV2,
+  applyDraftUndoWithExpectedVersionV2,
+} from "./draft-undo-mutation-v2";
+export type { DraftUndoMutationV2 } from "./draft-undo-mutation-v2";
 export { initialDraftVersionV2 } from "./draft-versioning-v2";
 export type { InitialCharacterSheetDraftV2 } from "./draft-versioning-v2";
 
@@ -154,6 +160,9 @@ export {
   SheetDraftRerollRequestV2Schema,
   SheetDraftRerollResponseV2Schema,
   SheetDraftSnapshotResponseV2Schema,
+  SheetDraftUndoRequestV2Schema,
+  SheetDraftUndoResponseV2Schema,
+  TransportDraftMutationV2Schema,
 } from "./draft-transport-v2";
 export type {
   SheetDraftConfirmRequestV2,
@@ -162,4 +171,6 @@ export type {
   SheetDraftRerollRequestV2,
   SheetDraftRerollResponseV2,
   SheetDraftSnapshotResponseV2,
+  SheetDraftUndoRequestV2,
+  SheetDraftUndoResponseV2,
 } from "./draft-transport-v2";

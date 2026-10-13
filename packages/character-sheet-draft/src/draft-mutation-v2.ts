@@ -20,6 +20,11 @@ import {
   DraftLayoutMutationV2Schema,
   parseDraftLayoutMutationV2,
 } from "./draft-layout-mutation-v2";
+import {
+  applyDraftUndoWithExpectedVersionV2,
+  DraftUndoMutationV2Schema,
+  parseDraftUndoMutationV2,
+} from "./draft-undo-mutation-v2";
 import { MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
 import { draftKeyPattern, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { DraftNodeDestinationSchema } from "./draft-structure-placement-plan";
@@ -48,12 +53,17 @@ export type DraftPlaceNodeMutationV2 = z.infer<
  * - set_value, clear_value, set_field_label, set_field_type, lock_field,
  *   unlock_field: content/value mutations (4A1)
  * - add_field, remove_field: field registry mutations (4A2)
- * - add_section, rename_section: section registry mutations (4A3)
+ * - add_section, rename_section, remove_section: section registry mutations (4A3/14.10)
  * - set_container_layout, set_node_layout: spatial layout mutations (14.8;
  *   geometry only, never structure)
+ * - undo: one-level server-authoritative undo (14.10)
  *
  * `expectedVersion` is deliberately OUT of the payload; pass it to
  * applyDraftMutationV2 instead.
+ *
+ * Note: `undo` is included in the schema for internal/domain use (e.g., local
+ * backend, testing) but is NOT exposed via the generic PATCH /drafts endpoint.
+ * The dedicated POST /undo endpoint handles undo with server-side history.
  */
 export const DraftMutationV2Schema = z.discriminatedUnion("op", [
   DraftPlaceNodeMutationV2Schema,
@@ -61,6 +71,7 @@ export const DraftMutationV2Schema = z.discriminatedUnion("op", [
   ...DraftFieldRegistryMutationV2Schema.options,
   ...DraftSectionRegistryMutationV2Schema.options,
   ...DraftLayoutMutationV2Schema.options,
+  ...DraftUndoMutationV2Schema.options,
 ]);
 export type DraftMutationV2 = z.infer<typeof DraftMutationV2Schema>;
 
@@ -102,10 +113,13 @@ export function parseDraftMutationV2(input: unknown): DraftMutationV2 {
       return parseDraftFieldRegistryMutationV2(mutation);
     case "add_section":
     case "rename_section":
+    case "remove_section":
       return parseDraftSectionRegistryMutationV2(mutation);
     case "set_container_layout":
     case "set_node_layout":
       return parseDraftLayoutMutationV2(mutation);
+    case "undo":
+      return parseDraftUndoMutationV2(mutation);
     default:
       return assertNeverV2Mutation(mutation);
   }
@@ -158,6 +172,7 @@ export function applyDraftMutationV2(
       );
     case "add_section":
     case "rename_section":
+    case "remove_section":
       return applyDraftSectionRegistryMutationWithExpectedVersionV2(
         draft,
         mutation,
@@ -170,10 +185,18 @@ export function applyDraftMutationV2(
         mutation,
         expectedVersion,
       );
+    case "undo":
+      return applyDraftUndoWithExpectedVersionV2(
+        draft,
+        mutation,
+        expectedVersion,
+      );
     default:
       return assertNeverV2Mutation(mutation);
   }
 }
+
+export { DraftUndoMutationV2Schema };
 
 function assertNeverV2Mutation(mutation: never): never {
   throw draftError("invalid_mutation", "Unsupported V2 mutation op.");

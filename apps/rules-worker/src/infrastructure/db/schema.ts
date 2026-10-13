@@ -182,6 +182,10 @@ export type SheetGenerationRunRow = typeof sheetGenerationRun.$inferSelect;
  * claimed next version + its claim id. The PK is the `(sessionId, draftId)`
  * pair; `pending_since` is the bounded staleness anchor for stale-claim
  * recovery.
+ *
+ * Undo metadata (14.10): one-level server-authoritative undo eligibility.
+ * `undo_source_version` records the authoritative version that can be restored
+ * via Undo. `undo_consumed` prevents a second Undo from acting as Redo.
  */
 export const sheetDraftHead = sqliteTable(
   "sheet_draft_heads",
@@ -194,6 +198,12 @@ export const sheetDraftHead = sqliteTable(
     pendingSince: integer("pending_since", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    /** Version eligible for one-level server-authoritative Undo (14.10). */
+    undoSourceVersion: integer("undo_source_version"),
+    /** Whether the one-level Undo has been consumed (14.10). */
+    undoConsumed: integer("undo_consumed", { mode: "boolean" })
+      .notNull()
+      .default(false),
   },
   (table) => [
     primaryKey({ columns: [table.sessionId, table.draftId] }),

@@ -36,6 +36,13 @@
       "when": 1789374418337,
       "tag": "0004_useful_luckman",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789460800000,
+      "tag": "0005_calm_thor",
+      "breakpoints": true
     }
   ]
 }

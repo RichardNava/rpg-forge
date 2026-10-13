@@ -764,6 +764,7 @@ describe("4E3B1 error channel", () => {
       "assertDraftV2Precondition",
       "openDraftV2Mutation",
       "persistNextDraftV2",
+      "persistUndoDraftV2",
       "readCurrentDraftV2",
     ]);
     for (const removed of [

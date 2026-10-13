@@ -393,6 +393,44 @@ export class InMemoryDraftHeadRepository implements DraftHeadRepositoryPort {
     return { kind: "committed", head: cloneHead(committed) };
   }
 
+  async commitUndo(
+    identity: DraftHeadIdentity,
+    claimId: string,
+    expectedCurrentVersion: number,
+    committedAt: Date,
+  ): Promise<DraftHeadCommitResult> {
+    const head = this.rows.get(this.key(identity));
+    if (head === undefined) {
+      return { kind: "not_found" };
+    }
+    const nextVersion = expectedCurrentVersion + 1;
+    const ownsClaim =
+      head.pendingClaimId === claimId &&
+      head.pendingVersion === nextVersion &&
+      head.currentVersion === expectedCurrentVersion;
+    if (!ownsClaim) {
+      if (
+        head.pendingClaimId !== claimId ||
+        head.pendingVersion !== nextVersion
+      ) {
+        return { kind: "wrong_claim", head: cloneHead(head) };
+      }
+      return { kind: "version_conflict", head: cloneHead(head) };
+    }
+    const committed = {
+      ...head,
+      currentVersion: nextVersion,
+      pendingVersion: null,
+      pendingClaimId: null,
+      pendingSince: null,
+      updatedAt: committedAt,
+      // Undo: mark consumed, preserve undoSourceVersion
+      undoConsumed: true,
+    };
+    this.rows.set(this.key(identity), committed);
+    return { kind: "committed", head: cloneHead(committed) };
+  }
+
   async release(
     identity: DraftHeadIdentity,
     claimId: string,

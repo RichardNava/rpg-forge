@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type {
   DraftField,
   DraftLayoutNodeV1,
@@ -28,14 +29,45 @@ export function FieldValueInput({
   onSetValue(value: DraftValue): void;
   onClearValue(): void;
 }) {
+  if (field.type === "label") {
+    return (
+      <span
+        className="character-workshop__label-value"
+        aria-label={field.label}
+      >
+        {field.label}
+      </span>
+    );
+  }
   if (field.type === "checkbox") {
+    // Tri-state: blank (indeterminate) / false / true
+    const isIndeterminate = value === undefined || value === null;
+    const isChecked = value === true;
+    const checkboxRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+      if (checkboxRef.current) {
+        checkboxRef.current.indeterminate = isIndeterminate;
+      }
+    }, [isIndeterminate]);
     return (
       <input
+        ref={checkboxRef}
         type="checkbox"
         aria-label={field.label}
-        checked={value === true}
+        checked={isChecked}
         disabled={readOnly}
-        onChange={(event) => onSetValue(event.currentTarget.checked)}
+        onChange={(event) => {
+          if (event.currentTarget.indeterminate) {
+            // From blank -> checked
+            onSetValue(true);
+          } else if (event.currentTarget.checked) {
+            // From checked -> blank
+            onClearValue();
+          } else {
+            // From unchecked -> checked
+            onSetValue(true);
+          }
+        }}
       />
     );
   }
@@ -63,6 +95,21 @@ export function FieldValueInput({
         value={typeof value === "string" ? value : ""}
         disabled={readOnly}
         onChange={(event) => onSetValue(event.currentTarget.value)}
+      />
+    );
+  }
+  if (field.type === "date") {
+    return (
+      <input
+        type="date"
+        aria-label={field.label}
+        value={typeof value === "string" ? value : ""}
+        disabled={readOnly}
+        onChange={(event) => {
+          const next = event.currentTarget.value;
+          if (next === "") onClearValue();
+          else onSetValue(next);
+        }}
       />
     );
   }

@@ -436,6 +436,22 @@ function draftFieldToSpecField(
         itemLabel: field.label,
         maxItems: 100,
       };
+    case "label":
+      return {
+        type: "text",
+        id: field.key,
+        label: field.label,
+        requiredForPlayableNpc: false,
+        placement,
+      };
+    case "date":
+      return {
+        type: "text",
+        id: field.key,
+        label: field.label,
+        requiredForPlayableNpc: false,
+        placement,
+      };
   }
 }
 

@@ -23,6 +23,10 @@ export interface SheetStoreV2State {
   rerolledKeys: string[] | null;
   /** The last version the rules-worker acknowledged. */
   savedVersion: number | null;
+  /** Whether server-authoritative Undo is available (14.10). */
+  undoAvailable: boolean;
+  /** The version that can be restored via Undo (14.10). */
+  undoSourceVersion: number | null;
   error: SheetApiError | null;
 }
 
@@ -40,6 +44,8 @@ export const INITIAL_SHEET_STORE_V2_STATE: SheetStoreV2State = {
   },
   rerolledKeys: null,
   savedVersion: null,
+  undoAvailable: false,
+  undoSourceVersion: null,
   error: null,
 };
 
@@ -81,6 +87,7 @@ export interface SheetStoreV2 {
   applyMutation(
     mutation: DraftMutationV2,
   ): Promise<SheetStoreV2MutationOutcome>;
+  undo(): Promise<SheetStoreV2MutationOutcome>;
   reroll(seed: string): Promise<SheetStoreV2RerollOutcome>;
   confirm(): Promise<SheetStoreV2ConfirmOutcome>;
   reset(): void;

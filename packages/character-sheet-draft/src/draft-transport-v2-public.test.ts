@@ -217,7 +217,9 @@ describe("4D3 public boundary — mutation composition", () => {
       mutation: { op: "set_value", key: "character_name", value: "Aria Stone" },
     });
 
-    expect("expectedVersion" in envelope.mutation).toBe(false);
+    // TypeScript doesn't know the exact mutation type after parsing
+    const mutation = envelope.mutation as { op: string };
+    expect("expectedVersion" in mutation).toBe(false);
     // A precondition smuggled INSIDE the mutation is rejected by the strict
     // mutation union.
     expect(

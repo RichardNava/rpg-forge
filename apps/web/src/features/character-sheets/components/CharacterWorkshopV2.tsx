@@ -38,6 +38,7 @@ import {
   type AddSectionV2Result,
 } from "./AddSectionDialogV2";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
@@ -127,7 +128,13 @@ const LANDING_CHOICES = [
 
 type WorkshopScreen = "landing" | "editing" | "exported";
 type WorkshopModal =
-  "none" | "add-field" | "add-section" | "confirm" | "upload";
+  | "none"
+  | "add-field"
+  | "add-section"
+  | "confirm"
+  | "upload"
+  | "delete-field"
+  | "delete-section";
 
 export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
   const [store] = useState<SheetStoreV2>(() =>
@@ -139,6 +146,9 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
   const [pending, setPending] = useState(false);
   const [transientError, setTransientError] = useState<string | null>(null);
   const [selection, setSelection] = useState<CanvasSelection>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: "field"; key: string } | { kind: "section"; key: string } | null
+  >(null);
 
   const draft = state.draft;
 
@@ -222,6 +232,7 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
       } else if (outcome.kind === "ok") {
         setTransientError(null);
       }
+      return outcome;
     },
     [store],
   );
@@ -251,12 +262,60 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     [applyMutation],
   );
 
-  const handleRemoveField = useCallback(
-    (key: string) => {
-      void applyMutation({ op: "remove_field", key });
+  const handleRemoveField = useCallback((key: string) => {
+    setDeleteTarget({ kind: "field", key });
+    setModal("delete-field");
+  }, []);
+
+  const handleConfirmDeleteField = useCallback(
+    async (key: string) => {
+      setDeleteTarget(null);
+      const outcome = await applyMutation({ op: "remove_field", key });
+      if (outcome.kind === "ok") {
+        setModal("none");
+      }
     },
     [applyMutation],
   );
+
+  const handleCancelDelete = useCallback(() => {
+    setDeleteTarget(null);
+    setModal("none");
+  }, []);
+
+  const handleRemoveSection = useCallback((key: string) => {
+    setDeleteTarget({ kind: "section", key });
+    setModal("delete-section");
+  }, []);
+
+  const handleConfirmDeleteSection = useCallback(
+    async (key: string) => {
+      setDeleteTarget(null);
+      const outcome = await applyMutation({ op: "remove_section", key });
+      if (outcome.kind === "ok") {
+        setModal("none");
+      }
+    },
+    [applyMutation],
+  );
+
+  const handleUndo = useCallback(async () => {
+    if (!draft) return;
+    setPending(true);
+    setTransientError(null);
+    try {
+      const outcome = await store.undo();
+      if (outcome.kind === "rejected") {
+        setTransientError(outcome.message);
+      } else if (outcome.kind === "error") {
+        setTransientError(outcome.error.message);
+      } else if (outcome.kind === "ok") {
+        setTransientError(null);
+      }
+    } finally {
+      setPending(false);
+    }
+  }, [store, draft]);
 
   const handleSetFieldLabel = useCallback(
     (key: string, label: string) => {
@@ -429,6 +488,10 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
       onSetValue: handleSetValue,
       onClearValue: handleClearValue,
       onRemoveField: handleRemoveField,
+      onConfirmDeleteField: handleConfirmDeleteField,
+      onCancelDelete: handleCancelDelete,
+      onRemoveSection: handleRemoveSection,
+      onConfirmDeleteSection: handleConfirmDeleteSection,
       onSetFieldLabel: handleSetFieldLabel,
       onSetFieldType: handleSetFieldTypeGuarded,
       onRenameSection: handleRenameSection,
@@ -442,6 +505,10 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
       handleSetValue,
       handleClearValue,
       handleRemoveField,
+      handleConfirmDeleteField,
+      handleCancelDelete,
+      handleRemoveSection,
+      handleConfirmDeleteSection,
       handleSetFieldLabel,
       handleSetFieldTypeGuarded,
       handleRenameSection,
@@ -492,6 +559,8 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
             onAddField={() => setModal("add-field")}
             onConfirm={() => setModal("confirm")}
             onRestart={handleRestart}
+            onUndo={handleUndo}
+            undoAvailable={state.undoAvailable}
           />
           <div className="character-workshop__identity-bar">
             <WorkshopIdentitySelector
@@ -587,6 +656,32 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
         error={transientError}
         onConfirm={() => void handleConfirm()}
         onClose={() => setModal("none")}
+      />
+      <DestructiveConfirmDialog
+        open={modal === "delete-field"}
+        title="Delete field"
+        message="This will permanently remove the field and its value from the sheet. This cannot be undone."
+        busy={pending}
+        error={transientError}
+        onConfirm={() => {
+          if (deleteTarget?.kind === "field") {
+            void handleConfirmDeleteField(deleteTarget.key);
+          }
+        }}
+        onClose={handleCancelDelete}
+      />
+      <DestructiveConfirmDialog
+        open={modal === "delete-section"}
+        title="Delete section"
+        message="This will permanently remove the section. The section must be empty (no fields or sub-sections) to be deleted."
+        busy={pending}
+        error={transientError}
+        onConfirm={() => {
+          if (deleteTarget?.kind === "section") {
+            void handleConfirmDeleteSection(deleteTarget.key);
+          }
+        }}
+        onClose={handleCancelDelete}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import {
   parseDraftContentMutationV2,
   type DraftContentMutationV2,
 } from "./draft-content-mutation-v2";
+import { applyDraftMutationV2, type DraftMutationV2 } from "./draft-mutation-v2";
 import { validateDraftV2, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { defaultDraftLayoutV1 } from "./draft-layout-v1";
 import { DraftError } from "./errors";
@@ -96,14 +97,10 @@ function makeConfirmedContentDraft(): CharacterSheetDraftV2 {
 
 function apply(
   draft: CharacterSheetDraftV2,
-  mutation: DraftContentMutationV2,
+  mutation: DraftMutationV2,
   expectedVersion = draft.version,
 ): CharacterSheetDraftV2 {
-  return applyDraftContentMutationWithExpectedVersionV2(
-    draft,
-    mutation,
-    expectedVersion,
-  );
+  return applyDraftMutationV2(draft, mutation, expectedVersion);
 }
 
 function expectDraftCode(fn: () => unknown, code: DraftError["code"]): void {
@@ -376,6 +373,111 @@ describe("draft-content-mutation-v2 set_value", () => {
     expect(result.values.loot).toEqual(["gem", "scroll"]);
   });
 
+  it("sets a date value", () => {
+    const draft = makeContentDraft();
+    // Add a date field first
+    const draftWithDate = apply(draft, {
+      op: "add_field",
+      field: {
+        key: "birthdate",
+        label: "Birth Date",
+        type: "date",
+        locked: false,
+      },
+    });
+    const result = apply(draftWithDate, {
+      op: "set_value",
+      key: "birthdate",
+      value: "2024-02-29",
+    });
+    expect(result.values.birthdate).toBe("2024-02-29");
+  });
+
+  it("rejects invalid date format", () => {
+    const draft = makeContentDraft();
+    const draftWithDate = apply(draft, {
+      op: "add_field",
+      field: {
+        key: "birthdate",
+        label: "Birth Date",
+        type: "date",
+        locked: false,
+      },
+    });
+    expectDraftCode(
+      () =>
+        apply(draftWithDate, {
+          op: "set_value",
+          key: "birthdate",
+          value: "02-29-2024",
+        }),
+      "invalid_mutation",
+    );
+  });
+
+  it("rejects invalid calendar date", () => {
+    const draft = makeContentDraft();
+    const draftWithDate = apply(draft, {
+      op: "add_field",
+      field: {
+        key: "birthdate",
+        label: "Birth Date",
+        type: "date",
+        locked: false,
+      },
+    });
+    expectDraftCode(
+      () =>
+        apply(draftWithDate, {
+          op: "set_value",
+          key: "birthdate",
+          value: "2024-02-30",
+        }),
+      "invalid_mutation",
+    );
+  });
+
+  it("accepts valid leap date", () => {
+    const draft = makeContentDraft();
+    const draftWithDate = apply(draft, {
+      op: "add_field",
+      field: {
+        key: "birthdate",
+        label: "Birth Date",
+        type: "date",
+        locked: false,
+      },
+    });
+    const result = apply(draftWithDate, {
+      op: "set_value",
+      key: "birthdate",
+      value: "2024-02-29",
+    });
+    expect(result.values.birthdate).toBe("2024-02-29");
+  });
+
+  it("rejects invalid leap date", () => {
+    const draft = makeContentDraft();
+    const draftWithDate = apply(draft, {
+      op: "add_field",
+      field: {
+        key: "birthdate",
+        label: "Birth Date",
+        type: "date",
+        locked: false,
+      },
+    });
+    expectDraftCode(
+      () =>
+        apply(draftWithDate, {
+          op: "set_value",
+          key: "birthdate",
+          value: "2023-02-29",
+        }),
+      "invalid_mutation",
+    );
+  });
+
   it("mirrors character_name through characterName", () => {
     const result = apply(makeContentDraft(), {
       op: "set_value",
@@ -622,6 +724,7 @@ describe("draft-content-mutation-v2 labels / types / locks", () => {
     const result = apply(makeContentDraft(), {
       op: "set_field_type",
       field: { key: "strength", type: "textarea" },
+      confirmClear: true,
     });
     const field = result.fields.find((entry) => entry.key === "strength");
     expect(field?.key).toBe("strength");
@@ -641,6 +744,7 @@ describe("draft-content-mutation-v2 labels / types / locks", () => {
     const result = apply(makeContentDraft(), {
       op: "set_field_type",
       field: { key: "strength", type: "textarea" },
+      confirmClear: true,
     });
     expect(result.values.strength).toBeUndefined();
   });
@@ -734,6 +838,7 @@ describe("draft-content-mutation-v2 labels / types / locks", () => {
     const result = apply(makeContentDraft(), {
       op: "set_field_type",
       field: { key: "strength", type: "textarea" },
+      confirmClear: true,
     });
     expect(() => validateDraftV2(result)).not.toThrow();
   });
@@ -969,6 +1074,7 @@ describe("draft-content-mutation-v2 non-structural guarantee", () => {
       {
         op: "set_field_type",
         field: { key: "strength", type: "textarea" },
+        confirmClear: true,
       },
       { op: "lock_field", key: "veteran" },
       { op: "unlock_field", key: "secret" },
@@ -992,7 +1098,11 @@ describe("draft-content-mutation-v2 version / reference semantics", () => {
     { op: "set_value", key: "strength", value: 9 },
     { op: "clear_value", key: "notes" },
     { op: "set_field_label", key: "strength", label: "Power" },
-    { op: "set_field_type", field: { key: "strength", type: "textarea" } },
+    {
+      op: "set_field_type",
+      field: { key: "strength", type: "textarea" },
+      confirmClear: true,
+    },
     { op: "lock_field", key: "veteran" },
     { op: "unlock_field", key: "secret" },
   ];

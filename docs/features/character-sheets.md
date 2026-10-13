@@ -397,7 +397,10 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | Visual style rendering                               | PLANNED                   | Style keys defined, rendering integration pending                                                                                                                                   |
 | Character image (upload/URL/AI)                      | PLANNED                   | UI placeholder only                                                                                                                                                                 |
 | Preview as modal                                     | NOT IMPLEMENTED           | Live preview pane exists; modal UX target not implemented                                                                                                                           |
-| Undo (server-authoritative)                          | NOT IMPLEMENTED           | Target architecture defined; no domain mutation, Worker endpoint, or UI                                                                                                             |
+| Undo (server-authoritative, one-level)               | IMPLEMENTED (14.10)       | Dedicated POST /undo; D1 head metadata (undoSourceVersion, undoConsumed); R2 snapshot restore; atomic consumption; no Redo                                                          |
+| remove_section (safe)                                | IMPLEMENTED (14.10)       | Empty Section allowed, non-empty rejected with explanation; atomic cleanup of sections/structure/layout; destructive confirmation UI                                              |
+| MVP Field authoring completeness                     | IMPLEMENTED (14.10)       | All 7 MVP types user-authorable: Label, Text, Number, Date, Textarea, Checkbox, Choice; full config editing (Number bounds, Choice options); Date timezone-independent; Label no value; Checkbox tri-state |
+| Safe type/config change                              | IMPLEMENTED (14.10)       | set_field_type with confirmClear; compatible keep, incompatible reject, explicit clear+change atomic; Number bounds / Choice options protected                                       |
 | V2 initial versioning                                | IMPLEMENTED (V2 DOMAIN)   | `initialDraftVersionV2`; creation validates supplied structure, never infers placements                                                                                             |
 | V2 edit transitions                                  | IMPLEMENTED (V2 DOMAIN)   | `applyDraftMutationV2` is the only public V2 edit contract                                                                                                                          |
 | V2 deterministic reroll                              | IMPLEMENTED (V2 DOMAIN)   | `rerollLockedDraftValuesV2`; deterministic per seed and Field registry order                                                                                                        |
@@ -461,5 +464,6 @@ Full transport, concurrency and error contract:
 - **Architecture:** `docs/architecture/phase-14.7/character-sheet-integration.md` (for implementation details, labeled with CURRENT/COMPLETED/SUPERSEDED/DEFERRED)
 - **V2 transport contract:** `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md` (FROZEN FOR 4E CUTOVER)
 - **Data Model:** `docs/architecture/data-model.md` (persistence direction)
-- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059
+- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**
+- **Phase 14.10:** `docs/architecture/phase-14.10/character-sheet-authoring-completeness.md`
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`

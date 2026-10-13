@@ -1,0 +1,10 @@
+const handleConfirmDeleteSection = useCallback(
+    async (key: string) => {
+      setDeleteTarget(null);
+      const outcome = await applyMutation({ op: "remove_section", key });
+      if (outcome.kind === "ok") {
+        setModal("none");
+      }
+    },
+    [applyMutation],
+  );

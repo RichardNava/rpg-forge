@@ -6,12 +6,14 @@ import {
   SheetDraftRerollRequestV2Schema,
   SheetDraftRerollResponseV2Schema,
   SheetDraftSnapshotResponseV2Schema,
+  SheetDraftUndoRequestV2Schema,
   type SheetDraftConfirmRequestV2,
   type SheetDraftCreateRequestV2,
   type SheetDraftMutationRequestV2,
   type SheetDraftRerollRequestV2,
   type SheetDraftRerollResponseV2,
   type SheetDraftSnapshotResponseV2,
+  type SheetDraftUndoRequestV2,
 } from "./draft-transport-v2";
 
 /**
@@ -267,14 +269,31 @@ describe("4D1 transport — MUTATION request", () => {
     );
   });
 
-  it("22. rejects remove_section (not approved functionality)", () => {
+  it("22. accepts remove_section", () => {
     const body = {
       expectedVersion: 7,
       mutation: { op: "remove_section", key: "combat" },
     };
     expect(SheetDraftMutationRequestV2Schema.safeParse(body).success).toBe(
+      true,
+    );
+  });
+
+  it("23. rejects undo in generic mutation request", () => {
+    const body = {
+      expectedVersion: 7,
+      mutation: { op: "undo" },
+    };
+    expect(SheetDraftMutationRequestV2Schema.safeParse(body).success).toBe(
       false,
     );
+  });
+
+  it("23b. accepts undo in dedicated undo request", () => {
+    const body = {
+      expectedVersion: 7,
+    };
+    expect(SheetDraftUndoRequestV2Schema.safeParse(body).success).toBe(true);
   });
 });
 

@@ -30,6 +30,13 @@ export interface DraftHeadRepositoryPort {
     expectedCurrentVersion: number,
     committedAt: Date,
   ): Promise<DraftHeadCommitResult>;
+  /** Commits an Undo operation: advances version, marks consumed, preserves undoSourceVersion. */
+  commitUndo(
+    identity: DraftHeadIdentity,
+    claimId: string,
+    expectedCurrentVersion: number,
+    committedAt: Date,
+  ): Promise<DraftHeadCommitResult>;
   release(
     identity: DraftHeadIdentity,
     claimId: string,

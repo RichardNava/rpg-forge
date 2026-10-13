@@ -68,7 +68,16 @@ function makeApiClient(
     })),
     createDraft: vi.fn(async (_s, _t, draft) => draft),
     getDraft: vi.fn(async () => makeDraftV2()),
-    mutateDraft: vi.fn(async () => makeDraftV2({ version: 4 })),
+    mutateDraft: vi.fn(async () => ({
+      draft: makeDraftV2({ version: 4 }),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    })),
+    undoDraft: vi.fn(async () => ({
+      draft: makeDraftV2({ version: 4 }),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    })),
     rerollDraft: vi.fn(async () => ({
       draft: makeDraftV2({ version: 4 }),
       rerolledKeys: ["strength"],
@@ -117,7 +126,11 @@ describe("createSheetStoreV2", () => {
     const mutateDraft = vi.fn(
       async (_s: string, _t: string, _d: string, request: unknown) => {
         seen = request;
-        return makeDraftV2({ version: 4 });
+        return {
+          draft: makeDraftV2({ version: 4 }),
+          undoAvailable: false,
+          undoSourceVersion: null,
+        };
       },
     );
     const { store } = await readyStore({ mutateDraft });
@@ -134,10 +147,18 @@ describe("createSheetStoreV2", () => {
   });
 
   it("E. optimistic mutation previews through applyDraftMutationV2", async () => {
-    let resolveMutate!: (draft: CharacterSheetDraftV2) => void;
+    let resolveMutate!: (result: {
+      draft: CharacterSheetDraftV2;
+      undoAvailable: boolean;
+      undoSourceVersion: number | null;
+    }) => void;
     const mutateDraft = vi.fn(
       () =>
-        new Promise<CharacterSheetDraftV2>((resolve) => {
+        new Promise<{
+          draft: CharacterSheetDraftV2;
+          undoAvailable: boolean;
+          undoSourceVersion: number | null;
+        }>((resolve) => {
           resolveMutate = resolve;
         }),
     );
@@ -150,7 +171,11 @@ describe("createSheetStoreV2", () => {
     // The optimistic preview applies synchronously before the request resolves.
     expect(store.getState().draft?.values["character_name"]).toBe("Mara");
     expect(store.getState().saveStatus).toBe("saving");
-    resolveMutate(makeDraftV2({ version: 4 }));
+    resolveMutate({
+      draft: makeDraftV2({ version: 4 }),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    });
     await outcome;
   });
 
@@ -168,7 +193,11 @@ describe("createSheetStoreV2", () => {
   });
 
   it("G. semantic no-op does not invent a version", async () => {
-    const mutateDraft = vi.fn(async () => makeDraftV2({ version: 3 }));
+    const mutateDraft = vi.fn(async () => ({
+      draft: makeDraftV2({ version: 3 }),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    }));
     const { store } = await readyStore({ mutateDraft });
     // Setting the value it already holds is a domain no-op.
     const outcome = await store.applyMutation({
@@ -183,7 +212,11 @@ describe("createSheetStoreV2", () => {
   it("H. the server response replaces optimistic state", async () => {
     const server = makeDraftV2({ version: 4, characterName: "Server Mara" });
     const { store } = await readyStore({
-      mutateDraft: vi.fn(async () => server),
+      mutateDraft: vi.fn(async () => ({
+        draft: server,
+        undoAvailable: false,
+        undoSourceVersion: null,
+      })),
     });
     await store.applyMutation({
       op: "set_value",
@@ -332,10 +365,18 @@ describe("createSheetStoreV2 spatial layout mutations (14.8)", () => {
   }
 
   it("Q. optimistic set_container_layout previews before commit", async () => {
-    let resolveMutate!: (draft: CharacterSheetDraftV2) => void;
+    let resolveMutate!: (result: {
+      draft: CharacterSheetDraftV2;
+      undoAvailable: boolean;
+      undoSourceVersion: number | null;
+    }) => void;
     const mutateDraft = vi.fn(
       () =>
-        new Promise<CharacterSheetDraftV2>((resolve) => {
+        new Promise<{
+          draft: CharacterSheetDraftV2;
+          undoAvailable: boolean;
+          undoSourceVersion: number | null;
+        }>((resolve) => {
           resolveMutate = resolve;
         }),
     );
@@ -347,16 +388,28 @@ describe("createSheetStoreV2 spatial layout mutations (14.8)", () => {
     });
     expect(store.getState().draft?.layout?.root.columns).toBe(3);
     expect(store.getState().saveStatus).toBe("saving");
-    resolveMutate(makeLayoutDraft({ version: 4, layout: undefined }));
+    resolveMutate({
+      draft: makeLayoutDraft({ version: 4, layout: undefined }),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    });
     await outcome;
     expect(store.getState().draft?.version).toBe(4);
   });
 
   it("R. optimistic set_node_layout previews geometry before commit", async () => {
-    let resolveMutate!: (draft: CharacterSheetDraftV2) => void;
+    let resolveMutate!: (result: {
+      draft: CharacterSheetDraftV2;
+      undoAvailable: boolean;
+      undoSourceVersion: number | null;
+    }) => void;
     const mutateDraft = vi.fn(
       () =>
-        new Promise<CharacterSheetDraftV2>((resolve) => {
+        new Promise<{
+          draft: CharacterSheetDraftV2;
+          undoAvailable: boolean;
+          undoSourceVersion: number | null;
+        }>((resolve) => {
           resolveMutate = resolve;
         }),
     );
@@ -377,12 +430,20 @@ describe("createSheetStoreV2 spatial layout mutations (14.8)", () => {
       rowSpan: 2,
       breakBefore: true,
     });
-    resolveMutate(makeLayoutDraft({ version: 4 }));
+    resolveMutate({
+      draft: makeLayoutDraft({ version: 4 }),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    });
     await outcome;
   });
 
   it("S. spatial semantic no-op keeps the local version", async () => {
-    const mutateDraft = vi.fn(async () => makeLayoutDraft());
+    const mutateDraft = vi.fn(async () => ({
+      draft: makeLayoutDraft(),
+      undoAvailable: false,
+      undoSourceVersion: null,
+    }));
     const { store } = await readyStore({ mutateDraft }, makeLayoutDraft());
     const outcome = await store.applyMutation({
       op: "set_container_layout",
@@ -428,7 +489,11 @@ describe("createSheetStoreV2 spatial layout mutations (14.8)", () => {
     const mutateDraft = vi.fn(
       async (_s: string, _t: string, _d: string, request: unknown) => {
         seen = request;
-        return makeDraftV2({ version: 4 });
+        return {
+          draft: makeDraftV2({ version: 4 }),
+          undoAvailable: false,
+          undoSourceVersion: null,
+        };
       },
     );
     const { store } = await readyStore({ mutateDraft });

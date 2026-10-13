@@ -259,19 +259,21 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
       });
 
       try {
-        const committed = await options.api.mutateDraft(
+        const result = await options.api.mutateDraft(
           sessionId,
           accessToken,
           draft.draftId,
           { expectedVersion, mutation },
         );
         setState({
-          draft: committed,
+          draft: result.draft,
           saveStatus: "saved",
-          savedVersion: committed.version,
+          savedVersion: result.draft.version,
           error: null,
+          undoAvailable: result.undoAvailable,
+          undoSourceVersion: result.undoSourceVersion,
         });
-        return { kind: "ok", draft: committed };
+        return { kind: "ok", draft: result.draft };
       } catch (error) {
         const sheetError = toSheetApiError(error);
         setState({ saveStatus: "error", error: sheetError });
@@ -362,6 +364,50 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           error: null,
         });
         return { kind: "ok", draft: confirmed };
+      } catch (error) {
+        const sheetError = toSheetApiError(error);
+        setState({ saveStatus: "error", error: sheetError });
+        await reconcile();
+        return { kind: "error", error: sheetError };
+      }
+    },
+
+    async undo(): Promise<SheetStoreV2MutationOutcome> {
+      if (
+        !hasSession() ||
+        state.draft === null ||
+        state.sessionId === null ||
+        state.accessToken === null
+      ) {
+        return { kind: "not_ready" };
+      }
+      if (state.saveStatus === "saving") {
+        return { kind: "inflight" };
+      }
+
+      const { sessionId, accessToken, draft } = state;
+      const expectedVersion = draft.version;
+      setState({
+        saveStatus: "saving",
+        error: null,
+      });
+
+      try {
+        const result = await options.api.undoDraft(
+          sessionId,
+          accessToken,
+          draft.draftId,
+          { expectedVersion },
+        );
+        setState({
+          draft: result.draft,
+          saveStatus: "saved",
+          savedVersion: result.draft.version,
+          error: null,
+          undoAvailable: result.undoAvailable,
+          undoSourceVersion: result.undoSourceVersion,
+        });
+        return { kind: "ok", draft: result.draft };
       } catch (error) {
         const sheetError = toSheetApiError(error);
         setState({ saveStatus: "error", error: sheetError });

@@ -55,6 +55,10 @@ export interface SheetCanvasCallbacks {
   onSetValue(key: string, value: DraftValue): void;
   onClearValue(key: string): void;
   onRemoveField(key: string): void;
+  onConfirmDeleteField(key: string): void;
+  onCancelDelete(): void;
+  onRemoveSection(key: string): void;
+  onConfirmDeleteSection(key: string): void;
   onSetFieldLabel(key: string, label: string): void;
   onSetFieldType(
     field: Extract<DraftMutationV2, { op: "set_field_type" }>["field"],

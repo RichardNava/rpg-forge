@@ -81,12 +81,14 @@ import {
   SheetDraftRerollRequestV2Schema,
   SheetDraftRerollResponseV2Schema,
   SheetDraftSnapshotResponseV2Schema,
+  SheetDraftUndoRequestV2Schema,
   type SheetDraftConfirmRequestV2,
   type SheetDraftCreateRequestV2,
   type SheetDraftMutationRequestV2,
   type SheetDraftRerollRequestV2,
   type SheetDraftRerollResponseV2,
   type SheetDraftSnapshotResponseV2,
+  type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
 
 export {
@@ -157,6 +159,22 @@ export function parseDraftV2ConfirmRequest(
   body: unknown,
 ): DraftV2RequestOutcome<SheetDraftConfirmRequestV2> {
   const parsed = SheetDraftConfirmRequestV2Schema.safeParse(body);
+  return parsed.success
+    ? { kind: "ok", value: parsed.data }
+    : { kind: "invalid" };
+}
+
+/**
+ * `{ expectedVersion }` for the V2 undo route (14.10).
+ *
+ * Undo requires server-side history (the undoSourceVersion from the D1 draft head).
+ * The client sends only expectedVersion; the server resolves the undo source and
+ * creates a new snapshot at version N+2.
+ */
+export function parseDraftV2UndoRequest(
+  body: unknown,
+): DraftV2RequestOutcome<SheetDraftUndoRequestV2> {
+  const parsed = SheetDraftUndoRequestV2Schema.safeParse(body);
   return parsed.success
     ? { kind: "ok", value: parsed.data }
     : { kind: "invalid" };

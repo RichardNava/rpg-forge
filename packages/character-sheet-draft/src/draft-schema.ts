@@ -45,6 +45,8 @@ export const DraftFieldTypeSchema = z.enum([
   "textarea",
   "checkbox",
   "choice",
+  "label",
+  "date",
   "list",
 ]);
 export type DraftFieldType = z.infer<typeof DraftFieldTypeSchema>;
@@ -115,6 +117,30 @@ export const DraftFieldSchema = z
         code: z.ZodIssueCode.custom,
         message: "Only number fields may declare numeric bounds.",
       });
+    }
+    if (field.type === "label") {
+      if (
+        field.options !== undefined ||
+        field.min !== undefined ||
+        field.max !== undefined
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A label field cannot declare options or numeric bounds.",
+        });
+      }
+    }
+    if (field.type === "date") {
+      if (
+        field.options !== undefined ||
+        field.min !== undefined ||
+        field.max !== undefined
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A date field cannot declare options or numeric bounds.",
+        });
+      }
     }
   });
 export type DraftField = z.infer<typeof DraftFieldSchema>;

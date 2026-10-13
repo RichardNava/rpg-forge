@@ -16,6 +16,8 @@ const FIELD_TYPES: Array<{ value: DraftFieldType; label: string }> = [
   { value: "textarea", label: "Text area" },
   { value: "checkbox", label: "Checkbox" },
   { value: "choice", label: "Choice" },
+  { value: "label", label: "Label" },
+  { value: "date", label: "Date" },
 ];
 
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;

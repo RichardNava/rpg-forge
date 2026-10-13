@@ -65,9 +65,9 @@ describe("createLocalSheetBackendV2", () => {
       },
     );
 
-    expect(named.values["character_name"]).toBe("Mara");
-    expect(named.characterName).toBe("Mara");
-    expect(named.version).toBe(2);
+    expect(named.draft.values["character_name"]).toBe("Mara");
+    expect(named.draft.characterName).toBe("Mara");
+    expect(named.draft.version).toBe(2);
   });
 
   it("reroll checks expectedVersion first and persists N+1", async () => {

@@ -326,6 +326,104 @@ export async function persistNextDraftV2(
 }
 
 /**
+ * SECOND CONCURRENCY BARRIER — persist an UNDO snapshot (14.10).
+ *
+ * This is like `persistNextDraftV2` but for the Undo operation.
+ * It advances the head from V to V+1 (where current is V) and atomically
+ * marks the Undo as consumed (undoConsumed = true) without updating
+ * undoSourceVersion to the just-undone version.
+ *
+ * The Undo source version remains available for potential future Undo
+ * eligibility only after a new real authoring mutation.
+ *
+ * ```text
+ * stable head V (with undoSourceVersion = U, undoConsumed = false)
+ *   -> atomic D1 claim V+1        (CAS: currentVersion = V AND pendingVersion IS NULL)
+ *   -> R2 put canonical V2 V+1
+ *   -> D1 commit V+1              (CAS: currentVersion = V AND pendingVersion = V+1 AND claimId)
+ *       sets undoSourceVersion = U (unchanged)
+ *       sets undoConsumed = true
+ * ```
+ *
+ * This ensures there is NO persisted state where:
+ *   currentVersion = V+1
+ *   undoConsumed = false
+ *   undoSourceVersion = V (the just-undone version)
+ *
+ * which would allow an immediate second Undo to act as Redo.
+ *
+ * @param deps - Runtime dependencies
+ * @param current - Current draft (version V)
+ * @param next - Next draft (version V+1, content from undo source U)
+ * @returns The committed next draft
+ * @throws DraftError - version_conflict, draft_inflight, storage_unavailable, etc.
+ */
+export async function persistUndoDraftV2(
+  deps: DraftV2Runtime,
+  current: CharacterSheetDraftV2,
+  next: CharacterSheetDraftV2,
+): Promise<CharacterSheetDraftV2> {
+  assertNextSnapshotContinues(current, next);
+
+  const identity: DraftHeadIdentity = {
+    sessionId: current.sessionId,
+    draftId: current.draftId,
+  };
+  const claimId = deps.crypto.uuid();
+
+  const claimed = await deps.heads.claim(
+    identity,
+    current.version,
+    claimId,
+    deps.clock.now(),
+  );
+
+  if (claimed.kind === "already_pending") {
+    throw draftError(
+      "draft_inflight",
+      "Another save is already in progress for this draft.",
+    );
+  }
+  if (claimed.kind === "version_conflict") {
+    throw draftError(
+      "version_conflict",
+      "The draft version changed during the save.",
+    );
+  }
+  if (claimed.kind === "not_found") {
+    throw draftError(
+      "version_conflict",
+      "The draft version changed during the save.",
+    );
+  }
+
+  try {
+    await deps.store.putDraft(next);
+  } catch (error) {
+    await releaseClaimQuietly(deps, identity, claimId, claimed.claimedVersion);
+    throw error;
+  }
+
+  // Commit with Undo-specific metadata: mark as consumed, preserve undoSourceVersion
+  const committed = await deps.heads.commitUndo(
+    identity,
+    claimId,
+    current.version,
+    deps.clock.now(),
+  );
+
+  if (committed.kind !== "committed") {
+    await releaseClaimQuietly(deps, identity, claimId, claimed.claimedVersion);
+    throw draftError(
+      "version_conflict",
+      "The draft version changed during the save.",
+    );
+  }
+
+return next;
+}
+
+/**
  * Fails loudly when `next` is not the real successor of `current`.
  *
  * This is a defensive invariant, not a repair step: `next.version` is never

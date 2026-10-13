@@ -5,7 +5,21 @@ import {
   draftKeyPattern,
   type CharacterSheetDraftV2,
 } from "./draft-schema-v2";
-import { DraftMutationV2Schema } from "./draft-mutation-v2";
+import { DraftMutationV2Schema, DraftUndoMutationV2Schema } from "./draft-mutation-v2";
+
+/**
+ * Transport mutation schema that excludes `undo` — undo is a dedicated
+ * transport operation (POST /undo) and must not be accepted via the generic
+ * PATCH /drafts endpoint.
+ */
+const transportMutationOptions = DraftMutationV2Schema.options.filter(
+  (opt: z.ZodTypeAny) => (opt as any).shape?.op?.value !== "undo",
+) as z.ZodTypeAny[];
+
+const TransportDraftMutationV2Schema = z.union(transportMutationOptions);
+
+export { TransportDraftMutationV2Schema };
+export type TransportDraftMutationV2Schema = z.infer<typeof TransportDraftMutationV2Schema>;
 
 /**
  * 4D1 — CANONICAL V2 TRANSPORT SCHEMAS (internal; not yet public).
@@ -117,10 +131,14 @@ export type SheetDraftSnapshotResponseV2 = CharacterSheetDraftV2;
  * smuggled alongside the mutation) are rejected. `mutation` keeps its own strict
  * discriminated union, which independently rejects an `expectedVersion` placed
  * INSIDE the mutation payload.
+ *
+ * Note: `undo` is excluded from this schema because it has its own dedicated
+ * endpoint (POST /undo) and must not be accepted via the generic PATCH /drafts
+ * mutation endpoint.
  */
 export const SheetDraftMutationRequestV2Schema = z.strictObject({
   expectedVersion: DraftExpectedVersionSchema,
-  mutation: DraftMutationV2Schema,
+  mutation: TransportDraftMutationV2Schema,
 });
 export type SheetDraftMutationRequestV2 = z.infer<
   typeof SheetDraftMutationRequestV2Schema
@@ -171,3 +189,26 @@ export const SheetDraftConfirmRequestV2Schema = z.strictObject({
 export type SheetDraftConfirmRequestV2 = z.infer<
   typeof SheetDraftConfirmRequestV2Schema
 >;
+
+/**
+ * UNDO request body (14.10): a concurrency precondition, and nothing else.
+ *
+ * Undo is a dedicated transport operation because it requires server-side
+ * history (the undoSourceVersion from the D1 draft head). The client sends
+ * only expectedVersion; the server resolves the undo source and creates a
+ * new snapshot at version N+2.
+ */
+export const SheetDraftUndoRequestV2Schema = z.strictObject({
+  expectedVersion: DraftExpectedVersionSchema,
+});
+export type SheetDraftUndoRequestV2 = z.infer<
+  typeof SheetDraftUndoRequestV2Schema
+>;
+
+/**
+ * UNDO response body (14.10): the raw canonical V2 snapshot.
+ *
+ * Same shape as mutation/confirm responses — the authoritative restored draft.
+ */
+export const SheetDraftUndoResponseV2Schema = CharacterSheetDraftV2Schema;
+export type SheetDraftUndoResponseV2 = CharacterSheetDraftV2;

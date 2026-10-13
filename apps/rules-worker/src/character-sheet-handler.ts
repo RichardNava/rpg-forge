@@ -14,6 +14,7 @@ import { createDraftV2 } from "./features/character-sheets/draft-v2-create.js";
 import { mutateDraftV2 } from "./features/character-sheets/draft-v2-mutation.js";
 import { rerollDraftV2 } from "./features/character-sheets/draft-v2-reroll.js";
 import { confirmDraftV2 } from "./features/character-sheets/draft-v2-confirm.js";
+import { undoDraftV2 } from "./features/character-sheets/draft-v2-undo.js";
 import {
   readCurrentDraftV2,
   type DraftV2Runtime,
@@ -22,6 +23,7 @@ import {
   parseDraftV2ConfirmRequest,
   parseDraftV2MutationRequest,
   parseDraftV2RerollRequest,
+  parseDraftV2UndoRequest,
 } from "./features/character-sheets/draft-v2-transport.js";
 import {
   draftV2CreatedResponse,
@@ -57,6 +59,8 @@ const SHEET_DRAFT_REROLL_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/reroll$/;
 const SHEET_DRAFT_CONFIRM_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/confirm$/;
+const SHEET_DRAFT_UNDO_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/undo$/;
 const SHEET_DOCUMENT_EXTRACTION_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/extraction$/;
 const SHEET_DOCUMENT_MAX_BYTES = 8 * 1024 * 1024;
@@ -161,6 +165,15 @@ export async function handleCharacterSheetRequest(
     const draftId = draftConfirmMatch[2] ?? "";
     if (method === "POST") {
       return handleConfirmDraft(sessionId, draftId, request, deps);
+    }
+  }
+
+  const draftUndoMatch = SHEET_DRAFT_UNDO_PATH_PATTERN.exec(path);
+  if (draftUndoMatch !== null) {
+    const sessionId = draftUndoMatch[1] ?? "";
+    const draftId = draftUndoMatch[2] ?? "";
+    if (method === "POST") {
+      return handleUndoDraft(sessionId, draftId, request, deps);
     }
   }
 
@@ -644,8 +657,20 @@ async function handleMutateDraft(
     return errorResponse("SHEET_DRAFT_NOT_FOUND");
   }
 
+  // Read the updated head to get undo metadata for the client
+  const head = await deps.sheetDraftHeadRepository.getHead(draftIdentity);
+  const undoHeaders: Record<string, string> = {};
+  if (head) {
+    if (head.undoSourceVersion !== null && !head.undoConsumed) {
+      undoHeaders["X-Undo-Available"] = "true";
+      undoHeaders["X-Undo-Source-Version"] = String(head.undoSourceVersion);
+    } else {
+      undoHeaders["X-Undo-Available"] = "false";
+    }
+  }
+
   traceSheetDraft(deps, "draft mutation response", mutated);
-  return draftV2SnapshotResponse(mutated);
+  return draftV2SnapshotResponse(mutated, undoHeaders);
 }
 
 async function handleRerollDraft(
@@ -762,6 +787,62 @@ async function handleConfirmDraft(
   return draftV2SnapshotResponse(confirmed);
 }
 
+async function handleUndoDraft(
+  sessionId: string,
+  draftId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+
+  if (!hasJsonContentType(request)) {
+    return errorResponse("INVALID_REQUEST", "Expected application/json.");
+  }
+  const body = await readBoundedJson(request);
+  if (body === null) {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "Request body is malformed or too large.",
+    );
+  }
+  const parsed = parseDraftV2UndoRequest(body);
+  if (parsed.kind === "invalid") {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "The request body must contain an expectedVersion.",
+    );
+  }
+
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
+    return draftStorageUnavailable();
+  }
+  const draftIdentity: CharacterSheetDraftIdentity = {
+    sessionId: auth.sessionId,
+    draftId,
+  };
+
+  let undone;
+  try {
+    undone = await undoDraftV2(
+      runtime,
+      draftIdentity,
+      parsed.value.expectedVersion,
+    );
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+  if (undone === null) {
+    return errorResponse("SHEET_DRAFT_NOT_FOUND");
+  }
+
+  traceSheetDraft(deps, "draft undo response", undone);
+  return draftV2SnapshotResponse(undone);
+}
+
 type DraftV2ReadOutcome =
   | { kind: "ok"; draft: CharacterSheetDraftV2 | null }
   | { kind: "error"; response: Response };
@@ -858,6 +939,15 @@ function draftErrorToResponse(error: unknown): Response {
         return errorResponse("SHEET_DRAFT_INVALID", error.message);
       case "invalid_mutation":
         return errorResponse("SHEET_DRAFT_MUTATION_INVALID", error.message);
+      case "undo_not_available":
+        return errorResponse("SHEET_DRAFT_UNDO_NOT_AVAILABLE", error.message);
+      case "undo_already_consumed":
+        return errorResponse(
+          "SHEET_DRAFT_UNDO_ALREADY_CONSUMED",
+          error.message,
+        );
+      case "undo_source_missing":
+        return errorResponse("SHEET_DRAFT_UNDO_SOURCE_MISSING", error.message);
       case "cleanup_failed":
         return draftStorageUnavailable();
       case "projection_invalid":

@@ -75,6 +75,8 @@ const DraftSetFieldTypeMutationV2Schema = z.strictObject({
     min: z.number().finite().optional(),
     max: z.number().finite().optional(),
   }),
+  /** Explicit user approval to clear an incompatible value. */
+  confirmClear: z.boolean().optional(),
 });
 export type DraftSetFieldTypeMutationV2 = z.infer<
   typeof DraftSetFieldTypeMutationV2Schema
@@ -303,11 +305,46 @@ function applySetFieldType(
   const replacement = fieldForTypeChangeV2(current, mutation);
 
   const currentValue = draft.values[current.key];
-  const removesValue =
-    currentValue !== undefined && !valueMatchesType(currentValue, replacement);
+  let removesValue = false;
+
+  if (currentValue !== undefined) {
+    if (!valueMatchesType(currentValue, replacement)) {
+      removesValue = true;
+    } else if (replacement.type === "number") {
+      // Check if new bounds would invalidate current value
+      if (
+        (replacement.min !== undefined &&
+          typeof currentValue === "number" &&
+          currentValue < replacement.min) ||
+        (replacement.max !== undefined &&
+          typeof currentValue === "number" &&
+          currentValue > replacement.max)
+      ) {
+        removesValue = true;
+      }
+    } else if (replacement.type === "choice") {
+      // Check if new options would remove selected value
+      if (
+        typeof currentValue === "string" &&
+        replacement.options !== undefined &&
+        !replacement.options.includes(currentValue)
+      ) {
+        removesValue = true;
+      }
+    }
+  }
 
   if (fieldSemanticallyEqual(current, replacement) && !removesValue) {
     return draft;
+  }
+
+  // If there's an incompatible explicit value and user hasn't confirmed clearing,
+  // reject with a specific error code that the UI can handle
+  if (removesValue && !mutation.confirmClear) {
+    throw draftError(
+      "invalid_mutation",
+      `Changing "${current.key}" to ${replacement.type} would remove its current value. Confirm to proceed.`,
+    );
   }
 
   const values = { ...draft.values };
@@ -391,6 +428,11 @@ function fieldForTypeChangeV2(
         "A choice field needs at least one option.",
       );
     }
+    // Check for duplicate options
+    const uniqueOptions = new Set(change.options);
+    if (uniqueOptions.size !== change.options.length) {
+      throw draftError("invalid_mutation", "Choice options must be unique.");
+    }
     return { ...base, options: change.options };
   }
   if (change.type === "number") {
@@ -409,6 +451,9 @@ function fieldForTypeChangeV2(
       ...(change.min === undefined ? {} : { min: change.min }),
       ...(change.max === undefined ? {} : { max: change.max }),
     };
+  }
+  if (change.type === "label" || change.type === "date") {
+    return base;
   }
   return base;
 }
@@ -460,6 +505,8 @@ function valueMatchesType(value: DraftValue, field: DraftField): boolean {
   }
   if (field.type === "number") return typeof value === "number";
   if (field.type === "checkbox") return typeof value === "boolean";
+  if (field.type === "date") return typeof value === "string";
+  if (field.type === "label") return false; // Label fields never have values
   return Array.isArray(value);
 }
 
@@ -520,6 +567,47 @@ function assertValueMatchesField(field: DraftField, value: DraftValue): void {
         );
       }
       return;
+    case "date":
+      if (typeof value !== "string") {
+        throw draftError(
+          "invalid_mutation",
+          `Draft field "${field.key}" expects a date string (YYYY-MM-DD).`,
+        );
+      }
+      // Validate YYYY-MM-DD format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw draftError(
+          "invalid_mutation",
+          `Draft field "${field.key}" expects a date in YYYY-MM-DD format.`,
+        );
+      }
+      // Validate it's a real calendar date (timezone-independent)
+      const year = parseInt(value.slice(0, 4), 10);
+      const month = parseInt(value.slice(5, 7), 10);
+      const day = parseInt(value.slice(8, 10), 10);
+      if (month < 1 || month > 12 || day < 1 || day > 31) {
+        throw draftError(
+          "invalid_mutation",
+          `Draft field "${field.key}" contains an invalid calendar date.`,
+        );
+      }
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+      ) {
+        throw draftError(
+          "invalid_mutation",
+          `Draft field "${field.key}" contains an invalid calendar date.`,
+        );
+      }
+      return;
+    case "label":
+      throw draftError(
+        "invalid_mutation",
+        `Draft field "${field.key}" is a label and cannot have a value.`,
+      );
     case "list":
       if (
         !Array.isArray(value) ||

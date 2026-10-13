@@ -59,6 +59,8 @@ export function createD1DraftHeadRepository(
           pendingSince: null,
           createdAt: now,
           updatedAt: now,
+          undoSourceVersion: null,
+          undoConsumed: false,
         })
         .onConflictDoNothing()
         .run();
@@ -132,6 +134,53 @@ export function createD1DraftHeadRepository(
           pendingClaimId: null,
           pendingSince: null,
           updatedAt: committedAt,
+          // 14.10: record the previous version as the undo source, reset consumed flag
+          undoSourceVersion: expectedCurrentVersion,
+          undoConsumed: false,
+        })
+        .where(
+          and(
+            eq(table.sessionId, identity.sessionId),
+            eq(table.draftId, identity.draftId),
+            eq(table.currentVersion, expectedCurrentVersion),
+            eq(table.pendingVersion, committedVersion),
+            eq(table.pendingClaimId, claimId),
+          ),
+        )
+        .run();
+      const head = await find(identity);
+      if (attempted.meta.changes > 0) {
+        return { kind: "committed", head: head! };
+      }
+      if (head === null) {
+        return { kind: "not_found" };
+      }
+      if (
+        head.pendingClaimId !== claimId ||
+        head.pendingVersion !== committedVersion
+      ) {
+        return { kind: "wrong_claim", head };
+      }
+      return { kind: "version_conflict", head };
+    },
+
+    async commitUndo(
+      identity,
+      claimId,
+      expectedCurrentVersion,
+      committedAt,
+    ): Promise<DraftHeadCommitResult> {
+      const committedVersion = expectedCurrentVersion + 1;
+      const attempted = await db
+        .update(table)
+        .set({
+          currentVersion: committedVersion,
+          pendingVersion: null,
+          pendingClaimId: null,
+          pendingSince: null,
+          updatedAt: committedAt,
+          // 14.10: Undo consumes eligibility, preserves undoSourceVersion (unchanged)
+          undoConsumed: true,
         })
         .where(
           and(
@@ -223,5 +272,7 @@ function fromRow(row: typeof sheetDraftHead.$inferSelect): DraftHead {
       row.pendingSince === null ? null : new Date(row.pendingSince.getTime()),
     createdAt: new Date(row.createdAt.getTime()),
     updatedAt: new Date(row.updatedAt.getTime()),
+    undoSourceVersion: row.undoSourceVersion ?? null,
+    undoConsumed: row.undoConsumed ?? false,
   };
 }
