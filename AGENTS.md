@@ -427,6 +427,7 @@ Do not repeatedly rerun expensive full gates while a known targeted blocker rema
 3. **Comprobar siempre que un `--grep` realmente está ejecutando un único test.**
 4. **Un fallo repetido de la misma forma no es "flaky" hasta demostrarlo.**
 5. **Formatting y limpieza de debug van al final, no durante el bucle funcional.**
+
 ## Bad practices to avoid
 
 Before implementation/debugging loops, read:
@@ -449,3 +450,4 @@ scope:
 STOP
 → report evidence
 → await user/reviewer decision
+```

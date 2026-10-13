@@ -214,11 +214,20 @@ Further executions require a materially new hypothesis.
 
 Never perform an open-ended sequence of "one more run".
 
+## Targeted blocker stop rule
+
+If a targeted blocker remains unresolved after two evidence-driven attempts,
+STOP and report it.
+
+Do not keep rerunning the same test.
+Do not test until green.
+Do not expand scope to avoid reporting a blocker.
+
+A further attempt is allowed only when there is materially new evidence,
+a new hypothesis, or a relevant implementation/test change.
+
 ## Core rule
 
 ```text
 Evidence must change before execution repeats.
 ```
-
-If nothing changed in the hypothesis, implementation, fixture, environment or
-observable being tested, do not run the same test again.
