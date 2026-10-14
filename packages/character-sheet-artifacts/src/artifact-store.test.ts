@@ -32,6 +32,18 @@ class InMemoryArtifactStore implements CharacterSheetArtifactStore {
     this.pdfs.set(this.key(sessionId, runId), pdfBytes);
   }
 
+  async putPdfBytes({
+    sessionId,
+    runId,
+    pdfBytes,
+  }: {
+    sessionId: string;
+    runId: string;
+    pdfBytes: Uint8Array;
+  }): Promise<void> {
+    this.pdfs.set(this.key(sessionId, runId), pdfBytes);
+  }
+
   async getSpec({
     sessionId,
     runId,
@@ -65,13 +77,14 @@ class InMemoryArtifactStore implements CharacterSheetArtifactStore {
 }
 
 describe("CharacterSheetArtifactStore contract", () => {
-  it("public API surface is exactly the five identity-keyed methods", () => {
+  it("public API surface is exactly the six identity-keyed methods", () => {
     const publicMethods = Object.getOwnPropertyNames(
       InMemoryArtifactStore.prototype,
     ).filter((name) => name !== "constructor" && name !== "key");
     expect(new Set(publicMethods)).toEqual(
       new Set([
         "putRunArtifacts",
+        "putPdfBytes",
         "getSpec",
         "getPdfBytes",
         "deleteRunArtifacts",
@@ -97,6 +110,19 @@ describe("CharacterSheetArtifactStore contract", () => {
 
     await store.deleteRunArtifacts({ sessionId, runId });
     expect(await store.getSpec({ sessionId, runId })).toBeNull();
+    expect(await store.getPdfBytes({ sessionId, runId })).toBeNull();
+  });
+
+  it("putPdfBytes persists a final styled PDF without a spec", async () => {
+    const store = new InMemoryArtifactStore();
+    const sessionId = "b15b4b3a-9a5f-4b6e-8d3c-1f7a6e2d4c0a";
+    const runId = "d3e6d5f2-2c1b-4d3e-9f5a-3b9c0d2e3f4a";
+
+    await store.putPdfBytes({ sessionId, runId, pdfBytes: PDF_BYTES });
+    expect(await store.getPdfBytes({ sessionId, runId })).toEqual(PDF_BYTES);
+    expect(await store.getSpec({ sessionId, runId })).toBeNull();
+
+    await store.deleteRunArtifacts({ sessionId, runId });
     expect(await store.getPdfBytes({ sessionId, runId })).toBeNull();
   });
 

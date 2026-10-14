@@ -10,6 +10,10 @@ export interface PutRunArtifactsInput extends CharacterSheetArtifactIdentity {
   pdfBytes: Uint8Array;
 }
 
+export interface PutPdfBytesInput extends CharacterSheetArtifactIdentity {
+  pdfBytes: Uint8Array;
+}
+
 /**
  * Port for temporary character-sheet run artifacts. The port deliberately has
  * no generic read/write-by-key method: keys are derived from opaque identities
@@ -18,6 +22,7 @@ export interface PutRunArtifactsInput extends CharacterSheetArtifactIdentity {
  */
 export interface CharacterSheetArtifactStore {
   putRunArtifacts(input: PutRunArtifactsInput): Promise<void>;
+  putPdfBytes(input: PutPdfBytesInput): Promise<void>;
   getSpec(
     identity: CharacterSheetArtifactIdentity,
   ): Promise<CharacterSheetSpec | null>;

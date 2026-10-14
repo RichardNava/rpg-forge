@@ -76,6 +76,10 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
     };
   }
 
+  function stableFinalSeed(draftId: string): string {
+    return `final-${draftId}`.slice(0, 64);
+  }
+
   async function reconcile(): Promise<void> {
     const { sessionId, accessToken } = state;
     const draft = state.draft;
@@ -162,6 +166,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           savedVersion: draft.version,
           workshop: workshopForDraft(draft.mode),
           rerolledKeys: null,
+          finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
           error: null,
         });
       } catch (error) {
@@ -206,6 +211,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           savedVersion: draft.version,
           workshop: workshopForDraft(draft.mode),
           rerolledKeys: null,
+          finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
           error: null,
         });
       } catch (error) {
@@ -369,6 +375,92 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
         await reconcile();
         return { kind: "error", error: sheetError };
       }
+    },
+
+    async generateFinalSheet(
+      input: import("./sheet-store-v2-types").SheetStoreV2FinalGenerationInput,
+    ): Promise<import("./sheet-store-v2-types").SheetStoreV2FinalGenerationOutcome> {
+      if (
+        !hasSession() ||
+        state.draft === null ||
+        state.sessionId === null ||
+        state.accessToken === null
+      ) {
+        return { kind: "not_ready" };
+      }
+      if (state.finalGeneration.status === "generating") {
+        return { kind: "inflight" };
+      }
+      const { sessionId, accessToken, draft } = state;
+      if (!draft.confirmed) {
+        return {
+          kind: "rejected",
+          code: "DRAFT_NOT_CONFIRMED",
+          message: "Only a confirmed draft can be finally generated.",
+        };
+      }
+      if (draft.mode === "npc" && (input.threat === null || input.threat === undefined)) {
+        return {
+          kind: "rejected",
+          code: "NPC_THREAT_REQUIRED",
+          message: "Choose a threat level before generating an NPC sheet.",
+        };
+      }
+      if (draft.mode === "pc" && input.threat !== null && input.threat !== undefined) {
+        return {
+          kind: "rejected",
+          code: "PC_THREAT_FORBIDDEN",
+          message: "Player-character sheets do not use a threat level.",
+        };
+      }
+      const seed = (input.seed ?? stableFinalSeed(draft.draftId)).slice(0, 64);
+      setState({
+        finalGeneration: { status: "generating", runId: null, draftVersion: draft.version, error: null },
+        error: null,
+      });
+      try {
+        const result = await options.api.generateFinalSheet(sessionId, accessToken, draft.draftId, {
+          expectedVersion: draft.version,
+          options: {
+            threat: draft.mode === "npc" ? (input.threat ?? null) : null,
+            visualStyle: input.visualStyle,
+            instructions: input.instructions ?? null,
+            portrait: { kind: "none" },
+          },
+          seed,
+        });
+        setState({
+          finalGeneration: {
+            status: "ready",
+            runId: result.runId,
+            draftVersion: result.draftVersion,
+            error: null,
+          },
+        });
+        return { kind: "ok", runId: result.runId, draftVersion: result.draftVersion };
+      } catch (error) {
+        const sheetError = toSheetApiError(error);
+        setState({
+          finalGeneration: { status: "error", runId: null, draftVersion: draft.version, error: sheetError },
+        });
+        return { kind: "error", error: sheetError };
+      }
+    },
+
+    async downloadFinalPdf(): Promise<Uint8Array | null> {
+      if (
+        !hasSession() ||
+        state.sessionId === null ||
+        state.accessToken === null ||
+        state.finalGeneration.runId === null
+      ) {
+        return null;
+      }
+      return options.api.downloadFinalPdf(
+        state.sessionId,
+        state.accessToken,
+        state.finalGeneration.runId,
+      );
     },
 
     async undo(): Promise<SheetStoreV2MutationOutcome> {

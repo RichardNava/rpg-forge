@@ -133,6 +133,26 @@ export function createR2CharacterSheetArtifactStore(
       }
     },
 
+    async putPdfBytes({ sessionId, runId, pdfBytes }) {
+      const keys = getRunArtifactKeys(sessionId, runId);
+      try {
+        await bucket.put(keys.pdf, pdfBytes, {
+          httpMetadata: {
+            contentType: PDF_CONTENT_TYPE,
+            cacheControl: CACHE_CONTROL_NO_STORE,
+          },
+        });
+      } catch (error) {
+        if (error instanceof CharacterSheetArtifactError) {
+          throw error;
+        }
+        throw artifactError(
+          "storage_unavailable",
+          "Character sheet artifact storage is unavailable.",
+        );
+      }
+    },
+
     async getSpec(identity) {
       const object = await getObject(bucket, identity, "spec");
       if (object === null) {

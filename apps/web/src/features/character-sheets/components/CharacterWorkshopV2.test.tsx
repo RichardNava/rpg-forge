@@ -87,6 +87,59 @@ describe("CharacterWorkshopV2", () => {
     });
   });
 
+  it("shows the final-generation panel after confirm with Medieval/Sci-fi only", async () => {
+    render(<CharacterWorkshopV2 />);
+    fireEvent.click(screen.getByRole("button", { name: /Create manually/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Sheet title")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm sheet" }));
+    const confirmDialog = screen.getByRole("dialog", {
+      name: "Confirm character sheet",
+    });
+    fireEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Confirm sheet" }),
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/confirmed and read-only/i)).toBeTruthy();
+    });
+
+    // Final-generation panel is the primary post-confirm action.
+    expect(
+      screen.getByRole("heading", { name: /Final sheet/i }),
+    ).toBeTruthy();
+    const medieval = screen.getByRole("button", { name: /^Medieval$/i });
+    const scifi = screen.getByRole("button", { name: /^Sci-fi$/i });
+    expect(medieval.getAttribute("aria-pressed")).toBe("true");
+    expect(scifi.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByRole("button", { name: /^Fantasy$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Gothic$/i })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /Generate Final Sheet with AI/i }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Download Final PDF/i }),
+    ).toBeTruthy();
+    // Technical PDF is secondary, not the primary CTA.
+    expect(
+      screen.getByRole("button", { name: /Download technical PDF/i }),
+    ).toBeTruthy();
+
+    // Presentation instructions are carried as presentation guidance.
+    const instructions = screen.getByLabelText(/Presentation instructions/i);
+    fireEvent.change(instructions, {
+      target: { value: "Keep the design restrained." },
+    });
+    expect((instructions as HTMLTextAreaElement).value).toBe(
+      "Keep the design restrained.",
+    );
+
+    // Switching style keeps the same panel (stable seed is store-owned).
+    fireEvent.click(scifi);
+    expect(scifi.getAttribute("aria-pressed")).toBe("true");
+    expect(medieval.getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("emits only DraftMutationV2 operations", async () => {
     const seen: string[] = [];
     const { container } = render(<CharacterWorkshopV2 />);

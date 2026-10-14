@@ -227,6 +227,66 @@ describe("SheetApiClientV2", () => {
     expect((error as SheetApiError).code).toBe("SHEET_DRAFT_VERSION_CONFLICT");
   });
 
+  it("M. generate sends expectedVersion/options/seed without a Draft", async () => {
+    const { client } = makeClient(async (input, init) => {
+      expect(String(input)).toBe(
+        `${SESSION_URL}/sessions/${SESSION_ID}/drafts/${DRAFT_ID}/generate`,
+      );
+      expect(init?.method).toBe("POST");
+      const body = JSON.parse(String(init?.body));
+      expect(body).toEqual({
+        expectedVersion: 4,
+        options: {
+          threat: null,
+          visualStyle: "medieval",
+          instructions: null,
+          portrait: { kind: "none" },
+        },
+        seed: "final-seed-1",
+      });
+      expect(body).not.toHaveProperty("draft");
+      return jsonResponse(200, {
+        schemaVersion: "1",
+        runId: "run.final.1",
+        status: "READY",
+        draftId: DRAFT_ID,
+        draftVersion: 4,
+      });
+    });
+
+    const result = await client.generateFinalSheet(SESSION_ID, "token.123", DRAFT_ID, {
+      expectedVersion: 4,
+      options: {
+        threat: null,
+        visualStyle: "medieval",
+        instructions: null,
+        portrait: { kind: "none" },
+      },
+      seed: "final-seed-1",
+    });
+    expect(result.runId).toBe("run.final.1");
+    expect(result.status).toBe("READY");
+    expect(result.draftVersion).toBe(4);
+  });
+
+  it("N. downloadFinalPdf returns raw PDF bytes", async () => {
+    const pdfBytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52]);
+    const { client } = makeClient(async (input, init) => {
+      expect(String(input)).toBe(
+        `${SESSION_URL}/sessions/${SESSION_ID}/runs/run.final.1/pdf`,
+      );
+      expect(init?.method).toBe("GET");
+      return new Response(pdfBytes.buffer as ArrayBuffer, {
+        status: 200,
+        headers: { "content-type": "application/pdf" },
+      });
+    });
+
+    const bytes = await client.downloadFinalPdf(SESSION_ID, "token.123", "run.final.1");
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes[0]).toBe(37);
+  });
+
   it("L. unsafe identity segments are rejected before any request", async () => {
     const draft = makeDraftV2({ version: 1 });
     const { client, fetchImpl } = makeClient(async () =>

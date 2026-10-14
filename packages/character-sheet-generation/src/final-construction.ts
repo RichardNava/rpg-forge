@@ -66,17 +66,17 @@ const ATTRIBUTES_SECTION_KEY = "attributes";
  * still produce different in-bounds values. The window lets the legendary tier hug
  * the top of the range without forcing `max` on every draw.
  */
-const THREAT_BIAS: Record<NPCThreatLevel, number> = {
+export const THREAT_BIAS: Record<NPCThreatLevel, number> = {
   "very-low": 0.15,
   low: 0.35,
   medium: 0.5,
   elite: 0.85,
   legendary: 0.95,
 };
-const NEUTRAL_THREAT_BIAS = 0.5;
+export const NEUTRAL_THREAT_BIAS = 0.5;
 
 /** Half-width of the sampled window around the tier bias (0..1 space). */
-const THREAT_BIAS_WINDOW = 0.25;
+export const THREAT_BIAS_WINDOW = 0.25;
 
 /**
  * Determinism seed used when the caller supplies neither seed nor sheetId so

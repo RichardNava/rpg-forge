@@ -50,6 +50,12 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   SHEET_DRAFT_MUTATION_INVALID: 422,
   SHEET_DRAFT_FIELD_READ_LOCKED: 422,
   SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS: 422,
+  SHEET_FINAL_GENERATION_INVALID: 422,
+  SHEET_FINAL_STYLE_UNSUPPORTED: 422,
+  SHEET_FINAL_GENERATION_UNAVAILABLE: 503,
+  SHEET_FINAL_GENERATION_FAILED: 500,
+  SHEET_FINAL_RUN_NOT_FOUND: 404,
+  SHEET_FINAL_RUN_NOT_READY: 409,
   INTERNAL_ERROR: 500,
 };
 
@@ -133,6 +139,18 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "The field is read-locked; unlock it before editing.",
   SHEET_DRAFT_SURFACE_OUT_OF_BOUNDS:
     "The mutation references a field outside the draft surface.",
+  SHEET_FINAL_GENERATION_INVALID:
+    "The final-generation options are invalid for this draft.",
+  SHEET_FINAL_STYLE_UNSUPPORTED:
+    "The requested final presentation style is not implemented yet.",
+  SHEET_FINAL_GENERATION_UNAVAILABLE:
+    "Final AI generation is temporarily unavailable. Please try again later.",
+  SHEET_FINAL_GENERATION_FAILED:
+    "The final sheet could not be generated.",
+  SHEET_FINAL_RUN_NOT_FOUND:
+    "No final-generation run was found for the given session and run id.",
+  SHEET_FINAL_RUN_NOT_READY:
+    "The final-generation run is not ready for download.",
   INTERNAL_ERROR: "An internal error occurred.",
 };
 

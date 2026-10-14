@@ -11,6 +11,15 @@ import type {
 
 export type { WorkshopPreferences } from "./sheet-workshop-types";
 
+export type FinalGenerationStatus = "idle" | "generating" | "ready" | "error";
+
+export interface FinalGenerationState {
+  status: FinalGenerationStatus;
+  runId: string | null;
+  draftVersion: number | null;
+  error: SheetApiError | null;
+}
+
 export interface SheetStoreV2State {
   phase: SheetStorePhase;
   /** Temporary sheet session identity; access tokens are kept in memory only. */
@@ -27,6 +36,8 @@ export interface SheetStoreV2State {
   undoAvailable: boolean;
   /** The version that can be restored via Undo (14.10). */
   undoSourceVersion: number | null;
+  /** Final-generation operational state (14.12). Never holds PDF bytes. */
+  finalGeneration: FinalGenerationState;
   error: SheetApiError | null;
 }
 
@@ -45,6 +56,7 @@ export const INITIAL_SHEET_STORE_V2_STATE: SheetStoreV2State = {
   savedVersion: null,
   undoAvailable: false,
   undoSourceVersion: null,
+  finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
   error: null,
 };
 
@@ -75,6 +87,20 @@ export type SheetStoreV2ConfirmOutcome =
   | { kind: "inflight" }
   | { kind: "error"; error: SheetApiError };
 
+export type SheetStoreV2FinalGenerationOutcome =
+  | { kind: "ok"; runId: string; draftVersion: number }
+  | { kind: "rejected"; code: string; message: string }
+  | { kind: "not_ready" }
+  | { kind: "inflight" }
+  | { kind: "error"; error: SheetApiError };
+
+export interface SheetStoreV2FinalGenerationInput {
+  threat: import("./sheet-workshop-types").ThreatLevelPreference | null;
+  visualStyle: import("./sheet-workshop-types").VisualStyleKey;
+  instructions?: string | null;
+  seed?: string;
+}
+
 export interface SheetStoreV2 {
   getState(): SheetStoreV2State;
   subscribe(listener: SheetStoreV2Listener): () => void;
@@ -89,5 +115,9 @@ export interface SheetStoreV2 {
   undo(): Promise<SheetStoreV2MutationOutcome>;
   reroll(seed: string): Promise<SheetStoreV2RerollOutcome>;
   confirm(): Promise<SheetStoreV2ConfirmOutcome>;
+  generateFinalSheet(
+    input: SheetStoreV2FinalGenerationInput,
+  ): Promise<SheetStoreV2FinalGenerationOutcome>;
+  downloadFinalPdf(): Promise<Uint8Array | null>;
   reset(): void;
 }

@@ -139,7 +139,7 @@ describe("template-backed PDF integration", () => {
     const request = NPCGenerationRequestSchema.parse({
       mode: "npc",
       disposition: "enemy",
-      threat: "ordinary",
+      threat: "medium",
       mechanicalFields: [
         { label: "Guard Rating", min: 1, max: 20 },
         { label: "Composure", min: 1, max: 20 },
@@ -217,7 +217,7 @@ describe("template-backed PDF integration", () => {
     const request = NPCGenerationRequestSchema.parse({
       mode: "npc",
       disposition: "enemy",
-      threat: "ordinary",
+      threat: "medium",
       mechanicalFields: [
         { label: "Guard Rating", min: 1, max: 20 },
         { label: "Composure", min: 1, max: 20 },
@@ -248,7 +248,7 @@ describe("template-backed PDF integration", () => {
     const request = NPCGenerationRequestSchema.parse({
       mode: "npc",
       disposition: "enemy",
-      threat: "ordinary",
+      threat: "medium",
       mechanicalFields: [
         { label: "Guard Rating", min: 1, max: 20 },
         { label: "Composure", min: 1, max: 20 },

@@ -7,7 +7,9 @@ import { createD1SessionRepository } from "./infrastructure/db/repository.js";
 import { createD1RulebookRepository } from "./infrastructure/db/rulebook-repository.js";
 import { createD1RulesAnalysisRunRepository } from "./infrastructure/db/run-repository.js";
 import { createD1SheetSessionRepository } from "./infrastructure/db/sheet-session-repository.js";
+import { createD1SheetRunRepository } from "./infrastructure/db/sheet-run-repository.js";
 import { createD1DraftHeadRepository } from "./infrastructure/db/draft-head-repository.js";
+import { createCloudflareAiFinalPresentation } from "./infrastructure/sheet-final-presentation.js";
 import { createPdfJsPageExtractor } from "./infrastructure/pdfjs-extractor.js";
 import { createRateLimitPort } from "./infrastructure/rate-limit.js";
 import {
@@ -65,7 +67,10 @@ export function createAppDeps(env: Env): AppDeps {
   const sheetSessionRepository = createD1SheetSessionRepository(env.DB, {
     clock,
   });
+  const sheetRunRepository = createD1SheetRunRepository(env.DB, { clock });
   const sheetDraftHeadRepository = createD1DraftHeadRepository(env.DB);
+  const finalPresentationPort =
+    env.AI === undefined ? undefined : createCloudflareAiFinalPresentation(env.AI);
   // The V2 draft store shares the same bucket and key layout as run
   // artifacts; it writes V2 only and reads V1-or-V2 as canonical V2.
   const sheetDraftStoreV2 =
@@ -116,9 +121,11 @@ export function createAppDeps(env: Env): AppDeps {
     ...(rulesAnalysisWorkflow === undefined ? {} : { rulesAnalysisWorkflow }),
     sheetSessionRepository,
     sheetDraftHeadRepository,
+    sheetRunRepository,
     ...(sheetDraftStoreV2 === undefined ? {} : { sheetDraftStoreV2 }),
     ...(sheetArtifactStore === undefined ? {} : { sheetArtifactStore }),
     ...(sheetVisualExtraction === undefined ? {} : { sheetVisualExtraction }),
+    ...(finalPresentationPort === undefined ? {} : { finalPresentationPort }),
     debugSheetDrafts: env.SHEET_DRAFT_DEBUG === "true",
   };
 }

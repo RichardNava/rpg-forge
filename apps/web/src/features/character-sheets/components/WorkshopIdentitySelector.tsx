@@ -10,6 +10,7 @@ import {
 } from "../lib/workshop-preferences";
 
 export interface WorkshopIdentityPatch {
+  mode?: "pc" | "npc";
   threatLevel?: ThreatLevelPreference | null;
 }
 
@@ -39,13 +40,31 @@ export function WorkshopIdentitySelector({
           Role
         </span>
         <div
-          className="character-workshop__identity-display"
+          className="character-workshop__identity-segment"
           role="group"
           aria-labelledby="workshop-identity-role-label"
         >
-          <span className="character-workshop__identity-value">
-            {mode === "pc" ? "Player Character" : "Non-Player Character"}
-          </span>
+          {(["pc", "npc"] as const).map((option) => {
+            const selected = mode === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                className={
+                  selected
+                    ? "character-workshop__identity-option character-workshop__identity-option--selected"
+                    : "character-workshop__identity-option"
+                }
+                aria-pressed={selected}
+                aria-label={option === "pc" ? "Player Character" : "Non-Player Character"}
+                title={option === "pc" ? "Player Character" : "Non-Player Character"}
+                onClick={() => !disabled && onChange({ mode: option })}
+                disabled={disabled}
+              >
+                {option.toUpperCase()}
+              </button>
+            );
+          })}
         </div>
       </div>
 

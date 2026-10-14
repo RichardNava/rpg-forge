@@ -85,6 +85,14 @@ function makeApiClient(
     confirmDraft: vi.fn(async () =>
       makeDraftV2({ version: 4, confirmed: true }),
     ),
+    generateFinalSheet: vi.fn(async () => ({
+      schemaVersion: "1" as const,
+      runId: "run.final.1",
+      status: "READY" as const,
+      draftId: DRAFT_ID,
+      draftVersion: 4,
+    })),
+    downloadFinalPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])),
     ...overrides,
   };
 }
@@ -309,6 +317,122 @@ describe("createSheetStoreV2", () => {
     });
     await store.confirm();
     expect(store.getState().draft?.confirmed).toBe(true);
+  });
+
+  it("O1. generateFinalSheet sends expectedVersion/options/seed without a Draft", async () => {
+    let seen: unknown;
+    const generateFinalSheet = vi.fn(
+      async (_s: string, _t: string, _d: string, request: unknown) => {
+        seen = request;
+        return {
+          schemaVersion: "1" as const,
+          runId: "run.final.1",
+          status: "READY" as const,
+          draftId: DRAFT_ID,
+          draftVersion: 4,
+        };
+      },
+    );
+    const confirmed = makeDraftV2({ version: 4, confirmed: true });
+    const { store } = await readyStore({ generateFinalSheet }, confirmed);
+    const outcome = await store.generateFinalSheet({
+      threat: null,
+      visualStyle: "medieval",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    expect(outcome).toEqual({ kind: "ok", runId: "run.final.1", draftVersion: 4 });
+    expect(seen).toEqual({
+      expectedVersion: 4,
+      options: {
+        threat: null,
+        visualStyle: "medieval",
+        instructions: null,
+        portrait: { kind: "none" },
+      },
+      seed: "final-seed-1",
+    });
+    expect(seen).not.toHaveProperty("draft");
+    expect(store.getState().finalGeneration).toMatchObject({
+      status: "ready",
+      runId: "run.final.1",
+      draftVersion: 4,
+    });
+  });
+
+  it("O2. generateFinalSheet rejects unconfirmed drafts locally", async () => {
+    const { store } = await readyStore();
+    const outcome = await store.generateFinalSheet({
+      threat: null,
+      visualStyle: "medieval",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    expect(outcome.kind).toBe("rejected");
+    expect(store.getState().finalGeneration.status).toBe("idle");
+  });
+
+  it("O3. generateFinalSheet requires threat for NPC drafts", async () => {
+    const npc = makeDraftV2({ version: 4, confirmed: true, mode: "npc" });
+    const { store } = await readyStore({}, npc);
+    const outcome = await store.generateFinalSheet({
+      threat: null,
+      visualStyle: "sci-fi",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    expect(outcome.kind).toBe("rejected");
+  });
+
+  it("O4. generateFinalSheet forbids threat for PC drafts", async () => {
+    const pc = makeDraftV2({ version: 4, confirmed: true, mode: "pc" });
+    const { store } = await readyStore({}, pc);
+    const outcome = await store.generateFinalSheet({
+      threat: "medium",
+      visualStyle: "medieval",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    expect(outcome.kind).toBe("rejected");
+  });
+
+  it("O5. downloadFinalPdf uses the ready runId", async () => {
+    const bytes = new Uint8Array([37, 80, 68, 70]);
+    const downloadFinalPdf = vi.fn(async () => bytes);
+    const confirmed = makeDraftV2({ version: 4, confirmed: true });
+    const { store } = await readyStore({ downloadFinalPdf }, confirmed);
+    await store.generateFinalSheet({
+      threat: null,
+      visualStyle: "medieval",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    const downloaded = await store.downloadFinalPdf();
+    expect(downloaded).toEqual(bytes);
+    expect(downloadFinalPdf).toHaveBeenCalledWith(SESSION_ID, "token.123", "run.final.1");
+  });
+
+  it("O6. stable seed is reused when the caller omits it", async () => {
+    const seen: string[] = [];
+    const generateFinalSheet = vi.fn(
+      async (_s: string, _t: string, _d: string, request: { seed: string }) => {
+        seen.push(request.seed);
+        return {
+          schemaVersion: "1" as const,
+          runId: "run.final.1",
+          status: "READY" as const,
+          draftId: DRAFT_ID,
+          draftVersion: 4,
+        };
+      },
+    );
+    const confirmed = makeDraftV2({ version: 4, confirmed: true });
+    const { store } = await readyStore({ generateFinalSheet }, confirmed);
+    await store.generateFinalSheet({ threat: null, visualStyle: "medieval", instructions: null });
+    await store.generateFinalSheet({ threat: null, visualStyle: "sci-fi", instructions: null });
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toBe(seen[1]);
+    expect(seen[0]).toContain(DRAFT_ID);
   });
 
   it("O. the session token lives in memory-only store state", async () => {

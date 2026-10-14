@@ -17,6 +17,8 @@
   "dependencies": {
     "@repo/character-sheet-artifacts": "workspace:*",
     "@repo/character-sheet-draft": "workspace:*",
+    "@repo/character-sheet-generation": "workspace:*",
+    "@repo/character-sheet-pdf-renderer": "workspace:*",
     "@repo/character-sheet-session": "workspace:*",
     "@repo/rulebook-ingestion": "workspace:*",
     "@repo/rules-analysis-run": "workspace:*",

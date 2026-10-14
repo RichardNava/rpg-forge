@@ -13,6 +13,15 @@ import {
   type SheetDraftRerollResponseV2,
   type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
+import {
+  buildFinalGenerationRequestV1,
+  getStyleProfile,
+  resolveFinalValues,
+  type FinalGenerationStartRequestV1,
+  type FinalGenerationStartResponseV1,
+  type FinalPresentationPlanV1,
+} from "@repo/character-sheet-generation";
+import { renderStyledCharacterSheetPdf } from "@repo/character-sheet-pdf-renderer";
 import type { SheetSession, SheetSessionView } from "../api/sheet-api-types";
 import type { SheetApiClientV2Port } from "../api/sheet-api-client-v2";
 
@@ -43,6 +52,8 @@ export function createLocalSheetBackendV2(
   >();
   const drafts = new Map<string, CharacterSheetDraftV2>();
   const draftHistory = new Map<string, CharacterSheetDraftV2[]>(); // history of drafts for undo
+  const finalPdfs = new Map<string, Uint8Array>();
+  const finalRuns = new Map<string, { draftId: string; draftVersion: number }>();
   const draftHeads = new Map<
     string,
     { undoSourceVersion: number | null; undoConsumed: boolean }
@@ -306,6 +317,82 @@ export function createLocalSheetBackendV2(
         undoAvailable: false,
         undoSourceVersion: head.undoSourceVersion,
       };
+    },
+
+    async generateFinalSheet(
+      sessionId: string,
+      accessToken: string,
+      draftId: string,
+      request: FinalGenerationStartRequestV1,
+    ): Promise<FinalGenerationStartResponseV1> {
+      requireSession(sessionId, accessToken);
+      const current = requireOwnedDraft(sessionId, draftId);
+      if (request.expectedVersion !== current.version) {
+        throw draftError(
+          "version_conflict",
+          `Expected draft version ${request.expectedVersion} but the current version is ${current.version}.`,
+        );
+      }
+      // Provider-free local path: real resolver + real styled renderer +
+      // deterministic fake presentation plan. Never calls Workers AI.
+      const built = buildFinalGenerationRequestV1(current, {
+        threat: request.options.threat ?? null,
+        visualStyle: request.options.visualStyle,
+        instructions: request.options.instructions ?? null,
+        portrait: request.options.portrait,
+        seed: request.seed,
+      });
+      if (built.options.visualStyle !== "medieval" && built.options.visualStyle !== "sci-fi") {
+        throw new DraftError(
+          "invalid_mutation",
+          `Unsupported final presentation style: ${String(built.options.visualStyle)}.`,
+        );
+      }
+      const resolved = resolveFinalValues(current, {
+        threat: built.options.threat ?? null,
+        seed: built.seed,
+      });
+      const plan: FinalPresentationPlanV1 = {
+        schemaVersion: "1",
+        style: built.options.visualStyle,
+        variant: "standard",
+        ornamentDensity: "light",
+        contrast: "medium",
+        sectionEmphasis: "standard",
+        fieldEmphasis: "standard",
+      };
+      const { bytes } = await renderStyledCharacterSheetPdf({
+        draft: current,
+        resolvedValues: resolved,
+        presentation: plan,
+        profile: getStyleProfile(built.options.visualStyle),
+      });
+      const runId = crypto.randomUUID();
+      finalPdfs.set(`${sessionId}:${runId}`, bytes);
+      finalRuns.set(`${sessionId}:${runId}`, {
+        draftId: current.draftId,
+        draftVersion: current.version,
+      });
+      return {
+        schemaVersion: "1",
+        runId,
+        status: "READY",
+        draftId: current.draftId,
+        draftVersion: current.version,
+      };
+    },
+
+    async downloadFinalPdf(
+      sessionId: string,
+      accessToken: string,
+      runId: string,
+    ): Promise<Uint8Array> {
+      requireSession(sessionId, accessToken);
+      const bytes = finalPdfs.get(`${sessionId}:${runId}`);
+      if (bytes === undefined) {
+        throw new Error("Final PDF not found.");
+      }
+      return bytes;
     },
   };
 }

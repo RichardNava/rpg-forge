@@ -94,6 +94,33 @@ describe("resolveCharacterSheetProxyPath", () => {
     });
   });
 
+  it("accepts the final-generation endpoints", () => {
+    expect(
+      resolveCharacterSheetProxyPath("POST", [
+        "sessions",
+        SESSION_ID,
+        "drafts",
+        DRAFT_ID,
+        "generate",
+      ]),
+    ).toMatchObject({
+      kind: "ok",
+      upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/drafts/${DRAFT_ID}/generate`,
+    });
+    expect(
+      resolveCharacterSheetProxyPath("GET", [
+        "sessions",
+        SESSION_ID,
+        "runs",
+        "run.final.1",
+        "pdf",
+      ]),
+    ).toMatchObject({
+      kind: "ok",
+      upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/runs/run.final.1/pdf`,
+    });
+  });
+
   it("accepts the authenticated document extraction endpoint", () => {
     expect(
       resolveCharacterSheetProxyPath("POST", [

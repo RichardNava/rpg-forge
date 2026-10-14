@@ -15,6 +15,11 @@ import { mutateDraftV2 } from "./features/character-sheets/draft-v2-mutation.js"
 import { rerollDraftV2 } from "./features/character-sheets/draft-v2-reroll.js";
 import { confirmDraftV2 } from "./features/character-sheets/draft-v2-confirm.js";
 import { undoDraftV2 } from "./features/character-sheets/draft-v2-undo.js";
+import { generateFinalCharacterSheet } from "./features/character-sheets/draft-v2-final-generation.js";
+import {
+  FinalGenerationStartRequestV1Schema,
+  FinalGenerationStartResponseV1Schema,
+} from "@repo/character-sheet-generation";
 import {
   readCurrentDraftV2,
   type DraftV2Runtime,
@@ -61,6 +66,10 @@ const SHEET_DRAFT_CONFIRM_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/confirm$/;
 const SHEET_DRAFT_UNDO_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/undo$/;
+const SHEET_DRAFT_GENERATE_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/generate$/;
+const SHEET_RUN_PDF_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/runs\/([^/]+)\/pdf$/;
 const SHEET_DOCUMENT_EXTRACTION_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/extraction$/;
 const SHEET_DOCUMENT_MAX_BYTES = 8 * 1024 * 1024;
@@ -174,6 +183,24 @@ export async function handleCharacterSheetRequest(
     const draftId = draftUndoMatch[2] ?? "";
     if (method === "POST") {
       return handleUndoDraft(sessionId, draftId, request, deps);
+    }
+  }
+
+  const draftGenerateMatch = SHEET_DRAFT_GENERATE_PATH_PATTERN.exec(path);
+  if (draftGenerateMatch !== null) {
+    const sessionId = draftGenerateMatch[1] ?? "";
+    const draftId = draftGenerateMatch[2] ?? "";
+    if (method === "POST") {
+      return handleGenerateFinal(sessionId, draftId, request, deps);
+    }
+  }
+
+  const runPdfMatch = SHEET_RUN_PDF_PATH_PATTERN.exec(path);
+  if (runPdfMatch !== null) {
+    const sessionId = runPdfMatch[1] ?? "";
+    const runId = runPdfMatch[2] ?? "";
+    if (method === "GET") {
+      return handleGetFinalPdf(sessionId, runId, request, deps);
     }
   }
 
@@ -841,6 +868,163 @@ async function handleUndoDraft(
 
   traceSheetDraft(deps, "draft undo response", undone);
   return draftV2SnapshotResponse(undone);
+}
+
+async function handleGenerateFinal(
+  sessionId: string,
+  draftId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+
+  if (!hasJsonContentType(request)) {
+    return errorResponse("INVALID_REQUEST", "Expected application/json.");
+  }
+  const body = await readBoundedJson(request);
+  if (body === null) {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "Request body is malformed or too large.",
+    );
+  }
+  const parsed = FinalGenerationStartRequestV1Schema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "The request body must contain expectedVersion, options and seed.",
+    );
+  }
+
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateLimit = await deps.rateLimiter.consume(
+    `sheet-final-generation:${clientIp}`,
+  );
+  if (rateLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (rateLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
+
+  const runtime = v2DraftRuntime(deps);
+  if (
+    runtime === null ||
+    deps.sheetRunRepository === undefined ||
+    deps.sheetArtifactStore === undefined
+  ) {
+    return draftStorageUnavailable();
+  }
+
+  let outcome;
+  try {
+    outcome = await generateFinalCharacterSheet(
+      {
+        runtime,
+        runs: deps.sheetRunRepository,
+        artifacts: deps.sheetArtifactStore,
+        sessions: deps.sheetSessionRepository,
+        ...(deps.finalPresentationPort === undefined
+          ? {}
+          : { presentation: deps.finalPresentationPort }),
+        clock: deps.clock,
+        crypto: deps.crypto,
+      },
+      {
+        identity: { sessionId: auth.sessionId, draftId },
+        expectedVersion: parsed.data.expectedVersion,
+        options: parsed.data.options,
+        seed: parsed.data.seed,
+      },
+    );
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+
+  switch (outcome.kind) {
+    case "ok":
+      return jsonResponse(
+        200,
+        FinalGenerationStartResponseV1Schema.parse({
+          schemaVersion: "1",
+          runId: outcome.run.runId,
+          status: "READY",
+          draftId: outcome.run.draftId,
+          draftVersion: outcome.run.draftVersion,
+        }),
+      );
+    case "not_found":
+      return errorResponse("SHEET_DRAFT_NOT_FOUND");
+    case "conflict":
+      return errorResponse("SHEET_DRAFT_VERSION_CONFLICT");
+    case "invalid":
+      if (outcome.code === "unsupported_style") {
+        return errorResponse("SHEET_FINAL_STYLE_UNSUPPORTED", outcome.message);
+      }
+      return errorResponse("SHEET_FINAL_GENERATION_INVALID", outcome.message);
+    case "unavailable":
+      return errorResponse("SHEET_FINAL_GENERATION_UNAVAILABLE", outcome.message);
+    case "failed":
+      return errorResponse("SHEET_FINAL_GENERATION_FAILED", outcome.message);
+  }
+}
+
+function safePdfFilename(value: string): string {
+  const cleaned = value
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return cleaned === "" ? "character-sheet" : cleaned;
+}
+
+async function handleGetFinalPdf(
+  sessionId: string,
+  runId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (deps.sheetRunRepository === undefined || deps.sheetArtifactStore === undefined) {
+    return draftStorageUnavailable();
+  }
+  const run = await deps.sheetRunRepository.getById(runId);
+  if (run === null || run.sessionId !== auth.sessionId) {
+    return errorResponse("SHEET_FINAL_RUN_NOT_FOUND");
+  }
+  if (run.status !== "READY") {
+    return errorResponse("SHEET_FINAL_RUN_NOT_READY");
+  }
+  let pdfBytes: Uint8Array | null;
+  try {
+    pdfBytes = await deps.sheetArtifactStore.getPdfBytes({
+      sessionId: auth.sessionId,
+      runId,
+    });
+  } catch {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  if (pdfBytes === null) {
+    return errorResponse("SHEET_FINAL_RUN_NOT_FOUND");
+  }
+  const filename = safePdfFilename(run.draftId ?? "character-sheet");
+  // Copy into a fresh ArrayBuffer so the Response body is a clean ArrayBuffer.
+  const body = new Uint8Array(pdfBytes.length);
+  body.set(pdfBytes);
+  return new Response(body.buffer as ArrayBuffer, {
+    status: 200,
+    headers: {
+      "content-type": "application/pdf",
+      "cache-control": "no-store",
+      "content-disposition": `attachment; filename="${filename}.pdf"`,
+    },
+  });
 }
 
 type DraftV2ReadOutcome =

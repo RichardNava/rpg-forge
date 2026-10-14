@@ -6,6 +6,9 @@
 
 export const PDF_RENDER_ERROR_CODES = [
   "invalid_spec",
+  "invalid_draft",
+  "invalid_presentation_plan",
+  "unsupported_style",
   "unsupported_field_type",
   "unsupported_field_value",
   "unsupported_glyph",

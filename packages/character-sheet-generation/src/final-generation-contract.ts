@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CharacterSheetDraftV2Schema } from "@repo/character-sheet-draft";
 import { NPCThreatLevelSchema } from "./authoring.js";
+import type { CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
 
 /**
  * Canonical five-level threat schema (14.11).
@@ -60,17 +61,41 @@ export type Instructions = z.infer<typeof InstructionsSchema>;
 /**
  * Canonical final generation request — carries confirmed Draft + options.
  * This is the single canonical request contract for final generation (14.11).
+ * Validates: confirmed draft, PC threat null, NPC threat required, visualStyle required.
  */
 export const FinalGenerationRequestV1Schema = z.strictObject({
   schemaVersion: z.literal("1"),
-  draft: z.any(), // CharacterSheetDraftV2 - using z.any() to avoid circular deps
+  draft: CharacterSheetDraftV2Schema,
   options: z.strictObject({
     threat: ThreatLevelSchema.nullish(),
-    visualStyle: CanonicalVisualStyleSchema.nullish(),
+    visualStyle: CanonicalVisualStyleSchema,
     instructions: InstructionsSchema,
     portrait: PortraitConfigSchema,
   }).strict(),
   seed: z.string().min(1).max(64),
+}).superRefine((request, ctx) => {
+  const { draft, options } = request;
+  if (!draft.confirmed) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["draft", "confirmed"],
+      message: "Draft must be confirmed for final generation",
+    });
+  }
+  if (draft.mode === "pc" && options.threat) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["options", "threat"],
+      message: "PC draft cannot have threat",
+    });
+  }
+  if (draft.mode === "npc" && !options.threat) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["options", "threat"],
+      message: "NPC draft requires threat",
+    });
+  }
 });
 export type FinalGenerationRequestV1 = z.infer<typeof FinalGenerationRequestV1Schema>;
 
@@ -81,10 +106,10 @@ export type FinalGenerationRequestV1 = z.infer<typeof FinalGenerationRequestV1Sc
  * @throws if NPC draft lacks threat option
  */
 export function buildFinalGenerationRequestV1(
-  draft: any, // CharacterSheetDraftV2
+  draft: CharacterSheetDraftV2,
   options: {
     threat?: ThreatLevel | null;
-    visualStyle?: CanonicalVisualStyle | null;
+    visualStyle: CanonicalVisualStyle;
     instructions?: string | null;
     portrait?: PortraitConfig;
     seed: string;
@@ -105,14 +130,10 @@ export function buildFinalGenerationRequestV1(
   const threatOption = draft.mode === "npc" ? options.threat : null;
   return {
     schemaVersion: "1",
-    draft: {
-      ...draft,
-      // Ensure threat is not persisted in the draft for final generation
-      // Threat is carried only in options
-    },
+    draft: { ...draft },
     options: {
       threat: threatOption,
-      visualStyle: options.visualStyle ?? null,
+      visualStyle: options.visualStyle,
       instructions: options.instructions ?? null,
       portrait: options.portrait ?? { kind: "none" as const },
     },

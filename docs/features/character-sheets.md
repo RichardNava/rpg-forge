@@ -394,11 +394,11 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | Field editing (text/number/textarea/checkbox/choice) | IMPLEMENTED               | Schema-driven editors (V2 runtime)                                                                                                                                                  |
 | Live preview                                         | IMPLEMENTED (V2 RUNTIME)  | `SheetPreviewV2` renders draft layout directly as nested CSS grids (read-only); PDF export still renders via V2 `projectDraftV2ToSpec`                                              |
 | Confirm → read-only                                  | IMPLEMENTED               | V2 `finalizeDraftV2` live with raw-snapshot confirm responses                                                                                                                       |
-| PC/NPC mode                                          | IMPLEMENTED               | UI + threat level for NPC                                                                                                                                                           |
-| PDF export/download                                  | IMPLEMENTED (V2 RUNTIME)  | Export renders via V2 `projectDraftV2ToSpec`                                                                                                                                        |
-| Visual style selection                               | PLANNED                   | Style keys defined, rendering integration pending                                                                                                                                   |
-| Visual style rendering                               | PLANNED                   | Style keys defined, rendering integration pending                                                                                                                                   |
-| Character image (upload/URL/AI)                      | PLANNED                   | UI placeholder only                                                                                                                                                                 |
+| PC/NPC mode                                          | IMPLEMENTED (14.11)       | Draft.mode is the sole authority; set_mode mutation; UI buttons invoke set_mode; threat level for NPC (canonical five-level)                                                        |
+| PDF export/download                                  | IMPLEMENTED (V2 RUNTIME)  | Technical export renders via V2 `projectDraftV2ToSpec`; final styled PDF renders Draft-native (14.12, primary product path)                                                        |
+| Visual style selection                               | IMPLEMENTED (14.12)       | Medieval + Sci-fi selectable in the final-generation panel; remaining four canonical styles hidden until later                                                                       |
+| Visual style rendering                               | IMPLEMENTED (14.12)       | Medieval + Sci-fi Draft-native styled PDFs; byte-distinct outputs with equal semantic manifests                                                                                     |
+| Character image (upload/URL/AI)                      | PLANNED (14.13)           | Contract and Workshop state remain `{ kind: "none" }` only                                                                                                                          |
 | Preview as modal                                     | NOT IMPLEMENTED           | Live preview pane exists; modal UX target not implemented                                                                                                                           |
 | Undo (server-authoritative, one-level)               | IMPLEMENTED (14.10)       | Dedicated POST /undo; D1 head metadata (undoSourceVersion, undoConsumed); R2 snapshot restore; atomic consumption; no Redo                                                          |
 | remove_section (safe)                                | IMPLEMENTED (14.10)       | Empty Section allowed, non-empty rejected with explanation; atomic cleanup of sections/structure/layout; destructive confirmation UI                                              |
@@ -447,6 +447,8 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | Remote Turnstile verification                        | LIVE                      | Public page defaults to remote; Turnstile widget + Worker verification required; remote fails closed without configuration                                                          |
 | Browser E2E (Playwright, local mode)                 | LIVE (4F)                 | `apps/web/e2e/character-sheets.spec.ts`: manual create/edit/reparent/confirm/export/restart on the real public page; provider-free                                                  |
 | workerd V1 → V2 compat bridge                        | LIVE (4F)                 | Real D1/R2 integration: historical V1 bytes → canonical V2 HTTP → V2 next write; V1 history never rewritten                                                                         |
+| Final generation contract (14.11)                    | IMPLEMENTED (14.11)       | FinalGenerationRequestV1 (confirmed Draft + options + required seed); canonical five-level threat; set_mode without confirmClear; Web adapter; no AI/PDF execution                   |
+| AI final presentation (14.12)                        | IMPLEMENTED (14.12)       | Bounded FinalPresentationPlanV1; Medieval + Sci-fi StyleProfiles; deterministic NPC bounded-numeric resolution; Draft-native styled PDF (primary); server-built request; sync PENDING → READY runs; temporary R2 final PDF |
 
 ### V2 response policy (after runtime cutover)
 
@@ -467,6 +469,8 @@ Full transport, concurrency and error contract:
 - **Architecture:** `docs/architecture/phase-14.7/character-sheet-integration.md` (for implementation details, labeled with CURRENT/COMPLETED/SUPERSEDED/DEFERRED)
 - **V2 transport contract:** `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md` (FROZEN FOR 4E CUTOVER)
 - **Data Model:** `docs/architecture/data-model.md` (persistence direction)
-- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**
+- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**, **ADR-062**
 - **Phase 14.10:** `docs/architecture/phase-14.10/character-sheet-authoring-completeness.md`
+- **Phase 14.11:** `docs/architecture/phase-14.11/character-sheet-final-generation.md`
+- **Phase 14.12:** `docs/architecture/phase-14.12/character-sheet-ai-final-presentation.md`
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`

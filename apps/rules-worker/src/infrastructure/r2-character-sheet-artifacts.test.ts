@@ -201,6 +201,19 @@ describe("R2 character sheet artifact store", () => {
     expect(bucket.objects.get(keys.pdf)?.cacheControl).toBe("no-store");
   });
 
+  it("persists a final styled PDF without manufacturing a spec", async () => {
+    const bucket = new FakeR2Bucket();
+    const store = createR2CharacterSheetArtifactStore(bucket);
+
+    await store.putPdfBytes({ sessionId, runId, pdfBytes: PDF_BYTES });
+
+    expect(await store.getPdfBytes({ sessionId, runId })).toEqual(PDF_BYTES);
+    expect(await store.getSpec({ sessionId, runId })).toBeNull();
+    const keys = getRunArtifactKeys(sessionId, runId);
+    expect(bucket.objects.get(keys.pdf)?.contentType).toBe("application/pdf");
+    expect(bucket.objects.get(keys.pdf)?.cacheControl).toBe("no-store");
+  });
+
   it("returns null for a missing spec or pdf", async () => {
     const store = createR2CharacterSheetArtifactStore(new FakeR2Bucket());
     expect(await store.getSpec({ sessionId, runId })).toBeNull();

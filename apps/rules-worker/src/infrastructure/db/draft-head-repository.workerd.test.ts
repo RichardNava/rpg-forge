@@ -13,7 +13,7 @@ import { createR2CharacterSheetDraftStoreV2 } from "../r2-character-sheet-drafts
 import { createD1DraftHeadRepository } from "./draft-head-repository.js";
 
 const MIGRATION_DDL =
-  "CREATE TABLE IF NOT EXISTS `sheet_draft_heads` (`session_id` text NOT NULL, `draft_id` text NOT NULL, `current_version` integer NOT NULL, `pending_version` integer, `pending_claim_id` text, `pending_since` integer, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`session_id`,`draft_id`)); CREATE INDEX IF NOT EXISTS `sheet_draft_heads_session_idx` ON `sheet_draft_heads` (`session_id`); CREATE INDEX IF NOT EXISTS `sheet_draft_heads_pending_idx` ON `sheet_draft_heads` (`pending_version`,`pending_since`);";
+  "CREATE TABLE IF NOT EXISTS `sheet_draft_heads` (`session_id` text NOT NULL, `draft_id` text NOT NULL, `current_version` integer NOT NULL, `pending_version` integer, `pending_claim_id` text, `pending_since` integer, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `undo_source_version` integer, `undo_consumed` integer NOT NULL DEFAULT 0, PRIMARY KEY(`session_id`,`draft_id`)); CREATE INDEX IF NOT EXISTS `sheet_draft_heads_session_idx` ON `sheet_draft_heads` (`session_id`); CREATE INDEX IF NOT EXISTS `sheet_draft_heads_pending_idx` ON `sheet_draft_heads` (`pending_version`,`pending_since`);";
 
 const IDENTITY = { sessionId: "sess-0001", draftId: "draft-a" };
 const NOW = new Date("2026-09-13T09:00:00.000Z");

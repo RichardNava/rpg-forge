@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useMemo, useState } from "react";
 import type {
   CharacterSheetDraftV2,
@@ -42,7 +40,15 @@ import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
-import type { ThreatLevelPreference } from "../state/sheet-workshop-types";
+import type {
+  ThreatLevelPreference,
+  VisualStyleKey,
+} from "../state/sheet-workshop-types";
+import {
+  THREAT_LEVEL_EXPLANATION,
+  THREAT_LEVEL_LABEL,
+  THREAT_LEVEL_OPTIONS,
+} from "../lib/workshop-preferences";
 
 /**
  * Narrow session-token boundary for the V2 workshop. Local mode may resolve
@@ -150,8 +156,17 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
   const [deleteTarget, setDeleteTarget] = useState<
     { kind: "field"; key: string } | { kind: "section"; key: string } | null
   >(null);
+  const [finalStyle, setFinalStyle] = useState<"medieval" | "sci-fi">("medieval");
+  const [finalInstructions, setFinalInstructions] = useState("");
 
   const draft = state.draft;
+
+  // Stable per-Draft generation seed: reused across style changes so the same
+  // confirmed Draft resolves identical NPC values in Medieval and Sci-fi.
+  const finalSeed = useMemo(
+    () => (draft === null ? null : `final-${draft.draftId}`.slice(0, 64)),
+    [draft],
+  );
 
   const resolveSessionToken = useCallback(async (): Promise<string> => {
     return resolveV2SessionToken(BACKEND_MODE, props.sessionTokenProvider);
@@ -477,11 +492,74 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     }
   }, [draft]);
 
+  const handleGenerateFinal = useCallback(async () => {
+    if (draft === null || finalSeed === null) return;
+    setPending(true);
+    setTransientError(null);
+    try {
+      const instructions =
+        finalInstructions.trim() === "" ? null : finalInstructions.slice(0, 5000);
+      const outcome = await store.generateFinalSheet({
+        threat: state.workshop.threatLevel,
+        visualStyle: finalStyle as VisualStyleKey,
+        instructions,
+        seed: finalSeed,
+      });
+      if (outcome.kind === "rejected") {
+        setTransientError(outcome.message);
+      } else if (outcome.kind === "error") {
+        setTransientError(outcome.error.message);
+      } else if (outcome.kind === "ok") {
+        setTransientError(null);
+      }
+    } finally {
+      setPending(false);
+    }
+  }, [draft, finalSeed, finalStyle, finalInstructions, state.workshop.threatLevel, store]);
+
+  const handleDownloadFinalPdf = useCallback(async () => {
+    setPending(true);
+    setTransientError(null);
+    try {
+      const bytes = await store.downloadFinalPdf();
+      if (bytes === null) {
+        setTransientError("The final PDF is not ready yet.");
+        return;
+      }
+      const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${draft?.characterName ?? "character-sheet"}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setTransientError(
+        error instanceof Error
+          ? error.message
+          : "The final PDF could not be downloaded.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }, [draft, store]);
+
   const handleWorkshopPreferences = useCallback(
     (patch: WorkshopIdentityPatch) => {
-      store.setWorkshopPreferences(patch);
+      if (patch.mode && draft) {
+        // Mode change: use authoritative set_mode mutation
+        void store.applyMutation({
+          op: "set_mode",
+          mode: patch.mode,
+        });
+      } else if (patch.threatLevel !== undefined) {
+        // Threat level change: update workshop preferences
+        store.setWorkshopPreferences({ threatLevel: patch.threatLevel });
+      }
     },
-    [store],
+    [store, draft],
   );
 
   const getThreatLevel = useCallback((): ThreatLevelPreference | null => {
@@ -614,22 +692,164 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
               <SheetPreviewV2 draft={draft} />
             </div>
           </div>
-          <div className="character-workshop__controls">
-            <button
-              type="button"
-              className="character-workshop__btn"
-              onClick={() => void handleDownload()}
-              disabled={pending}
-            >
-              Download PDF
-            </button>
-            <button
-              type="button"
-              className="character-workshop__btn character-workshop__btn--ghost"
-              onClick={handleRestart}
-            >
-              Start a new sheet
-            </button>
+          <div
+            className="character-workshop__final-panel"
+            aria-label="Final sheet generation"
+          >
+            <h2 className="character-workshop__final-title">Final sheet</h2>
+            <p className="character-workshop__final-hint">
+              Choose a presentation style, then generate the final styled sheet
+              with AI. The confirmed draft itself never changes.
+            </p>
+            <div className="character-workshop__identity-field">
+              <span
+                className="character-workshop__identity-label"
+                id="workshop-final-style-label"
+              >
+                Style
+              </span>
+              <div
+                className="character-workshop__identity-segment"
+                role="group"
+                aria-labelledby="workshop-final-style-label"
+              >
+                {(["medieval", "sci-fi"] as const).map((option) => {
+                  const selected = finalStyle === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      className={
+                        selected
+                          ? "character-workshop__identity-option character-workshop__identity-option--selected"
+                          : "character-workshop__identity-option"
+                      }
+                      aria-pressed={selected}
+                      onClick={() => setFinalStyle(option)}
+                      disabled={pending || state.finalGeneration.status === "generating"}
+                    >
+                      {option === "medieval" ? "Medieval" : "Sci-fi"}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="character-workshop__final-note">
+                Fantasy, Gothic, Steampunk and Contemporary arrive later.
+              </span>
+            </div>
+            {draft.mode === "npc" && (
+              <div className="character-workshop__identity-field">
+                <span
+                  className="character-workshop__identity-label"
+                  id="workshop-final-threat-label"
+                >
+                  Threat
+                </span>
+                <div
+                  className="character-workshop__identity-segment"
+                  role="group"
+                  aria-labelledby="workshop-final-threat-label"
+                >
+                  {THREAT_LEVEL_OPTIONS.map((option) => {
+                    const selected = state.workshop.threatLevel === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          selected
+                            ? "character-workshop__identity-option character-workshop__identity-option--selected"
+                            : "character-workshop__identity-option"
+                        }
+                        aria-pressed={selected}
+                        title={THREAT_LEVEL_EXPLANATION[option]}
+                        onClick={() =>
+                          store.setWorkshopPreferences({
+                            threatLevel: selected ? null : option,
+                          })
+                        }
+                        disabled={pending || state.finalGeneration.status === "generating"}
+                      >
+                        {THREAT_LEVEL_LABEL[option]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="character-workshop__identity-field">
+              <label
+                className="character-workshop__identity-label"
+                htmlFor="workshop-final-instructions"
+              >
+                Presentation instructions (optional)
+              </label>
+              <textarea
+                id="workshop-final-instructions"
+                className="character-workshop__final-textarea"
+                value={finalInstructions}
+                maxLength={5000}
+                rows={3}
+                placeholder="Keep the design restrained and readable when printed."
+                onChange={(event) => setFinalInstructions(event.target.value)}
+                disabled={pending || state.finalGeneration.status === "generating"}
+              />
+              <span className="character-workshop__final-note">
+                Presentation guidance only — it never changes field values. A
+                request like “make Strength high” will not change Strength.
+              </span>
+            </div>
+            {state.finalGeneration.status === "error" &&
+              state.finalGeneration.error !== null && (
+                <p className="character-workshop__alert" role="alert">
+                  {state.finalGeneration.error.message}
+                </p>
+              )}
+            {state.finalGeneration.status === "generating" && (
+              <p className="character-workshop__final-status" role="status">
+                Generating the final sheet…
+              </p>
+            )}
+            <div className="character-workshop__controls">
+              <button
+                type="button"
+                className="character-workshop__btn"
+                onClick={() => void handleGenerateFinal()}
+                disabled={
+                  pending ||
+                  state.finalGeneration.status === "generating" ||
+                  (draft.mode === "npc" && state.workshop.threatLevel === null)
+                }
+              >
+                Generate Final Sheet with AI
+              </button>
+              <button
+                type="button"
+                className="character-workshop__btn"
+                onClick={() => void handleDownloadFinalPdf()}
+                disabled={
+                  pending || state.finalGeneration.status !== "ready"
+                }
+              >
+                Download Final PDF
+              </button>
+              <button
+                type="button"
+                className="character-workshop__btn character-workshop__btn--ghost"
+                onClick={() => void handleDownload()}
+                disabled={pending}
+                title="Technical debug export (un-styled layout preview)"
+              >
+                Download technical PDF
+              </button>
+              <button
+                type="button"
+                className="character-workshop__btn character-workshop__btn--ghost"
+                onClick={handleRestart}
+              >
+                Start a new sheet
+              </button>
+            </div>
           </div>
         </>
       )}

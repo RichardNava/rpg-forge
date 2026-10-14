@@ -16,6 +16,12 @@ import {
   type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
 import {
+  FinalGenerationStartRequestV1Schema,
+  FinalGenerationStartResponseV1Schema,
+  type FinalGenerationStartRequestV1,
+  type FinalGenerationStartResponseV1,
+} from "@repo/character-sheet-generation";
+import {
   CHARACTER_SHEET_API_PREFIX,
   SheetSessionSchema,
   SheetSessionViewSchema,
@@ -90,6 +96,17 @@ export interface SheetApiClientV2Port {
     undoAvailable: boolean;
     undoSourceVersion: number | null;
   }>;
+  generateFinalSheet(
+    sessionId: string,
+    accessToken: string,
+    draftId: string,
+    request: FinalGenerationStartRequestV1,
+  ): Promise<FinalGenerationStartResponseV1>;
+  downloadFinalPdf(
+    sessionId: string,
+    accessToken: string,
+    runId: string,
+  ): Promise<Uint8Array>;
 }
 
 export class SheetApiClientV2 implements SheetApiClientV2Port {
@@ -277,6 +294,43 @@ const response = await this.request({
     };
   }
 
+  async generateFinalSheet(
+    sessionId: string,
+    accessToken: string,
+    draftId: string,
+    request: FinalGenerationStartRequestV1,
+  ): Promise<FinalGenerationStartResponseV1> {
+    const validated = FinalGenerationStartRequestV1Schema.safeParse(request);
+    if (!validated.success) {
+      throw new SheetApiError(
+        "INVALID_REQUEST",
+        "The final-generation request must carry expectedVersion, options and seed.",
+        400,
+      );
+    }
+    const response = await this.request({
+      method: "POST",
+      url: this.generateUrl(sessionId, draftId),
+      accessToken,
+      body: validated.data,
+    });
+    return parseJsonBody(response, FinalGenerationStartResponseV1Schema);
+  }
+
+  async downloadFinalPdf(
+    sessionId: string,
+    accessToken: string,
+    runId: string,
+  ): Promise<Uint8Array> {
+    const response = await this.request({
+      method: "GET",
+      url: this.finalPdfUrl(sessionId, runId),
+      accessToken,
+    });
+    const buffer = await response.arrayBuffer();
+    return new Uint8Array(buffer);
+  }
+
   private request(input: {
     method: string;
     url: string;
@@ -350,6 +404,18 @@ const response = await this.request({
     assertIdentitySegment(sessionId, "sessionId");
     assertIdentitySegment(draftId, "draftId");
     return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/undo`;
+  }
+
+  private generateUrl(sessionId: string, draftId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    assertIdentitySegment(draftId, "draftId");
+    return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/generate`;
+  }
+
+  private finalPdfUrl(sessionId: string, runId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    assertIdentitySegment(runId, "runId");
+    return `${this.baseUrl}/sessions/${sessionId}/runs/${runId}/pdf`;
   }
 }
 

@@ -18,9 +18,11 @@ import type {
 import type {
   SheetSessionRepositoryPort,
   DraftHeadRepositoryPort,
+  SheetRunRepositoryPort,
 } from "@repo/character-sheet-session";
 import type { CharacterSheetDraftStoreV2 } from "@repo/character-sheet-draft";
 import type { CharacterSheetArtifactStore } from "@repo/character-sheet-artifacts";
+import type { FinalPresentationPort } from "@repo/character-sheet-generation";
 import {
   parseBearerToken,
   hasJsonContentType,
@@ -71,6 +73,8 @@ export interface AppDeps {
   sheetDraftStoreV2?: CharacterSheetDraftStoreV2;
   sheetArtifactStore?: CharacterSheetArtifactStore;
   sheetVisualExtraction?: SheetVisualExtractionPort;
+  sheetRunRepository?: SheetRunRepositoryPort;
+  finalPresentationPort?: FinalPresentationPort;
   debugSheetDrafts?: boolean;
 }
 

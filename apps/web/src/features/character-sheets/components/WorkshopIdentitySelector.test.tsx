@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 
 describe("WorkshopIdentitySelector", () => {
-  it("renders mode display with correct labels", () => {
+  it("renders PC/NPC buttons with correct labels and pressed states", () => {
     const onChange = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -23,9 +23,13 @@ describe("WorkshopIdentitySelector", () => {
       { container },
     );
 
-    // PC mode displays "Player Character"
-    const pcDisplay = container.querySelector(".character-workshop__identity-value");
-    expect(pcDisplay?.textContent?.trim()).toBe("Player Character");
+    const pcButton = container.querySelector('button[aria-label="Player Character"]');
+    const npcButton = container.querySelector('button[aria-label="Non-Player Character"]');
+
+    expect(pcButton).toBeTruthy();
+    expect(npcButton).toBeTruthy();
+    expect(pcButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(npcButton?.getAttribute("aria-pressed")).toBe("false");
 
     // Threat options not shown when PC
     expect(container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]')).toBeNull();
@@ -49,14 +53,60 @@ describe("WorkshopIdentitySelector", () => {
       { container },
     );
 
-    const npcDisplay = container.querySelector(".character-workshop__identity-value");
-    expect(npcDisplay?.textContent?.trim()).toBe("Non-Player Character");
+    const npcButton = container.querySelector('button[aria-label="Non-Player Character"]');
+    expect(npcButton?.getAttribute("aria-pressed")).toBe("true");
 
     const threatGroup = container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]');
     expect(threatGroup).toBeTruthy();
 
     // Threat buttons exist (5 levels: very-low, low, medium, elite, legendary)
     expect(threatGroup?.querySelectorAll("button").length).toBe(5);
+
+    container.remove();
+  });
+
+  it("calls onChange with mode when clicking NPC button", () => {
+    const onChange = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    // Start with PC
+    render(
+      <WorkshopIdentitySelector
+        mode="pc"
+        threatLevel={null}
+        disabled={false}
+        onChange={onChange}
+      />,
+      { container },
+    );
+
+    const npcButton = container.querySelector('button[aria-label="Non-Player Character"]');
+    fireEvent.click(npcButton!);
+    expect(onChange).toHaveBeenCalledWith({ mode: "npc" });
+
+    container.remove();
+  });
+
+  it("calls onChange with mode when clicking PC button", () => {
+    const onChange = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    // Start with NPC
+    render(
+      <WorkshopIdentitySelector
+        mode="npc"
+        threatLevel={null}
+        disabled={false}
+        onChange={onChange}
+      />,
+      { container },
+    );
+
+    const pcButton = container.querySelector('button[aria-label="Player Character"]');
+    fireEvent.click(pcButton!);
+    expect(onChange).toHaveBeenCalledWith({ mode: "pc" });
 
     container.remove();
   });
@@ -172,6 +222,12 @@ describe("WorkshopIdentitySelector", () => {
       />,
       { container },
     );
+
+    const pcButton = container.querySelector<HTMLButtonElement>('button[aria-label="Player Character"]');
+    const npcButton = container.querySelector<HTMLButtonElement>('button[aria-label="Non-Player Character"]');
+
+    expect(pcButton?.disabled).toBe(true);
+    expect(npcButton?.disabled).toBe(true);
 
     const threatGroup = container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]');
     expect(threatGroup).toBeNull();

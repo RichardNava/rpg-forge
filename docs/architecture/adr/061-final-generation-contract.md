@@ -5,7 +5,7 @@
 
 ## Context
 
-Phase 14.11 completes the Character Sheets MVP by defining the canonical final generation contract — the single request surface that carries a confirmed Draft plus presentation options to the generation endpoint. This is the boundary between the authoring surface (Canvas, Workshop, draft mutations) and the generation pipeline (AI text, AI image, PDF rendering).
+Phase 14.11 establishes the final-generation contract by defining the canonical final generation request — the single request surface that carries a confirmed Draft plus generation metadata (threat, style, instructions, portrait, seed) to the generation endpoint. This is the boundary between the authoring surface (Canvas, Workshop, draft mutations) and the generation pipeline (AI text, AI image, PDF rendering). Phases 14.12–14.15 remain.
 
 Key constraints from prior phases:
 - Draft is server-authoritative; client holds optimistic preview only (14.9, 14.10)
@@ -35,7 +35,7 @@ Key constraints from prior phases:
 ```
 
 - `draft` carries the full confirmed Draft (content preserved exactly)
-- `threat` is ONLY in `options` for NPC mode; stripped from Draft
+- `threat` is ONLY in `options` for NPC mode; it is generation metadata and is not part of CharacterSheetDraftV2
 - `visualStyle` references the strict enum from `authoring.ts`
 - `portrait` is discriminated union; only `kind: "none"` valid in 14.11
 - `seed` at top level is the single source of randomness (required, non-empty, max 64)

@@ -10,3 +10,16 @@ export class AiProviderUnavailableError extends Error {
     this.name = "AiProviderUnavailableError";
   }
 }
+
+/**
+ * Failure type for final presentation AI provider.
+ */
+export class FinalPresentationError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "PROVIDER_UNAVAILABLE" | "INVALID_OUTPUT" | "REPAIR_FAILED" | "UNSUPPORTED_STYLE",
+  ) {
+    super(message);
+    this.name = "FinalPresentationError";
+  }
+}

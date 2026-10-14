@@ -3,18 +3,17 @@ import {
   buildFinalGenerationRequestV1,
   type FinalGenerationRequestV1,
   type CanonicalVisualStyle,
-  type ThreatLevel,
   type PortraitConfig,
 } from "@repo/character-sheet-generation";
 import type { ThreatLevelPreference, VisualStyleKey } from "../state/sheet-workshop-types";
 
 /**
- * Web adapter for final generation (Phase 14.11).
+ * Web adapter for final generation.
  *
- * In Phase 14.11, final generation is request contract only — no AI/PDF
- * execution. This adapter prepares the canonical FinalGenerationRequestV1
- * from a confirmed Draft + workshop options. The actual generation endpoint
- * will be implemented in a later phase (14.12+).
+ * Prepares the canonical FinalGenerationRequestV1 from a confirmed Draft +
+ * workshop options for local validation/tests. Production remote generation
+ * loads the authoritative Draft server-side; the Web never sends Draft
+ * authority.
  */
 export function buildFinalGenerationRequestFromDraft(
   draft: CharacterSheetDraftV2,
@@ -26,7 +25,13 @@ export function buildFinalGenerationRequestFromDraft(
     seed: string;
   },
 ): FinalGenerationRequestV1 {
-  return buildFinalGenerationRequestV1(draft, options);
+  return buildFinalGenerationRequestV1(draft, {
+    threat: options.threat ?? null,
+    visualStyle: options.visualStyle as CanonicalVisualStyle,
+    instructions: options.instructions ?? null,
+    portrait: options.portrait ?? { kind: "none" },
+    seed: options.seed,
+  });
 }
 
 /**
