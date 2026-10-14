@@ -5,8 +5,8 @@ export * from "./api/sheet-fetch";
 export * from "./api/sheet-proxy";
 export * from "./state/sheet-store-v2";
 export * from "./state/sheet-store-v2-types";
+export * from "./lib/final-generation-adapter";
 export type {
-  CharacterTypePreference,
   PortraitSource,
   SheetDraftSaveStatus,
   SheetStorePhase,

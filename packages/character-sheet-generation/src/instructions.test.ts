@@ -108,7 +108,7 @@ function makeDefinition(
     overrides: options.overrides ?? [],
     conflicts: options.conflicts ?? [],
     ...(options.mode === "npc"
-      ? { npc: { disposition: "enemy", threat: "boss" } }
+      ? { npc: { disposition: "enemy", threat: "legendary" } }
       : {}),
   });
 }

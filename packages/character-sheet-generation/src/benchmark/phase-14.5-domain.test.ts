@@ -201,7 +201,7 @@ function pcRequest(
 
 function npcRequest(overrides: {
   characterName?: string;
-  threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss";
+  threat: "very-low" | "low" | "medium" | "elite" | "legendary";
   mechanicalFields: Array<{ label: string; min: number; max: number }>;
 }): CharacterSheetGenerationRequest {
   return {
@@ -257,7 +257,7 @@ describe("Phase 14.5 domain benchmark", () => {
         context: null,
         request: npcRequest({
           characterName: "Sera",
-          threat: "dangerous",
+          threat: "medium",
           mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
         }),
         seed: "benchmark-seed-b",
@@ -277,7 +277,7 @@ describe("Phase 14.5 domain benchmark", () => {
         context: null,
         request: npcRequest({
           characterName: "Sera",
-          threat: "dangerous",
+          threat: "medium",
           mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
         }),
         seed: "benchmark-seed-b",
@@ -547,7 +547,7 @@ describe("Phase 14.5 domain benchmark", () => {
   });
 
   describe("J — NPC threat bias is deterministic, in-range and seed-varying", () => {
-    const threats = ["weak", "ordinary", "dangerous", "elite", "boss"] as const;
+    const threats = ["very-low", "low", "medium", "elite", "legendary"] as const;
 
     it("resolves in-range values with zero provider calls and never escapes the bounds", async () => {
       let toughnessFieldBounds: { min: number; max: number } | null = null;
@@ -591,17 +591,17 @@ describe("Phase 14.5 domain benchmark", () => {
       }
     });
 
-    it("boss retains variation across seeds and does not always return the max", async () => {
+    it("legendary retains variation across seeds and does not always return the max", async () => {
       const seen = new Set<number>();
       for (let index = 0; index < 40; index += 1) {
         const { spec } = await runPipeline({
           context: null,
           request: npcRequest({
             characterName: "Vex",
-            threat: "boss",
+            threat: "legendary",
             mechanicalFields: [{ label: "Toughness", min: 10, max: 20 }],
           }),
-          seed: `benchmark-boss-${index}`,
+          seed: `benchmark-legendary-${index}`,
         });
         const value = Number(spec.values.toughness);
         expect(value).toBeGreaterThanOrEqual(10);
@@ -616,7 +616,7 @@ describe("Phase 14.5 domain benchmark", () => {
         context: null,
         request: npcRequest({
           characterName: "Vex",
-          threat: "boss",
+          threat: "legendary",
           mechanicalFields: [{ label: "Level", min: 5, max: 5 }],
         }),
       });

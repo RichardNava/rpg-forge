@@ -461,9 +461,9 @@ describe("NormalizedSheetDefinitionSchema", () => {
     const definition = NormalizedSheetDefinitionSchema.parse({
       schemaVersion: 1,
       mode: "npc",
-      npc: { disposition: "enemy", threat: "boss" },
+      npc: { disposition: "enemy", threat: "legendary" },
     });
-    expect(definition.npc).toEqual({ disposition: "enemy", threat: "boss" });
+    expect(definition.npc).toEqual({ disposition: "enemy", threat: "legendary" });
 
     const ally = NormalizedSheetDefinitionSchema.parse({
       schemaVersion: 1,
@@ -477,7 +477,7 @@ describe("NormalizedSheetDefinitionSchema", () => {
     const result = NormalizedSheetDefinitionSchema.safeParse({
       schemaVersion: 1,
       mode: "pc",
-      npc: { disposition: "enemy", threat: "weak" },
+      npc: { disposition: "enemy", threat: "very-low" },
     });
     expect(result.success).toBe(false);
   });

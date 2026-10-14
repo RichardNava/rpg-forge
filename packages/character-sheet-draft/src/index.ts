@@ -63,6 +63,12 @@ export {
 } from "./draft-mutation-v2";
 export type { DraftMutationV2 } from "./draft-mutation-v2";
 export {
+  DraftModeMutationV2Schema,
+  parseDraftModeMutationV2,
+  applyDraftModeMutationWithExpectedVersionV2,
+} from "./draft-mode-mutation-v2";
+export type { DraftModeMutationV2 } from "./draft-mode-mutation-v2";
+export {
   DraftUndoMutationV2Schema,
   parseDraftUndoMutationV2,
   applyDraftUndoWithExpectedVersionV2,

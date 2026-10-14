@@ -42,6 +42,7 @@ import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
+import type { ThreatLevelPreference } from "../state/sheet-workshop-types";
 
 /**
  * Narrow session-token boundary for the V2 workshop. Local mode may resolve
@@ -483,6 +484,10 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     [store],
   );
 
+  const getThreatLevel = useCallback((): ThreatLevelPreference | null => {
+    return state.workshop.threatLevel;
+  }, [state.workshop.threatLevel]);
+
   const canvasCallbacks = useMemo(
     () => ({
       onSetValue: handleSetValue,
@@ -564,8 +569,8 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
           />
           <div className="character-workshop__identity-bar">
             <WorkshopIdentitySelector
-              characterType={state.workshop.characterType}
-              threatLevel={state.workshop.threatLevel}
+              mode={draft.mode}
+              threatLevel={getThreatLevel()}
               disabled={
                 draft.confirmed || pending || state.saveStatus === "saving"
               }

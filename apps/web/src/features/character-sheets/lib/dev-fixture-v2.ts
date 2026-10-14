@@ -21,7 +21,7 @@ export function createBlankDraftV2(sessionId: string): CharacterSheetDraftV2 {
     schemaVersion: "2",
     draftId: crypto.randomUUID(),
     sessionId,
-    mode: "npc",
+    mode: "pc",
     characterName: null,
     rulesContextId: null,
     fields: [blankNameField()],

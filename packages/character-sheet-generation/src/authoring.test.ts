@@ -202,21 +202,21 @@ describe("NPCGenerationRequestSchema", () => {
     const request = NPCGenerationRequestSchema.parse({
       mode: "npc",
       disposition: "enemy",
-      threat: "dangerous",
+      threat: "elite",
     });
-    expect(request.threat).toBe("dangerous");
+    expect(request.threat).toBe("elite");
   });
 
   it("forbids a threat level on allies", () => {
     const result = NPCGenerationRequestSchema.safeParse({
       mode: "npc",
       disposition: "ally",
-      threat: "weak",
+      threat: "low",
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects threat values outside the enum", () => {
+  it("rejects threat values outside the canonical enum", () => {
     const result = NPCGenerationRequestSchema.safeParse({
       mode: "npc",
       disposition: "enemy",
@@ -311,7 +311,7 @@ describe("CharacterSheetGenerationRequestSchema", () => {
     const npc = CharacterSheetGenerationRequestSchema.parse({
       mode: "npc",
       disposition: "enemy",
-      threat: "boss",
+      threat: "legendary",
     }) as NPCGenerationRequest;
     expect(npc.mode).toBe("npc");
     expect(npc.disposition).toBe("enemy");
@@ -326,11 +326,11 @@ describe("CharacterSheetGenerationRequestSchema", () => {
 
   it("exposes the full threat vocabulary", () => {
     expect(NPCThreatLevelSchema.options).toEqual([
-      "weak",
-      "ordinary",
-      "dangerous",
+      "very-low",
+      "low",
+      "medium",
       "elite",
-      "boss",
+      "legendary",
     ]);
   });
 });

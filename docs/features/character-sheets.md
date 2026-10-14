@@ -307,16 +307,19 @@ The editor/layout must eventually provide a place for the portrait.
 ### NPC (Non-Player Character)
 
 - blank fields may be populated by AI during final generation
-- supports **threat level**:
+- supports **threat level** (canonical five-level contract):
 
-| Level   | Description       |
-| ------- | ----------------- |
-| Common  | Standard enemy    |
-| Veteran | Experienced enemy |
-| Elite   | Strong enemy      |
-| Boss    | Major antagonist  |
+| Level       | Description         |
+| ----------- | ------------------- |
+| Very low    | Minimal threat      |
+| Low         | Minor threat        |
+| Medium      | Moderate threat     |
+| Elite       | Significant threat  |
+| Legendary   | Extreme threat      |
 
-Reflect the actual current code where already implemented, but distinguish implemented UI preference from final server-side generation integration.
+These are the canonical machine keys: `very-low`, `low`, `medium`, `elite`, `legendary`.
+UI labels are: Very low, Low, Medium, Elite, Legendary.
+Old aliases (`common`, `veteran`, `elite`, `boss`) are no longer valid for final generation.
 
 ---
 
@@ -421,8 +424,8 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | Section creation/renaming                            | IMPLEMENTED               | V2 runtime: `add_section`, `rename_section`                                                                                                                                         |
 | Field ↔ Section movement (`move_field`)              | REMOVED (4E6)             | V1 runtime deleted; `place_node` is the only placement op; not in `DraftMutationV2`                                                                                                 |
 | Section reparenting (`reparent_section`)             | REMOVED (4E6)             | V1 runtime deleted; `place_node` is the only placement op; not in `DraftMutationV2`                                                                                                 |
-| `remove_section` mutation                            | NOT IMPLEMENTED           | Not implemented; `place_node` does not cover deletion                                                                                                                               |
-| `remove_section` safe semantics                      | NOT IMPLEMENTED           | Target behavior only: empty Section may be removed, non-empty Section rejected                                                                                                      |
+| `remove_section` mutation                            | IMPLEMENTED (14.10)       | Empty Section allowed, non-empty rejected with explanation; atomic cleanup of sections/structure/layout; destructive confirmation UI                                              |
+| `remove_section` safe semantics                      | IMPLEMENTED (14.10)       | Empty Section allowed, non-empty rejected with explanation; atomic cleanup of sections/structure/layout; destructive confirmation UI                                              |
 | Web V2 cutover                                       | LIVE                      | Public page renders `CharacterWorkshopV2Host` → V2 store/client                                                                                                                     |
 | Worker V2 cutover                                    | LIVE                      | Create/mutate/reroll/confirm routes and extraction compiler serve canonical V2                                                                                                      |
 | Persistence V2 write path                            | LIVE                      | Canonical V2 R2 writes with atomic initial create; historical V1 reads canonicalized in memory only                                                                                 |
@@ -464,6 +467,6 @@ Full transport, concurrency and error contract:
 - **Architecture:** `docs/architecture/phase-14.7/character-sheet-integration.md` (for implementation details, labeled with CURRENT/COMPLETED/SUPERSEDED/DEFERRED)
 - **V2 transport contract:** `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md` (FROZEN FOR 4E CUTOVER)
 - **Data Model:** `docs/architecture/data-model.md` (persistence direction)
-- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**
+- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**
 - **Phase 14.10:** `docs/architecture/phase-14.10/character-sheet-authoring-completeness.md`
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`

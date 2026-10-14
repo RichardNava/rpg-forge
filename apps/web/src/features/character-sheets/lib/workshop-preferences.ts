@@ -1,85 +1,59 @@
 import type {
-  CharacterTypePreference,
   ThreatLevelPreference,
   VisualStyleKey,
   PortraitSource,
 } from "../state/sheet-workshop-types";
 
-export const CHARACTER_TYPE_OPTIONS: readonly CharacterTypePreference[] = [
-  "pc",
-  "npc",
-];
-
 export const THREAT_LEVEL_OPTIONS: readonly ThreatLevelPreference[] = [
-  "common",
-  "veteran",
+  "very-low",
+  "low",
+  "medium",
   "elite",
-  "boss",
+  "legendary",
 ];
 
 export const VISUAL_STYLE_OPTIONS: readonly VisualStyleKey[] = [
-  "medieval-fantasy",
-  "dark-fantasy",
+  "medieval",
+  "fantasy",
+  "gothic",
   "steampunk",
-  "oriental-fantasy",
-  "retrofuturistic",
-  "classic-rpg",
+  "sci-fi",
+  "contemporary",
 ];
 
-export const CHARACTER_TYPE_LABEL: Record<CharacterTypePreference, string> = {
-  pc: "Player character",
-  npc: "Non-player character",
-};
-
 export const THREAT_LEVEL_LABEL: Record<ThreatLevelPreference, string> = {
-  common: "Common",
-  veteran: "Veteran",
+  "very-low": "Very Low",
+  low: "Low",
+  medium: "Medium",
   elite: "Elite",
-  boss: "Boss",
+  legendary: "Legendary",
 };
 
 export const THREAT_LEVEL_EXPLANATION: Record<ThreatLevelPreference, string> = {
-  common: "Barely a handful.",
-  veteran: "Seasoned and dangerous.",
+  "very-low": "Barely a handful.",
+  low: "Weaker than average.",
+  medium: "A fair challenge.",
   elite: "A serious threat.",
-  boss: "Deadly even alone.",
+  legendary: "Deadly even alone.",
 };
 
 export const VISUAL_STYLE_LABEL: Record<VisualStyleKey, string> = {
-  "medieval-fantasy": "Medieval Fantasy",
-  "dark-fantasy": "Dark Fantasy",
+  medieval: "Medieval",
+  fantasy: "Fantasy",
+  gothic: "Gothic",
   steampunk: "Steampunk",
-  "oriental-fantasy": "Oriental Fantasy",
-  retrofuturistic: "Retrofuturistic",
-  "classic-rpg": "Classic RPG",
+  "sci-fi": "Sci-fi",
+  contemporary: "Contemporary",
 };
 
 export const VISUAL_STYLE_EXPLANATION: Record<VisualStyleKey, string> = {
-  "medieval-fantasy": "Swords, sorcery, and heraldry.",
-  "dark-fantasy": "Grim, gothic, and perilous.",
+  medieval: "Classic swords and sorcery.",
+  fantasy: "High magic and wonder.",
+  gothic: "Grim, dark, and perilous.",
   steampunk: "Brass, gears, and steam power.",
-  "oriental-fantasy": "Brush strokes, spirits, and honor.",
-  retrofuturistic: "Chrome, neon, and atompunk dreams.",
-  "classic-rpg": "Clean lines, dice, and imagination.",
+  "sci-fi": "Starships and cybernetics.",
+  contemporary: "Modern day, hidden worlds.",
 };
-
-export function isPortraitSourceUpload(
-  source: PortraitSource,
-): source is { kind: "upload"; dataUrl: string } {
-  return source.kind === "upload";
-}
-
-export function isPortraitSourceUrl(
-  source: PortraitSource,
-): source is { kind: "url"; url: string } {
-  return source.kind === "url";
-}
-
-export function isPortraitSourceAi(
-  source: PortraitSource,
-): source is { kind: "ai"; prompt: string } {
-  return source.kind === "ai";
-}
 
 export function isPortraitSourceNone(
   source: PortraitSource,

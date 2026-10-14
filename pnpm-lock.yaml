@@ -105,6 +105,9 @@ importers:
       '@repo/character-sheet-draft':
         specifier: workspace:*
         version: link:../../packages/character-sheet-draft
+      '@repo/character-sheet-generation':
+        specifier: workspace:*
+        version: link:../../packages/character-sheet-generation
       '@repo/character-sheet-pdf-renderer':
         specifier: workspace:*
         version: link:../../packages/character-sheet-pdf-renderer
@@ -234,6 +237,9 @@ importers:
 
   packages/character-sheet-generation:
     dependencies:
+      '@repo/character-sheet-draft':
+        specifier: workspace:*
+        version: link:../character-sheet-draft
       '@repo/character-sheet-schema':
         specifier: workspace:*
         version: link:../character-sheet-schema

@@ -91,7 +91,7 @@ describe("normalizeGuiSource", () => {
       parseNpc({
         mode: "npc",
         disposition: "enemy",
-        threat: "boss",
+        threat: "legendary",
         mechanicalFields: [{ label: "Strength", min: 3, max: 18 }],
       }),
     );
@@ -104,7 +104,7 @@ describe("normalizeGuiSource", () => {
       permittedValueRange: { min: 3, max: 18 },
     });
     expect(strength).not.toHaveProperty("explicitValue");
-    expect(normalized.npc).toEqual({ disposition: "enemy", threat: "boss" });
+    expect(normalized.npc).toEqual({ disposition: "enemy", threat: "legendary" });
   });
 
   it("preserves a min == max NPC range as a fixed constraint", () => {
@@ -146,7 +146,7 @@ describe("normalizeGuiSource", () => {
       parseNpc({
         mode: "npc",
         disposition: "enemy",
-        threat: "weak",
+        threat: "very-low",
         characterName: "Gruk",
       }),
     );
@@ -160,13 +160,13 @@ describe("normalizeGuiSource", () => {
       parsePc({ mode: "pc", characterName: "   " }),
     );
     const npcOmitted = normalizeGuiSource(
-      parseNpc({ mode: "npc", disposition: "enemy", threat: "weak" }),
+      parseNpc({ mode: "npc", disposition: "enemy", threat: "very-low" }),
     );
     const npcBlank = normalizeGuiSource(
       parseNpc({
         mode: "npc",
         disposition: "enemy",
-        threat: "weak",
+        threat: "very-low",
         characterName: "",
       }),
     );

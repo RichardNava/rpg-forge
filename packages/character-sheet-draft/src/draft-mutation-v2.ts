@@ -25,6 +25,11 @@ import {
   DraftUndoMutationV2Schema,
   parseDraftUndoMutationV2,
 } from "./draft-undo-mutation-v2";
+import {
+  applyDraftModeMutationWithExpectedVersionV2,
+  DraftModeMutationV2Schema,
+  parseDraftModeMutationV2,
+} from "./draft-mode-mutation-v2";
 import { MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
 import { draftKeyPattern, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { DraftNodeDestinationSchema } from "./draft-structure-placement-plan";
@@ -48,7 +53,7 @@ export type DraftPlaceNodeMutationV2 = z.infer<
 /**
  * Unified V2 mutation contract — the canonical discriminated union.
  *
- * The thirteen operations are composed from the approved primitives:
+ * The fourteen operations are composed from the approved primitives:
  * - place_node: structural placement (2B)
  * - set_value, clear_value, set_field_label, set_field_type, lock_field,
  *   unlock_field: content/value mutations (4A1)
@@ -56,6 +61,7 @@ export type DraftPlaceNodeMutationV2 = z.infer<
  * - add_section, rename_section, remove_section: section registry mutations (4A3/14.10)
  * - set_container_layout, set_node_layout: spatial layout mutations (14.8;
  *   geometry only, never structure)
+ * - set_mode: PC/NPC mode switch (14.11)
  * - undo: one-level server-authoritative undo (14.10)
  *
  * `expectedVersion` is deliberately OUT of the payload; pass it to
@@ -71,6 +77,7 @@ export const DraftMutationV2Schema = z.discriminatedUnion("op", [
   ...DraftFieldRegistryMutationV2Schema.options,
   ...DraftSectionRegistryMutationV2Schema.options,
   ...DraftLayoutMutationV2Schema.options,
+  ...DraftModeMutationV2Schema.options,
   ...DraftUndoMutationV2Schema.options,
 ]);
 export type DraftMutationV2 = z.infer<typeof DraftMutationV2Schema>;
@@ -118,6 +125,8 @@ export function parseDraftMutationV2(input: unknown): DraftMutationV2 {
     case "set_container_layout":
     case "set_node_layout":
       return parseDraftLayoutMutationV2(mutation);
+    case "set_mode":
+      return parseDraftModeMutationV2(mutation);
     case "undo":
       return parseDraftUndoMutationV2(mutation);
     default:
@@ -181,6 +190,12 @@ export function applyDraftMutationV2(
     case "set_container_layout":
     case "set_node_layout":
       return applyDraftLayoutMutationWithExpectedVersionV2(
+        draft,
+        mutation,
+        expectedVersion,
+      );
+    case "set_mode":
+      return applyDraftModeMutationWithExpectedVersionV2(
         draft,
         mutation,
         expectedVersion,

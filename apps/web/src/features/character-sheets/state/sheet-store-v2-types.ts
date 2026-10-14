@@ -37,9 +37,8 @@ export const INITIAL_SHEET_STORE_V2_STATE: SheetStoreV2State = {
   draft: null,
   saveStatus: "idle",
   workshop: {
-    characterType: "pc",
     threatLevel: null,
-    visualStyle: "medieval-fantasy",
+    visualStyle: "medieval",
     portrait: { kind: "none" },
   },
   rerolledKeys: null,

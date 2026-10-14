@@ -10,36 +10,30 @@ export type SheetDraftSaveStatus = "idle" | "saving" | "saved" | "error";
 /**
  * Workshop-level identity preferences. These are UX coaching inputs that guide
  * the final sheet generation; they are NOT part of the draft schema and never
- * cross the API boundary. `characterType` is seeded from `draft.mode` whenever
- * a draft loads; `threatLevel` only applies to NPCs.
+ * cross the API boundary. `threatLevel` only applies to NPCs.
  */
-export type CharacterTypePreference = "pc" | "npc";
-
-export type ThreatLevelPreference = "common" | "veteran" | "elite" | "boss";
+export type ThreatLevelPreference = "very-low" | "low" | "medium" | "elite" | "legendary";
 
 /**
- * Visual style keys for sheet rendering. Must match the kebab-case regex in
- * `packages/character-sheet-generation/src/authoring.ts` (`VisualStyleKeySchema`).
+ * Visual style keys for sheet rendering. Reuses the canonical enum from
+ * @repo/character-sheet-generation (CanonicalVisualStyleSchema).
  */
 export type VisualStyleKey =
-  | "medieval-fantasy"
-  | "dark-fantasy"
+  | "medieval"
+  | "fantasy"
+  | "gothic"
   | "steampunk"
-  | "oriental-fantasy"
-  | "retrofuturistic"
-  | "classic-rpg";
+  | "sci-fi"
+  | "contemporary";
 
 /**
  * Portrait source for the character image.
+ * 14.11 boundary: only `none` is valid.
  */
 export type PortraitSource =
-  | { kind: "upload"; dataUrl: string }
-  | { kind: "url"; url: string }
-  | { kind: "ai"; prompt: string }
   | { kind: "none" };
 
 export interface WorkshopPreferences {
-  characterType: CharacterTypePreference;
   threatLevel: ThreatLevelPreference | null;
   visualStyle: VisualStyleKey;
   portrait: PortraitSource;

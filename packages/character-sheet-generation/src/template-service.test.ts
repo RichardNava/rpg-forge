@@ -74,7 +74,7 @@ function npcRequest(body: Record<string, unknown>) {
   return NPCGenerationRequestSchema.parse({
     mode: "npc",
     disposition: "enemy",
-    threat: "ordinary",
+    threat: "low",
     ...body,
   });
 }

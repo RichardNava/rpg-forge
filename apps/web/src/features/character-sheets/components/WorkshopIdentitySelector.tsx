@@ -1,42 +1,27 @@
 "use client";
 
 import type {
-  CharacterTypePreference,
   ThreatLevelPreference,
 } from "../state/sheet-workshop-types";
 import {
-  CHARACTER_TYPE_LABEL,
-  CHARACTER_TYPE_OPTIONS,
   THREAT_LEVEL_EXPLANATION,
   THREAT_LEVEL_LABEL,
   THREAT_LEVEL_OPTIONS,
 } from "../lib/workshop-preferences";
 
 export interface WorkshopIdentityPatch {
-  characterType?: CharacterTypePreference;
   threatLevel?: ThreatLevelPreference | null;
 }
 
 interface WorkshopIdentitySelectorProps {
-  characterType: CharacterTypePreference;
+  mode: "pc" | "npc";
   threatLevel: ThreatLevelPreference | null;
   disabled: boolean;
   onChange(patch: WorkshopIdentityPatch): void;
 }
 
-function handleRoleChange(
-  option: CharacterTypePreference,
-  onChange: (patch: WorkshopIdentityPatch) => void,
-): void {
-  if (option === "pc") {
-    onChange({ characterType: "pc", threatLevel: null });
-  } else {
-    onChange({ characterType: "npc" });
-  }
-}
-
 export function WorkshopIdentitySelector({
-  characterType,
+  mode,
   threatLevel,
   disabled,
   onChange,
@@ -54,35 +39,17 @@ export function WorkshopIdentitySelector({
           Role
         </span>
         <div
-          className="character-workshop__identity-segment"
+          className="character-workshop__identity-display"
           role="group"
           aria-labelledby="workshop-identity-role-label"
         >
-          {CHARACTER_TYPE_OPTIONS.map((option) => {
-            const selected = characterType === option;
-            return (
-              <button
-                key={option}
-                type="button"
-                className={
-                  selected
-                    ? "character-workshop__identity-option character-workshop__identity-option--selected"
-                    : "character-workshop__identity-option"
-                }
-                aria-pressed={selected}
-                aria-label={CHARACTER_TYPE_LABEL[option]}
-                title={CHARACTER_TYPE_LABEL[option]}
-                onClick={() => handleRoleChange(option, onChange)}
-                disabled={disabled}
-              >
-                {option.toUpperCase()}
-              </button>
-            );
-          })}
+          <span className="character-workshop__identity-value">
+            {mode === "pc" ? "Player Character" : "Non-Player Character"}
+          </span>
         </div>
       </div>
 
-      {characterType === "npc" && (
+      {mode === "npc" && (
         <div className="character-workshop__identity-field">
           <span
             className="character-workshop__identity-label"

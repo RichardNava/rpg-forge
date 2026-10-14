@@ -163,7 +163,7 @@ describe("generateCharacterSheetSpec — name resolution", () => {
       definition: makeDefinition({
         mode: "npc",
         characterName: "Baron Grim",
-        npc: { disposition: "enemy", threat: "boss" },
+        npc: { disposition: "enemy", threat: "legendary" },
       }),
     });
     expect(spec.mode).toBe("npc");
@@ -343,7 +343,7 @@ describe("generateCharacterSheetSpec — PC values", () => {
 describe("generateCharacterSheetSpec — NPC values", () => {
   function npcInput(
     field: SourceResolvedField,
-    threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss" | null,
+    threat: "very-low" | "low" | "medium" | "elite" | "legendary" | null,
     options: { seed?: string; sheetId?: string } = {},
   ): GenerateCharacterSheetSpecInput {
     return baseInput(new FakeNamePort().scriptWith(["Grim"]), {
@@ -362,7 +362,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
 
   it("preserves an explicit NPC value", async () => {
     const spec = await generateCharacterSheetSpec(
-      npcInput(mechanicalField("armor", "Armor", { value: 12 }), "ordinary"),
+      npcInput(mechanicalField("armor", "Armor", { value: 12 }), "elite"),
     );
     expect(spec.values.armor).toBe(12);
   });
@@ -371,7 +371,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
     const spec = await generateCharacterSheetSpec(
       npcInput(
         mechanicalField("hp_pool", "Hit Points", { range: [40, 40] }),
-        "boss",
+        "legendary",
       ),
     );
     expect(spec.values.hp_pool).toBe(40);
@@ -381,14 +381,14 @@ describe("generateCharacterSheetSpec — NPC values", () => {
     const first = await generateCharacterSheetSpec(
       npcInput(
         mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-        "dangerous",
+        "medium",
         { seed: "seed-a" },
       ),
     );
     const second = await generateCharacterSheetSpec(
       npcInput(
         mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-        "dangerous",
+        "medium",
         { seed: "seed-a" },
       ),
     );
@@ -403,7 +403,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
       const spec = await generateCharacterSheetSpec(
         npcInput(
           mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-          "ordinary",
+          "low",
           { seed },
         ),
       );
@@ -420,13 +420,13 @@ describe("generateCharacterSheetSpec — NPC values", () => {
 
   it("value never escapes the permitted range for any threat", async () => {
     const cases: Array<{
-      threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss";
+      threat: "very-low" | "low" | "medium" | "elite" | "legendary";
     }> = [
-      { threat: "weak" },
-      { threat: "ordinary" },
-      { threat: "dangerous" },
+      { threat: "very-low" },
+      { threat: "low" },
+      { threat: "medium" },
       { threat: "elite" },
-      { threat: "boss" },
+      { threat: "legendary" },
     ];
     for (const entry of cases) {
       for (const seed of ["seed-x", "seed-y", "seed-z"]) {
@@ -452,7 +452,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
   it("threat biases the distribution (higher tiers skew to higher values)", async () => {
     await baseInput(new FakeNamePort().scriptWith(["Grim"]), {});
     const meanOf = async (
-      threat: "weak" | "ordinary" | "dangerous" | "elite" | "boss",
+      threat: "very-low" | "low" | "medium" | "elite" | "legendary",
     ): Promise<number> => {
       let total = 0;
       const count = 32;
@@ -468,19 +468,19 @@ describe("generateCharacterSheetSpec — NPC values", () => {
       }
       return total / count;
     };
-    const weakMean = await meanOf("weak");
-    const bossMean = await meanOf("boss");
-    expect(bossMean).toBeGreaterThan(weakMean);
+    const veryLowMean = await meanOf("very-low");
+    const legendaryMean = await meanOf("legendary");
+    expect(legendaryMean).toBeGreaterThan(veryLowMean);
   });
 
-  it("boss retains variation and does not universally return the max", async () => {
+  it("legendary retains variation and does not universally return the max", async () => {
     const seen = new Set<number>();
     for (let index = 0; index < 48; index += 1) {
       const spec = await generateCharacterSheetSpec(
         npcInput(
           mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-          "boss",
-          { seed: `boss-${index}` },
+          "legendary",
+          { seed: `legendary-${index}` },
         ),
       );
       seen.add(Number(spec.values.hp_pool));
@@ -491,7 +491,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
 
   it("leaves an unbounded NPC range blank", async () => {
     const spec = await generateCharacterSheetSpec(
-      npcInput(mechanicalField("rerolls", "Rerolls"), "boss"),
+      npcInput(mechanicalField("rerolls", "Rerolls"), "legendary"),
     );
     expect(Object.hasOwn(spec.values, "rerolls")).toBe(false);
   });
@@ -500,8 +500,8 @@ describe("generateCharacterSheetSpec — NPC values", () => {
     const spec = await generateCharacterSheetSpec(
       npcInput(
         mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-        "weak",
-        { seed: "range-seed" },
+        "very-low",
+        { seed: "range-seid" },
       ),
     );
     const field = spec.fields.find((entry) => entry.id === "hp_pool");
@@ -519,7 +519,7 @@ describe("generateCharacterSheetSpec — NPC values", () => {
       await generateCharacterSheetSpec(
         npcInput(
           mechanicalField("hp_pool", "Hit Points", { range: [10, 20] }),
-          "boss",
+          "legendary",
           { seed: "no-math-random" },
         ),
       );
@@ -806,7 +806,7 @@ describe("generateCharacterSheetSpec — grouping and metadata", () => {
       definition: makeDefinition({
         mode: "npc",
         characterName: "Grim",
-        npc: { disposition: "enemy", threat: "boss" },
+        npc: { disposition: "enemy", threat: "legendary" },
       }),
     });
     expect(pc.metadata.title).toBe("Character Sheet");

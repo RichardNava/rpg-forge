@@ -118,11 +118,11 @@ export const NPCDispositionSchema = z.enum(["ally", "enemy"]);
 export type NPCDisposition = z.infer<typeof NPCDispositionSchema>;
 
 export const NPCThreatLevelSchema = z.enum([
-  "weak",
-  "ordinary",
-  "dangerous",
+  "very-low",
+  "low",
+  "medium",
   "elite",
-  "boss",
+  "legendary",
 ]);
 export type NPCThreatLevel = z.infer<typeof NPCThreatLevelSchema>;
 

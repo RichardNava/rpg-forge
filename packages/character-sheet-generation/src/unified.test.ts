@@ -35,7 +35,7 @@ function npcRequest(
   return NPCGenerationRequestSchema.parse({
     mode: "npc",
     disposition: "enemy",
-    threat: "boss",
+    threat: "legendary",
     ...body,
   });
 }
@@ -439,7 +439,7 @@ describe("generateNormalizedSheet", () => {
       return;
     }
     const npcDefinition = outcome.result.definition;
-    expect(npcDefinition.npc).toEqual({ disposition: "enemy", threat: "boss" });
+    expect(npcDefinition.npc).toEqual({ disposition: "enemy", threat: "legendary" });
     for (const field of npcDefinition.fields) {
       expect(field).not.toHaveProperty("explicitValue");
     }

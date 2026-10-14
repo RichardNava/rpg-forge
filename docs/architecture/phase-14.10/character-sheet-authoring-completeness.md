@@ -55,7 +55,7 @@ Safe remove_section
 One-Level Server-Authoritative Undo
   → Dedicated POST /undo transport (not generic PATCH)
   → Server-authoritative: reads undoSourceVersion from D1 head
-  → Loads undo source from R2, creates new version V+2
+  → Loads undo source from R2, creates new version V+1
   → ExpectedVersion concurrency protection
   → Restores structure + layout + values + registries atomically
   → Consumes eligibility (undoConsumed = true)

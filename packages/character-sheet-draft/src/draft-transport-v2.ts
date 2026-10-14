@@ -196,7 +196,7 @@ export type SheetDraftConfirmRequestV2 = z.infer<
  * Undo is a dedicated transport operation because it requires server-side
  * history (the undoSourceVersion from the D1 draft head). The client sends
  * only expectedVersion; the server resolves the undo source and creates a
- * new snapshot at version N+2.
+ * new snapshot at version N+1.
  */
 export const SheetDraftUndoRequestV2Schema = z.strictObject({
   expectedVersion: DraftExpectedVersionSchema,

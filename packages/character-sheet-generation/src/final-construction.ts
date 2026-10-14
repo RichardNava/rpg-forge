@@ -63,15 +63,15 @@ const ATTRIBUTES_SECTION_KEY = "attributes";
  * Threat bias centers the seeded NPC value distribution. A generated value is
  * sampled deterministically inside an upper/lower window around the tier's
  * bias (see resolveNpcValue), so tiers keep a real skew while different seeds
- * still produce different in-bounds values. The window lets the boss tier hug
+ * still produce different in-bounds values. The window lets the legendary tier hug
  * the top of the range without forcing `max` on every draw.
  */
 const THREAT_BIAS: Record<NPCThreatLevel, number> = {
-  weak: 0.25,
-  ordinary: 0.5,
-  dangerous: 0.75,
-  elite: 0.9,
-  boss: 1,
+  "very-low": 0.15,
+  low: 0.35,
+  medium: 0.5,
+  elite: 0.85,
+  legendary: 0.95,
 };
 const NEUTRAL_THREAT_BIAS = 0.5;
 
@@ -676,7 +676,7 @@ function resolveNpcValue(
     stableNameSeed(`${seed}|${threat ?? "none"}|${field.canonicalKey}`),
   );
   // Sample inside a window centered on the tier bias: every tier keeps its
-  // skew (the boss tier hugs the top of the range) but each draw still varies
+  // skew (the legendary tier hugs the top of the range) but each draw still varies
   // with the seed, so no tier is hard-coded to an exact value or to `max`.
   const low = Math.max(0, bias - THREAT_BIAS_WINDOW);
   const high = Math.min(1, bias + THREAT_BIAS_WINDOW);

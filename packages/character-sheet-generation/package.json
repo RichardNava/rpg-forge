@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@repo/character-sheet-draft": "workspace:*",
     "@repo/character-sheet-schema": "workspace:*",
     "@repo/character-sheet-template": "workspace:*",
     "@repo/rules-analysis-run": "workspace:*",

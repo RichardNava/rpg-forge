@@ -24,3 +24,4 @@ export * from "./final-construction.js";
 export * from "./template-normalization.js";
 export * from "./deterministic-local-name.js";
 export * from "./template-service.js";
+export * from "./final-generation-contract.js";

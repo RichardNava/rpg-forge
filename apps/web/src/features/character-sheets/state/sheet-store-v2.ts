@@ -70,9 +70,8 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
     mode: CharacterSheetDraftV2["mode"],
   ): WorkshopPreferences {
     return {
-      characterType: mode,
       threatLevel: null,
-      visualStyle: "medieval-fantasy",
+      visualStyle: "medieval",
       portrait: { kind: "none" },
     };
   }

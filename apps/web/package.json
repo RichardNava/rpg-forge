@@ -26,6 +26,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@opennextjs/cloudflare": "^1.19.9",
     "@repo/character-sheet-draft": "workspace:*",
+    "@repo/character-sheet-generation": "workspace:*",
     "@repo/character-sheet-pdf-renderer": "workspace:*",
     "@repo/dice-engine": "workspace:*",
     "better-auth": "^1.6.27",

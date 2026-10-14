@@ -36,7 +36,7 @@ function npcRequest(
   return NPCGenerationRequestSchema.parse({
     mode: "npc",
     disposition: "enemy",
-    threat: "dangerous",
+    threat: "medium",
     ...body,
   });
 }
@@ -171,7 +171,7 @@ describe("Phase 14.7A1 — genuine GUI-only generation", () => {
     expect(spec.rulesContextId).toBeNull();
     expect(spec.metadata.id).toBe("sheet.gui.npc.0001");
     expect(Object.keys(spec.sourceMap)).toHaveLength(0);
-    // dangerous tier: value stays inside the permitted bounds and is seeded.
+    // medium tier: value stays inside the permitted bounds and is seeded.
     const hitPoints = Number(spec.values.hit_points);
     expect(hitPoints).toBeGreaterThanOrEqual(10);
     expect(hitPoints).toBeLessThanOrEqual(20);

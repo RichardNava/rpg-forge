@@ -8,14 +8,14 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 
 describe("WorkshopIdentitySelector", () => {
-  it("renders PC/NPC segmented control with correct labels and pressed states", () => {
+  it("renders mode display with correct labels", () => {
     const onChange = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
 
     render(
       <WorkshopIdentitySelector
-        characterType="pc"
+        mode="pc"
         threatLevel={null}
         disabled={false}
         onChange={onChange}
@@ -23,81 +23,41 @@ describe("WorkshopIdentitySelector", () => {
       { container },
     );
 
-    const pcButton = container.querySelector('button[aria-label="Player character"]');
-    const npcButton = container.querySelector('button[aria-label="Non-player character"]');
+    // PC mode displays "Player Character"
+    const pcDisplay = container.querySelector(".character-workshop__identity-value");
+    expect(pcDisplay?.textContent?.trim()).toBe("Player Character");
 
-    expect(pcButton).toBeTruthy();
-    expect(npcButton).toBeTruthy();
-    expect(pcButton?.getAttribute("aria-pressed")).toBe("true");
-    expect(npcButton?.getAttribute("aria-pressed")).toBe("false");
-
-    // Threat options not shown when PC selected
+    // Threat options not shown when PC
     expect(container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]')).toBeNull();
 
     container.remove();
   });
 
-  it("shows threat options when NPC is selected", () => {
+  it("shows threat options when NPC mode", () => {
     const onChange = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
 
-    // Render with NPC from the start to test threat options
+    // Render with NPC mode
     render(
       <WorkshopIdentitySelector
-        characterType="npc"
+        mode="npc"
         threatLevel={null}
         disabled={false}
         onChange={onChange}
       />,
       { container },
     );
+
+    const npcDisplay = container.querySelector(".character-workshop__identity-value");
+    expect(npcDisplay?.textContent?.trim()).toBe("Non-Player Character");
 
     const threatGroup = container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]');
     expect(threatGroup).toBeTruthy();
 
-    // Threat buttons exist
-    expect(threatGroup?.querySelectorAll("button").length).toBe(4);
+    // Threat buttons exist (5 levels: very-low, low, medium, elite, legendary)
+    expect(threatGroup?.querySelectorAll("button").length).toBe(5);
 
-    container.remove();
-  });
-
-  it("calls onChange with characterType when clicking NPC, then re-render shows threat", () => {
-    const onChange = vi.fn();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-
-    // Start with PC
-    render(
-      <WorkshopIdentitySelector
-        characterType="pc"
-        threatLevel={null}
-        disabled={false}
-        onChange={onChange}
-      />,
-      { container },
-    );
-
-    const npcButton = container.querySelector('button[aria-label="Non-player character"]');
-    fireEvent.click(npcButton!);
-    expect(onChange).toHaveBeenCalledWith({ characterType: "npc" });
-
-    // Re-render with NPC to verify threat options appear
-    const { unmount } = render(
-      <WorkshopIdentitySelector
-        characterType="npc"
-        threatLevel={null}
-        disabled={false}
-        onChange={onChange}
-      />,
-      { container },
-    );
-
-    const threatGroup = container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]');
-    expect(threatGroup).toBeTruthy();
-    expect(threatGroup?.querySelectorAll("button").length).toBe(4);
-
-    unmount();
     container.remove();
   });
 
@@ -108,7 +68,7 @@ describe("WorkshopIdentitySelector", () => {
 
     render(
       <WorkshopIdentitySelector
-        characterType="npc"
+        mode="npc"
         threatLevel={null}
         disabled={false}
         onChange={onChange}
@@ -116,17 +76,17 @@ describe("WorkshopIdentitySelector", () => {
       { container },
     );
 
-    const commonButton = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent?.trim() === "Common",
+    const veryLowButton = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Very Low",
     );
-    fireEvent.click(commonButton!);
-    expect(onChange).toHaveBeenCalledWith({ threatLevel: "common" });
+    fireEvent.click(veryLowButton!);
+    expect(onChange).toHaveBeenCalledWith({ threatLevel: "very-low" });
 
-    const veteranButton = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent?.trim() === "Veteran",
+    const lowButton = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Low",
     );
-    fireEvent.click(veteranButton!);
-    expect(onChange).toHaveBeenCalledWith({ threatLevel: "veteran" });
+    fireEvent.click(lowButton!);
+    expect(onChange).toHaveBeenCalledWith({ threatLevel: "low" });
 
     container.remove();
   });
@@ -139,7 +99,7 @@ describe("WorkshopIdentitySelector", () => {
     // Start with no threat selected
     render(
       <WorkshopIdentitySelector
-        characterType="npc"
+        mode="npc"
         threatLevel={null}
         disabled={false}
         onChange={onChange}
@@ -156,7 +116,7 @@ describe("WorkshopIdentitySelector", () => {
     // Re-render with elite selected
     const { unmount } = render(
       <WorkshopIdentitySelector
-        characterType="npc"
+        mode="npc"
         threatLevel="elite"
         disabled={false}
         onChange={onChange}
@@ -174,52 +134,6 @@ describe("WorkshopIdentitySelector", () => {
     container.remove();
   });
 
-  it("resets threat to null when switching to PC", () => {
-    const onChange = vi.fn();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-
-    render(
-      <WorkshopIdentitySelector
-        characterType="npc"
-        threatLevel="elite"
-        disabled={false}
-        onChange={onChange}
-      />,
-      { container },
-    );
-
-    const pcButton = container.querySelector('button[aria-label="Player character"]');
-    fireEvent.click(pcButton!);
-    expect(onChange).toHaveBeenCalledWith({ characterType: "pc", threatLevel: null });
-
-    container.remove();
-  });
-
-  it("disables all controls when disabled prop is true", () => {
-    const onChange = vi.fn();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-
-    render(
-      <WorkshopIdentitySelector
-        characterType="pc"
-        threatLevel={null}
-        disabled={true}
-        onChange={onChange}
-      />,
-      { container },
-    );
-
-    const pcButton = container.querySelector<HTMLButtonElement>('button[aria-label="Player character"]');
-    const npcButton = container.querySelector<HTMLButtonElement>('button[aria-label="Non-player character"]');
-
-    expect(pcButton?.disabled).toBe(true);
-    expect(npcButton?.disabled).toBe(true);
-
-    container.remove();
-  });
-
   it("displays selected threat option with pressed styling", () => {
     const onChange = vi.fn();
     const container = document.createElement("div");
@@ -227,7 +141,7 @@ describe("WorkshopIdentitySelector", () => {
 
     render(
       <WorkshopIdentitySelector
-        characterType="npc"
+        mode="npc"
         threatLevel="elite"
         disabled={false}
         onChange={onChange}
@@ -240,6 +154,27 @@ describe("WorkshopIdentitySelector", () => {
     );
     expect(eliteButton?.getAttribute("aria-pressed")).toBe("true");
     expect(eliteButton?.classList.contains("character-workshop__identity-option--selected")).toBe(true);
+
+    container.remove();
+  });
+
+  it("disables all controls when disabled prop is true", () => {
+    const onChange = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    render(
+      <WorkshopIdentitySelector
+        mode="pc"
+        threatLevel={null}
+        disabled={true}
+        onChange={onChange}
+      />,
+      { container },
+    );
+
+    const threatGroup = container.querySelector('[role="group"][aria-labelledby="workshop-identity-threat-label"]');
+    expect(threatGroup).toBeNull();
 
     container.remove();
   });
