@@ -125,6 +125,51 @@ describe("createLocalSheetBackendV2", () => {
     expect(confirmed.version).toBe(2);
   });
 
+  it("stores an uploaded portrait and round-trips its bytes", async () => {
+    const api = createLocalSheetBackendV2();
+    const session = await api.createSession("token");
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48,
+      0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00,
+      0x00, 0x90, 0x77, 0x53, 0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, 0x54, 0x08,
+      0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xfb, 0x03,
+      0x0c, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ]);
+    const ref = await api.uploadPortrait(
+      session.sessionId,
+      session.accessToken,
+      new File([png.buffer as ArrayBuffer], "art.png", { type: "image/png" }),
+    );
+    expect(ref.source).toBe("upload");
+    const downloaded = await api.downloadPortrait(
+      session.sessionId,
+      session.accessToken,
+      ref.assetId,
+    );
+    expect([...downloaded.bytes]).toEqual([...png]);
+    expect(downloaded.mimeType).toBe("image/png");
+  });
+
+  it("rejects non-image uploads and fails URL/AI closed in local mode", async () => {
+    const api = createLocalSheetBackendV2();
+    const session = await api.createSession("token");
+    await expect(
+      api.uploadPortrait(
+        session.sessionId,
+        session.accessToken,
+        new File([new Uint8Array([1, 2, 3]).buffer as ArrayBuffer], "a.bin", {
+          type: "application/octet-stream",
+        }),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      api.importPortraitUrl(session.sessionId, session.accessToken, "https://example.com/a.png"),
+    ).rejects.toThrow();
+    await expect(
+      api.generatePortrait(session.sessionId, session.accessToken, "a ranger"),
+    ).rejects.toThrow();
+  });
+
   it("rejects a session-mismatched draft as invalid", async () => {
     const api = createLocalSheetBackendV2();
     const session = await api.createSession("token");

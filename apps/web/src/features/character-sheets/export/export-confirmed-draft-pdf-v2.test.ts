@@ -12,6 +12,18 @@ describe("downloadConfirmedDraftPdfV2", () => {
     );
   });
 
+  it("refuses a draft with a Portrait Slot instead of silently dropping it", async () => {
+    const base = createBlankDraftV2("session.export-v2");
+    const draft = {
+      ...base,
+      slots: [{ key: "portrait", type: "portrait" as const }],
+      confirmed: true,
+    };
+    await expect(downloadConfirmedDraftPdfV2(draft)).rejects.toThrow(
+      "Technical export does not include portrait slots. Use Download Final PDF.",
+    );
+  });
+
   it("renders a confirmed V2 draft through the V2 projection", async () => {
     const draft = {
       ...createBlankDraftV2("session.export-v2"),

@@ -21,6 +21,10 @@ import {
   type FinalGenerationStartResponseV1,
   type FinalPresentationPlanV1,
 } from "@repo/character-sheet-generation";
+import {
+  validatePortraitImageBytes,
+  type PortraitAssetRef,
+} from "@repo/character-sheet-portraits";
 import { renderStyledCharacterSheetPdf } from "@repo/character-sheet-pdf-renderer";
 import type { SheetSession, SheetSessionView } from "../api/sheet-api-types";
 import type { SheetApiClientV2Port } from "../api/sheet-api-client-v2";
@@ -54,6 +58,10 @@ export function createLocalSheetBackendV2(
   const draftHistory = new Map<string, CharacterSheetDraftV2[]>(); // history of drafts for undo
   const finalPdfs = new Map<string, Uint8Array>();
   const finalRuns = new Map<string, { draftId: string; draftVersion: number }>();
+  const portraitAssets = new Map<
+    string,
+    { bytes: Uint8Array; mimeType: "image/png" | "image/jpeg"; source: "upload" | "url" | "ai" }
+  >();
   const draftHeads = new Map<
     string,
     { undoSourceVersion: number | null; undoConsumed: boolean }
@@ -348,6 +356,26 @@ export function createLocalSheetBackendV2(
           `Unsupported final presentation style: ${String(built.options.visualStyle)}.`,
         );
       }
+      const draftSlots = current.slots ?? [];
+      if (draftSlots.length === 0 && built.options.portrait.kind !== "none") {
+        throw new Error("A portrait asset requires a Portrait Slot on the draft.");
+      }
+      let portraitImage: {
+        slotKey: string;
+        bytes: Uint8Array;
+        mimeType: "image/png" | "image/jpeg";
+      } | null = null;
+      if (built.options.portrait.kind !== "none") {
+        const slot = draftSlots[0];
+        const row =
+          slot === undefined
+            ? undefined
+            : portraitAssets.get(`${sessionId}:${built.options.portrait.assetId}`);
+        if (slot === undefined || row === undefined) {
+          throw new Error("The portrait asset is missing for this session.");
+        }
+        portraitImage = { slotKey: slot.key, bytes: row.bytes, mimeType: row.mimeType };
+      }
       const resolved = resolveFinalValues(current, {
         threat: built.options.threat ?? null,
         seed: built.seed,
@@ -366,6 +394,7 @@ export function createLocalSheetBackendV2(
         resolvedValues: resolved,
         presentation: plan,
         profile: getStyleProfile(built.options.visualStyle),
+        portrait: portraitImage,
       });
       const runId = crypto.randomUUID();
       finalPdfs.set(`${sessionId}:${runId}`, bytes);
@@ -393,6 +422,64 @@ export function createLocalSheetBackendV2(
         throw new Error("Final PDF not found.");
       }
       return bytes;
+    },
+
+    async uploadPortrait(
+      sessionId: string,
+      accessToken: string,
+      file: File,
+    ): Promise<PortraitAssetRef> {
+      requireSession(sessionId, accessToken);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const validated = validatePortraitImageBytes(bytes);
+      if (!validated.valid || validated.mimeType === null) {
+        throw new Error("The portrait image is not a valid PNG or JPEG.");
+      }
+      const assetId = crypto.randomUUID();
+      portraitAssets.set(`${sessionId}:${assetId}`, {
+        bytes,
+        mimeType: validated.mimeType,
+        source: "upload",
+      });
+      return {
+        schemaVersion: "1",
+        assetId,
+        source: "upload",
+        mimeType: validated.mimeType,
+      };
+    },
+
+    async importPortraitUrl(
+      sessionId: string,
+      accessToken: string,
+      url: string,
+    ): Promise<PortraitAssetRef> {
+      requireSession(sessionId, accessToken);
+      void url;
+      throw new Error("URL portrait import is unavailable in local mode.");
+    },
+
+    async generatePortrait(
+      sessionId: string,
+      accessToken: string,
+      prompt: string,
+    ): Promise<PortraitAssetRef> {
+      requireSession(sessionId, accessToken);
+      void prompt;
+      throw new Error("AI portrait generation is unavailable in local mode.");
+    },
+
+    async downloadPortrait(
+      sessionId: string,
+      accessToken: string,
+      assetId: string,
+    ): Promise<{ bytes: Uint8Array; mimeType: string }> {
+      requireSession(sessionId, accessToken);
+      const row = portraitAssets.get(`${sessionId}:${assetId}`);
+      if (row === undefined) {
+        throw new Error("Portrait asset not found.");
+      }
+      return { bytes: row.bytes.slice(), mimeType: row.mimeType };
     },
   };
 }

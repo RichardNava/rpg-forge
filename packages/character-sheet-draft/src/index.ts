@@ -35,6 +35,7 @@ export { buildDraftStructuralReadModelV2 } from "./draft-read-model-v2";
 export type {
   DraftFieldReadNodeV2,
   DraftSectionReadNodeV2,
+  DraftSlotReadNodeV2,
   DraftReadNodeV2,
   DraftStructuralReadModelV2,
 } from "./draft-read-model-v2";
@@ -68,6 +69,32 @@ export {
   applyDraftModeMutationWithExpectedVersionV2,
 } from "./draft-mode-mutation-v2";
 export type { DraftModeMutationV2 } from "./draft-mode-mutation-v2";
+export {
+  DraftAddPortraitSlotMutationV2Schema,
+  DraftRemovePortraitSlotMutationV2Schema,
+  DraftSetPortraitAspectRatioMutationV2Schema,
+  DraftSlotRegistryMutationV2Schema,
+  parseDraftSlotRegistryMutationV2,
+  applyDraftSlotRegistryMutationWithExpectedVersionV2,
+} from "./draft-slot-registry-mutation-v2";
+export type {
+  DraftAddPortraitSlotMutationV2,
+  DraftRemovePortraitSlotMutationV2,
+  DraftSetPortraitAspectRatioMutationV2,
+  DraftSlotRegistryMutationV2,
+} from "./draft-slot-registry-mutation-v2";
+export {
+  DraftSlotV1Schema,
+  PortraitAspectRatioSchema,
+  SlotDetailsV1Schema,
+  DEFAULT_PORTRAIT_ASPECT_RATIO,
+  MAX_PORTRAIT_SLOTS,
+} from "./draft-slot-v2";
+export type {
+  DraftSlotV1,
+  PortraitAspectRatio,
+  SlotDetailsV1,
+} from "./draft-slot-v2";
 export {
   DraftUndoMutationV2Schema,
   parseDraftUndoMutationV2,

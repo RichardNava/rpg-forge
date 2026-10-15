@@ -60,6 +60,8 @@ describe("CanvasInspectorV2", () => {
       onSetNodeLayout: vi.fn(),
       onAddField: vi.fn(),
       onOpenAddSection: vi.fn(),
+      onRemovePortraitSlot: vi.fn(),
+      onSetPortraitAspectRatio: vi.fn(),
     };
   }
 
@@ -206,6 +208,105 @@ describe("CanvasInspectorV2", () => {
       columnSpan: 1,
       rowSpan: 1,
       breakBefore: false,
+    });
+  });
+
+  function makeSlottedDraft(): CharacterSheetDraftV2 {
+    return initialDraftVersionV2({
+      schemaVersion: "2",
+      draftId: "draft.inspector.slot",
+      sessionId: "session.inspector.slot",
+      mode: "pc",
+      characterName: null,
+      rulesContextId: null,
+      fields: [
+        { key: "a", label: "Alpha", type: "text", locked: false },
+        { key: "b", label: "Beta", type: "number", locked: false },
+      ],
+      sections: [{ key: "s1", title: "First" }],
+      slots: [{ key: "portrait", type: "portrait" }],
+      structure: [
+        { kind: "field", key: "a", parentKey: null },
+        { kind: "section", key: "s1", parentKey: null },
+        { kind: "field", key: "b", parentKey: "s1" },
+        { kind: "slot", key: "portrait", parentKey: "s1" },
+      ],
+      values: { a: "A" },
+      source: { sourceSheetId: null, sourceRunId: null },
+      confirmed: false,
+      layout: {
+        schemaVersion: "1",
+        root: { columns: 2 },
+        sections: { s1: { columns: 2 } },
+        nodes: {
+          a: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          s1: { columnStart: 1, columnSpan: 2, rowSpan: 1, breakBefore: false },
+          b: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          portrait: { columnStart: 2, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        },
+        slotDetails: { portrait: { aspectRatio: "3:4" } },
+      },
+    });
+  }
+
+  it("inspects the selected portrait slot with aspect, geometry, and remove", () => {
+    const draft = makeSlottedDraft();
+    const cb = callbacks();
+    render(
+      <CanvasInspectorV2
+        draft={draft}
+        selection={{ kind: "slot", key: "portrait" }}
+        callbacks={cb}
+        disabled={false}
+        labelOf={labelOf(draft)}
+      />,
+    );
+    expect(screen.getByText("Portrait slot")).toBeTruthy();
+    expect(
+      document.querySelector(".canvas-inspector__meta")?.textContent,
+    ).toBe("Inside First");
+
+    const aspect = screen.getByLabelText(
+      "Aspect ratio for Portrait slot",
+    ) as unknown as HTMLSelectElement;
+    expect(aspect.value).toBe("3:4");
+    fireEvent.change(aspect, { target: { value: "1:1" } });
+    expect(cb.onSetPortraitAspectRatio).toHaveBeenCalledWith("portrait", "1:1");
+
+    const start = screen.getByLabelText("Column start for Portrait slot");
+    fireEvent.change(start, { target: { value: "1" } });
+    expect(cb.onSetNodeLayout).toHaveBeenCalledWith("portrait", {
+      columnStart: 1,
+      columnSpan: 1,
+      rowSpan: 1,
+      breakBefore: false,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove portrait slot" }));
+    expect(cb.onRemovePortraitSlot).toHaveBeenCalledWith("portrait");
+  });
+
+  it("moves the selected slot through the inspector move control", () => {
+    const draft = makeSlottedDraft();
+    const cb = callbacks();
+    const { container } = render(
+      <CanvasInspectorV2
+        draft={draft}
+        selection={{ kind: "slot", key: "portrait" }}
+        callbacks={cb}
+        disabled={false}
+        labelOf={labelOf(draft)}
+      />,
+    );
+    const select = container.querySelector(
+      'select[aria-label="Move destination"]',
+    ) as unknown as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    fireEvent.change(select, { target: { value: "canvas:inside:root" } });
+    fireEvent.click(screen.getByRole("button", { name: "Move here" }));
+    expect(cb.onPlaceNode).toHaveBeenCalledWith("portrait", {
+      position: "inside",
+      parentKey: null,
     });
   });
 

@@ -22,6 +22,13 @@ import {
   type FinalGenerationStartResponseV1,
 } from "@repo/character-sheet-generation";
 import {
+  PortraitAssetRefSchema,
+  PortraitGenerateRequestSchema,
+  PortraitGenerationPromptSchema,
+  PortraitImportUrlRequestSchema,
+  type PortraitAssetRef,
+} from "@repo/character-sheet-portraits";
+import {
   CHARACTER_SHEET_API_PREFIX,
   SheetSessionSchema,
   SheetSessionViewSchema,
@@ -107,6 +114,26 @@ export interface SheetApiClientV2Port {
     accessToken: string,
     runId: string,
   ): Promise<Uint8Array>;
+  uploadPortrait(
+    sessionId: string,
+    accessToken: string,
+    file: File,
+  ): Promise<PortraitAssetRef>;
+  importPortraitUrl(
+    sessionId: string,
+    accessToken: string,
+    url: string,
+  ): Promise<PortraitAssetRef>;
+  generatePortrait(
+    sessionId: string,
+    accessToken: string,
+    prompt: string,
+  ): Promise<PortraitAssetRef>;
+  downloadPortrait(
+    sessionId: string,
+    accessToken: string,
+    assetId: string,
+  ): Promise<{ bytes: Uint8Array; mimeType: string }>;
 }
 
 export class SheetApiClientV2 implements SheetApiClientV2Port {
@@ -331,6 +358,97 @@ const response = await this.request({
     return new Uint8Array(buffer);
   }
 
+  async uploadPortrait(
+    sessionId: string,
+    accessToken: string,
+    file: File,
+  ): Promise<PortraitAssetRef> {
+    assertIdentitySegment(sessionId, "sessionId");
+    const body = new FormData();
+    body.append("image", file);
+    const headers: Record<string, string> = {};
+    headers.authorization = `Bearer ${accessToken}`;
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/sessions/${sessionId}/portraits/upload`,
+      { method: "POST", headers, body },
+    ).then(async (inner) => {
+      if (!inner.ok) {
+        throw await toSheetApiError(inner);
+      }
+      return inner;
+    });
+    return parseJsonBody(response, PortraitAssetRefSchema);
+  }
+
+  async importPortraitUrl(
+    sessionId: string,
+    accessToken: string,
+    url: string,
+  ): Promise<PortraitAssetRef> {
+    const validated = PortraitImportUrlRequestSchema.safeParse({ url });
+    if (!validated.success) {
+      throw new SheetApiError(
+        "INVALID_REQUEST",
+        "The portrait URL is invalid.",
+        400,
+      );
+    }
+    const response = await this.request({
+      method: "POST",
+      url: this.portraitImportUrl(sessionId),
+      accessToken,
+      body: validated.data,
+    });
+    return parseJsonBody(response, PortraitAssetRefSchema);
+  }
+
+  async generatePortrait(
+    sessionId: string,
+    accessToken: string,
+    prompt: string,
+  ): Promise<PortraitAssetRef> {
+    const trimmed = PortraitGenerationPromptSchema.safeParse(prompt);
+    if (!trimmed.success) {
+      throw new SheetApiError(
+        "INVALID_REQUEST",
+        "A portrait description is required.",
+        400,
+      );
+    }
+    const validated = PortraitGenerateRequestSchema.safeParse({ prompt: trimmed.data });
+    if (!validated.success) {
+      throw new SheetApiError(
+        "INVALID_REQUEST",
+        "A portrait description is required.",
+        400,
+      );
+    }
+    const response = await this.request({
+      method: "POST",
+      url: this.portraitGenerateUrl(sessionId),
+      accessToken,
+      body: validated.data,
+    });
+    return parseJsonBody(response, PortraitAssetRefSchema);
+  }
+
+  async downloadPortrait(
+    sessionId: string,
+    accessToken: string,
+    assetId: string,
+  ): Promise<{ bytes: Uint8Array; mimeType: string }> {
+    assertIdentitySegment(assetId, "assetId");
+    const response = await this.request({
+      method: "GET",
+      url: this.portraitPreviewUrl(sessionId, assetId),
+      accessToken,
+    });
+    const mimeType =
+      response.headers.get("content-type") ?? "application/octet-stream";
+    const buffer = await response.arrayBuffer();
+    return { bytes: new Uint8Array(buffer), mimeType };
+  }
+
   private request(input: {
     method: string;
     url: string;
@@ -416,6 +534,22 @@ const response = await this.request({
     assertIdentitySegment(sessionId, "sessionId");
     assertIdentitySegment(runId, "runId");
     return `${this.baseUrl}/sessions/${sessionId}/runs/${runId}/pdf`;
+  }
+
+  private portraitImportUrl(sessionId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    return `${this.baseUrl}/sessions/${sessionId}/portraits/import-url`;
+  }
+
+  private portraitGenerateUrl(sessionId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    return `${this.baseUrl}/sessions/${sessionId}/portraits/generate`;
+  }
+
+  private portraitPreviewUrl(sessionId: string, assetId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    assertIdentitySegment(assetId, "assetId");
+    return `${this.baseUrl}/sessions/${sessionId}/portraits/${assetId}`;
   }
 }
 

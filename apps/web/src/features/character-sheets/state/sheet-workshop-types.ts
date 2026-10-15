@@ -27,11 +27,16 @@ export type VisualStyleKey =
   | "contemporary";
 
 /**
- * Portrait source for the character image.
- * 14.11 boundary: only `none` is valid.
+ * Portrait source for the character image. Reuses the shared canonical
+ * PortraitConfig: exactly one source is active (`none`, or an upload/url/ai
+ * asset reference). Raw files, data URLs, remote URLs and prompts never
+ * enter Workshop state.
  */
 export type PortraitSource =
-  | { kind: "none" };
+  | { kind: "none" }
+  | { kind: "upload"; assetId: string }
+  | { kind: "url"; assetId: string }
+  | { kind: "ai"; assetId: string };
 
 export interface WorkshopPreferences {
   threatLevel: ThreatLevelPreference | null;

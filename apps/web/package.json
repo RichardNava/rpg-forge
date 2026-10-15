@@ -28,6 +28,7 @@
     "@repo/character-sheet-draft": "workspace:*",
     "@repo/character-sheet-generation": "workspace:*",
     "@repo/character-sheet-pdf-renderer": "workspace:*",
+    "@repo/character-sheet-portraits": "workspace:*",
     "@repo/dice-engine": "workspace:*",
     "better-auth": "^1.6.27",
     "class-variance-authority": "^0.7.1",

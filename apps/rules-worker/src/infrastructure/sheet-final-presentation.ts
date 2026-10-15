@@ -11,11 +11,12 @@ import {
 } from "@repo/character-sheet-generation";
 
 /**
- * Model for final presentation AI. Configured via SHEET_PRESENTATION_MODEL
- * environment variable or falls back to a sensible default.
+ * Approved default model for final presentation AI, used only when the
+ * runtime explicitly passes no model. Production wiring passes
+ * `env.SHEET_PRESENTATION_MODEL`; a missing model fails closed (no port).
  */
-export const FINAL_PRESENTATION_MODEL = (globalThis as any).SHEET_PRESENTATION_MODEL
-  ?? "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+export const DEFAULT_FINAL_PRESENTATION_MODEL =
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 /**
  * Output token bound for presentation plan generation.
@@ -26,9 +27,14 @@ export const MAX_PRESENTATION_PLAN_TOKENS = 2048;
  * Create a Cloudflare Workers AI adapter implementing the FinalPresentationPort.
  *
  * @param ai - The Cloudflare Ai binding from the Worker environment.
+ * @param model - Explicit model name (from `env.SHEET_PRESENTATION_MODEL`).
  * @returns FinalPresentationPort implementation.
  */
-export function createCloudflareAiFinalPresentation(ai: Ai): FinalPresentationPort {
+export function createCloudflareAiFinalPresentation(
+  ai: Ai,
+  model: string = DEFAULT_FINAL_PRESENTATION_MODEL,
+): FinalPresentationPort {
+  const presentationModel = model;
   return {
     async generatePlan(
       style: FinalPresentationStyleV1,
@@ -49,7 +55,7 @@ export function createCloudflareAiFinalPresentation(ai: Ai): FinalPresentationPo
 
       let result: unknown;
       try {
-        result = await ai.run(FINAL_PRESENTATION_MODEL, {
+        result = await ai.run(presentationModel, {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -94,7 +100,7 @@ export function createCloudflareAiFinalPresentation(ai: Ai): FinalPresentationPo
       const validated = FinalPresentationPlanV1Schema.safeParse(parsed);
       if (!validated.success) {
         // One repair attempt
-        const repaired = await attemptRepair(ai, style, structuralSummary, userInstructions, raw);
+        const repaired = await attemptRepair(ai, presentationModel, style, structuralSummary, userInstructions, raw);
         if (repaired) return repaired;
         throw new FinalPresentationError(
           "The AI provider returned an invalid presentation plan.",
@@ -140,6 +146,7 @@ function buildUserPrompt(
  */
 async function attemptRepair(
   ai: Ai,
+  model: string,
   style: FinalPresentationStyleV1,
   structuralSummary: StructuralSummaryV1,
   userInstructions: string | null,
@@ -155,7 +162,7 @@ async function attemptRepair(
   ].join("\n");
 
   try {
-    const result = await ai.run(FINAL_PRESENTATION_MODEL, {
+    const result = await ai.run(model, {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: buildUserPrompt(structuralSummary, userInstructions) },

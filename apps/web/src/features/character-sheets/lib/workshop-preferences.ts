@@ -60,3 +60,13 @@ export function isPortraitSourceNone(
 ): source is { kind: "none" } {
   return source.kind === "none";
 }
+
+export const PORTRAIT_SOURCE_OPTIONS = ["none", "upload", "url", "ai"] as const;
+export type PortraitSourceKind = (typeof PORTRAIT_SOURCE_OPTIONS)[number];
+
+export const PORTRAIT_SOURCE_LABEL: Record<PortraitSourceKind, string> = {
+  none: "None",
+  upload: "Upload",
+  url: "URL",
+  ai: "AI",
+};

@@ -146,6 +146,62 @@ export function resolveCharacterSheetProxyPath(
     };
   }
 
+  if (
+    method === "POST" &&
+    first === "sessions" &&
+    second !== undefined &&
+    third === "portraits" &&
+    fourth === "upload" &&
+    fifth === undefined
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/portraits/upload`,
+    };
+  }
+
+  if (
+    method === "POST" &&
+    first === "sessions" &&
+    second !== undefined &&
+    third === "portraits" &&
+    fourth === "import-url" &&
+    fifth === undefined
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/portraits/import-url`,
+    };
+  }
+
+  if (
+    method === "POST" &&
+    first === "sessions" &&
+    second !== undefined &&
+    third === "portraits" &&
+    fourth === "generate" &&
+    fifth === undefined
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/portraits/generate`,
+    };
+  }
+
+  if (
+    method === "GET" &&
+    first === "sessions" &&
+    second !== undefined &&
+    third === "portraits" &&
+    fourth !== undefined &&
+    fifth === undefined
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/portraits/${fourth}`,
+    };
+  }
+
   return { kind: "route_not_found" };
 }
 
@@ -235,9 +291,34 @@ export async function proxyCharacterSheetRequest(
   if (contentType !== null) {
     responseHeaders.set("content-type", contentType);
   }
+  const contentDisposition = upstreamResponse.headers.get("content-disposition");
+  if (contentDisposition !== null) {
+    responseHeaders.set("content-disposition", contentDisposition);
+  }
+  // Binary payloads (final PDF, portrait PNG/JPEG) must pass through as raw
+  // bytes: decoding them as UTF-8 text would corrupt non-UTF8 sequences.
+  // JSON/error payloads keep the text path so bodies stay exact strings.
+  if (contentType !== null && isBinaryContentType(contentType)) {
+    const buffer = await upstreamResponse.arrayBuffer();
+    return new Response(buffer, {
+      status: upstreamResponse.status,
+      headers: responseHeaders,
+    });
+  }
   const body = await upstreamResponse.text();
   return new Response(body, {
     status: upstreamResponse.status,
     headers: responseHeaders,
   });
+}
+
+const BINARY_CONTENT_TYPE_PREFIXES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+] as const;
+
+function isBinaryContentType(contentType: string): boolean {
+  const normalized = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return (BINARY_CONTENT_TYPE_PREFIXES as readonly string[]).includes(normalized);
 }

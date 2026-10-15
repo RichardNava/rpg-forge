@@ -198,6 +198,53 @@ describe("proxyCharacterSheetRequest", () => {
     expect(await response.text()).toBe('{"ok":true}');
   });
 
+  it("preserves non-UTF8 binary bytes through the proxy", async () => {
+    // PNG magic + bytes that are invalid UTF-8: a text() round-trip would
+    // corrupt them via replacement characters.
+    const binary = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0xff, 0xd8, 0x00, 0x80, 0xfe]);
+    const fetchImpl = vi.fn<SheetFetch>();
+    fetchImpl.mockImplementation(async () => {
+      const copy = new Uint8Array(binary.length);
+      copy.set(binary);
+      return new Response(copy.buffer as ArrayBuffer, {
+        status: 200,
+        headers: {
+          "content-type": "image/png",
+          "content-disposition": 'attachment; filename="portrait.png"',
+        },
+      });
+    });
+
+    const response = await proxyCharacterSheetRequest(
+      makeRequest({
+        method: "GET",
+        segments: ["sessions", SESSION_ID, "runs", "run.final.1", "pdf"],
+      }),
+      fetchImpl,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="portrait.png"',
+    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const received = new Uint8Array(await response.arrayBuffer());
+    expect([...received]).toEqual([...binary]);
+  });
+
+  it("keeps JSON bodies on the exact text path", async () => {
+    const fetchImpl = vi.fn<SheetFetch>();
+    fetchImpl.mockImplementation(async () => jsonResponse());
+    const response = await proxyCharacterSheetRequest(
+      makeRequest({
+        segments: ["sessions", SESSION_ID, "runs", "run.final.1", "pdf"],
+      }),
+      fetchImpl,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("{}");
+  });
+
   it("rejects an unsafe path without contacting the upstream", async () => {
     const fetchImpl = vi.fn<SheetFetch>();
     const response = await proxyCharacterSheetRequest(

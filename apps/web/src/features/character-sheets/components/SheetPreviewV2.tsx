@@ -61,6 +61,9 @@ export function SheetPreviewV2({ draft }: SheetPreviewV2Props) {
           renderField={(node) => (
             <PreviewField draft={draft} surface={surface} node={node} />
           )}
+          renderSlot={(node) => (
+            <PreviewSlot surface={surface} node={node} />
+          )}
         />
       </div>
     </div>
@@ -101,6 +104,33 @@ function PreviewSection({
         {children}
       </div>
     </section>
+  );
+}
+
+function PreviewSlot({
+  surface,
+  node,
+}: {
+  surface: SpatialSurface;
+  node: Extract<DraftReadNodeV2, { kind: "slot" }>;
+}) {
+  const geometry = surface.layout.nodes[node.key];
+  if (geometry === undefined) {
+    return null;
+  }
+  const aspect = surface.layout.slotDetails?.[node.key]?.aspectRatio ?? "3:4";
+  return (
+    <div
+      className="character-workshop__preview-slot"
+      data-slot-aspect={aspect}
+      style={gridItemStyle(geometry)}
+      aria-label={`Portrait slot, aspect ratio ${aspect}`}
+    >
+      <span className="character-workshop__preview-label">Portrait</span>
+      <span className="character-workshop__preview-value character-workshop__preview-value--empty">
+        —
+      </span>
+    </div>
   );
 }
 

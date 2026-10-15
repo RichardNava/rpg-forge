@@ -278,22 +278,35 @@ The preview represents **structural layout** before the later ornamented/generat
 
 ## I. CHARACTER IMAGE
 
-Both upload/manual flows eventually support an optional character image.
+Both upload/manual flows support an optional character image.
+
+### Portrait Slot = layout; Portrait Image = content
+
+- The Portrait Slot is a structural grid node: authored, moved, and resized
+  like any Field/Section placement. At most one portrait Slot exists and it
+  is never a Field.
+- The Portrait Image is temporary session content consumed only by final
+  generation. User authority remains User > Draft > AI.
 
 ### Image enabled → one mutually exclusive source
 
-- uploaded image
-- URL
-- AI generated
+- uploaded image (PNG/JPEG, magic-validated, bounded)
+- URL import (HTTPS-only, SSRF-guarded, imported once into temporary R2)
+- AI generated (bounded description; configured model or fail closed)
+
+Exactly one source is active: every source resolves to one server-minted
+temporary asset reference. Raw bytes, data URLs, remote URLs, and prompts
+never enter the Draft or the final-generation request.
 
 ### AI generation
 
-- can accept an optional description
-- if no description is supplied, available character concepts such as race/basic identity may be used
+- requires a portrait description (bounded, untrusted user data)
+- never receives Draft structure, values, tokens, or R2 keys
+- never modifies the Draft
 
-The editor/layout must eventually provide a place for the portrait.
-
-**Status: TARGET/PLANNED** (not implemented in the approved baseline)
+**Status: IMPLEMENTED (14.13)** — slot authoring, all three sources,
+protected preview, final-generation ownership validation, and styled PDF
+embedding with contain-fit.
 
 ---
 
@@ -398,7 +411,8 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | PDF export/download                                  | IMPLEMENTED (V2 RUNTIME)  | Technical export renders via V2 `projectDraftV2ToSpec`; final styled PDF renders Draft-native (14.12, primary product path)                                                        |
 | Visual style selection                               | IMPLEMENTED (14.12)       | Medieval + Sci-fi selectable in the final-generation panel; remaining four canonical styles hidden until later                                                                       |
 | Visual style rendering                               | IMPLEMENTED (14.12)       | Medieval + Sci-fi Draft-native styled PDFs; byte-distinct outputs with equal semantic manifests                                                                                     |
-| Character image (upload/URL/AI)                      | PLANNED (14.13)           | Contract and Workshop state remain `{ kind: "none" }` only                                                                                                                          |
+| Character image (upload/URL/AI)                      | IMPLEMENTED (14.13)       | Portrait Slot authoring; one active asset source; protected preview; final PDF embedding                                                                                           |
+| Portrait Slot (spatial)                            | IMPLEMENTED (14.13)       | Structural slot (not a Field); DnD/resize/aspect; Undo via snapshots                                                                                                                |
 | Preview as modal                                     | NOT IMPLEMENTED           | Live preview pane exists; modal UX target not implemented                                                                                                                           |
 | Undo (server-authoritative, one-level)               | IMPLEMENTED (14.10)       | Dedicated POST /undo; D1 head metadata (undoSourceVersion, undoConsumed); R2 snapshot restore; atomic consumption; no Redo                                                          |
 | remove_section (safe)                                | IMPLEMENTED (14.10)       | Empty Section allowed, non-empty rejected with explanation; atomic cleanup of sections/structure/layout; destructive confirmation UI                                              |
@@ -449,6 +463,7 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | workerd V1 → V2 compat bridge                        | LIVE (4F)                 | Real D1/R2 integration: historical V1 bytes → canonical V2 HTTP → V2 next write; V1 history never rewritten                                                                         |
 | Final generation contract (14.11)                    | IMPLEMENTED (14.11)       | FinalGenerationRequestV1 (confirmed Draft + options + required seed); canonical five-level threat; set_mode without confirmClear; Web adapter; no AI/PDF execution                   |
 | AI final presentation (14.12)                        | IMPLEMENTED (14.12)       | Bounded FinalPresentationPlanV1; Medieval + Sci-fi StyleProfiles; deterministic NPC bounded-numeric resolution; Draft-native styled PDF (primary); server-built request; sync PENDING → READY runs; temporary R2 final PDF |
+| Portrait integration (14.13)                         | IMPLEMENTED (14.13)       | Portrait Slot spatial authority; upload/URL/AI converge to one session asset; protected preview; server ownership validation; contain-fit styled embedding with style-invariant semantics |
 
 ### V2 response policy (after runtime cutover)
 
@@ -469,8 +484,9 @@ Full transport, concurrency and error contract:
 - **Architecture:** `docs/architecture/phase-14.7/character-sheet-integration.md` (for implementation details, labeled with CURRENT/COMPLETED/SUPERSEDED/DEFERRED)
 - **V2 transport contract:** `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md` (FROZEN FOR 4E CUTOVER)
 - **Data Model:** `docs/architecture/data-model.md` (persistence direction)
-- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**, **ADR-062**
+- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**, **ADR-062**, **ADR-063**
 - **Phase 14.10:** `docs/architecture/phase-14.10/character-sheet-authoring-completeness.md`
 - **Phase 14.11:** `docs/architecture/phase-14.11/character-sheet-final-generation.md`
 - **Phase 14.12:** `docs/architecture/phase-14.12/character-sheet-ai-final-presentation.md`
+- **Phase 14.13:** `docs/architecture/phase-14.13/character-sheet-portrait-integration.md`
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`

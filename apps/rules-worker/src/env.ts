@@ -13,6 +13,7 @@ export interface Env {
   TURNSTILE_MODE?: string;
   SHEET_VISION_MODEL?: string;
   SHEET_PRESENTATION_MODEL?: string;
+  SHEET_PORTRAIT_MODEL?: string;
   SHEET_DRAFT_DEBUG?: string;
   SHEET_VISION_DEBUG_RAW_RESPONSE?: string;
   AI?: Ai;

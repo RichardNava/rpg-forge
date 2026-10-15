@@ -413,6 +413,14 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           message: "Player-character sheets do not use a threat level.",
         };
       }
+      const portrait = state.workshop.portrait;
+      if ((draft.slots ?? []).length === 0 && portrait.kind !== "none") {
+        return {
+          kind: "rejected",
+          code: "PORTRAIT_WITHOUT_SLOT",
+          message: "Add a Portrait Slot before generating with a portrait image.",
+        };
+      }
       const seed = (input.seed ?? stableFinalSeed(draft.draftId)).slice(0, 64);
       setState({
         finalGeneration: { status: "generating", runId: null, draftVersion: draft.version, error: null },
@@ -425,7 +433,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
             threat: draft.mode === "npc" ? (input.threat ?? null) : null,
             visualStyle: input.visualStyle,
             instructions: input.instructions ?? null,
-            portrait: { kind: "none" },
+            portrait,
           },
           seed,
         });
@@ -461,6 +469,77 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
         state.accessToken,
         state.finalGeneration.runId,
       );
+    },
+
+    async uploadPortraitImage(
+      file: File,
+    ): Promise<import("./sheet-store-v2-types").SheetStoreV2PortraitOutcome> {
+      if (!hasSession() || state.sessionId === null || state.accessToken === null) {
+        return { kind: "not_ready" };
+      }
+      const { sessionId, accessToken } = state;
+      try {
+        const ref = await options.api.uploadPortrait(sessionId, accessToken, file);
+        setState({
+          workshop: { ...state.workshop, portrait: { kind: ref.source, assetId: ref.assetId } },
+          error: null,
+        });
+        return { kind: "ok", assetId: ref.assetId, source: ref.source };
+      } catch (error) {
+        // Failed source changes retain the previous valid portrait config.
+        return { kind: "error", error: toSheetApiError(error) };
+      }
+    },
+
+    async importPortraitUrl(
+      url: string,
+    ): Promise<import("./sheet-store-v2-types").SheetStoreV2PortraitOutcome> {
+      if (!hasSession() || state.sessionId === null || state.accessToken === null) {
+        return { kind: "not_ready" };
+      }
+      const { sessionId, accessToken } = state;
+      try {
+        const ref = await options.api.importPortraitUrl(sessionId, accessToken, url);
+        setState({
+          workshop: { ...state.workshop, portrait: { kind: ref.source, assetId: ref.assetId } },
+          error: null,
+        });
+        return { kind: "ok", assetId: ref.assetId, source: ref.source };
+      } catch (error) {
+        return { kind: "error", error: toSheetApiError(error) };
+      }
+    },
+
+    async generatePortraitImage(
+      prompt: string,
+    ): Promise<import("./sheet-store-v2-types").SheetStoreV2PortraitOutcome> {
+      if (!hasSession() || state.sessionId === null || state.accessToken === null) {
+        return { kind: "not_ready" };
+      }
+      const { sessionId, accessToken } = state;
+      try {
+        const ref = await options.api.generatePortrait(sessionId, accessToken, prompt);
+        setState({
+          workshop: { ...state.workshop, portrait: { kind: ref.source, assetId: ref.assetId } },
+          error: null,
+        });
+        return { kind: "ok", assetId: ref.assetId, source: ref.source };
+      } catch (error) {
+        return { kind: "error", error: toSheetApiError(error) };
+      }
+    },
+
+    async downloadPortraitImage(
+      assetId: string,
+    ): Promise<{ bytes: Uint8Array; mimeType: string } | null> {
+      if (!hasSession() || state.sessionId === null || state.accessToken === null) {
+        return null;
+      }
+      try {
+        return await options.api.downloadPortrait(state.sessionId, state.accessToken, assetId);
+      } catch {
+        return null;
+      }
     },
 
     async undo(): Promise<SheetStoreV2MutationOutcome> {

@@ -29,6 +29,7 @@ import {
 import {
   CanvasFieldNode,
   CanvasSectionNode,
+  CanvasSlotNode,
   RootDropZone,
 } from "./canvas-nodes";
 import { KeyboardMoveMenu } from "./canvas-keyboard-move";
@@ -72,6 +73,11 @@ export interface SheetCanvasCallbacks {
   onSetNodeLayout(key: string, placement: DraftLayoutNodeV1): void;
   onAddField(): void;
   onOpenAddSection(): void;
+  onRemovePortraitSlot(key: string): void;
+  onSetPortraitAspectRatio(
+    key: string,
+    aspectRatio: "1:1" | "3:4" | "4:5" | "16:9",
+  ): void;
 }
 
 interface SheetCanvasV2Props {
@@ -124,7 +130,9 @@ export function SheetCanvasV2({
     (key: string): string =>
       draft.fields.find((entry) => entry.key === key)?.label ??
       draft.sections.find((entry) => entry.key === key)?.title ??
-      key,
+      (draft.slots ?? []).find((entry) => entry.key === key) !== undefined
+        ? "Portrait"
+        : key,
     [draft],
   );
 
@@ -185,7 +193,7 @@ export function SheetCanvasV2({
     const data = event.active.data.current as
       { kind?: unknown; key?: unknown; label?: unknown } | undefined;
     if (
-      (data?.kind === "field" || data?.kind === "section") &&
+      (data?.kind === "field" || data?.kind === "section" || data?.kind === "slot") &&
       typeof data.key === "string"
     ) {
       setActiveDrag({
@@ -206,7 +214,7 @@ export function SheetCanvasV2({
       { kind?: unknown; key?: unknown; label?: unknown } | undefined;
     setActiveDrag(null);
     if (
-      (data?.kind !== "field" && data?.kind !== "section") ||
+      (data?.kind !== "field" && data?.kind !== "section" && data?.kind !== "slot") ||
       typeof data.key !== "string"
     ) {
       return;
@@ -409,6 +417,25 @@ export function SheetCanvasV2({
                     onResizeActive={setResizingKey}
                   />
                 )}
+                renderSlot={(node) => (
+                  <CanvasSlotNode
+                    draft={draft}
+                    surface={surface}
+                    node={node}
+                    callbacks={callbacks}
+                    disabled={disabled}
+                    selected={
+                      selection?.kind === "slot" && selection.key === node.key
+                    }
+                    invalidIntents={invalidIntents}
+                    dragActive={activeDrag !== null}
+                    onSelect={() =>
+                      onSelectionChange({ kind: "slot", key: node.key })
+                    }
+                    onOpenKeyboardMove={openKeyboardMove}
+                    onResizeActive={setResizingKey}
+                  />
+                )}
               />
               {!disabled && (
                 <RootDropZone
@@ -426,7 +453,11 @@ export function SheetCanvasV2({
             <span className="character-workshop__drag-overlay">
               Moving {activeDrag.label}
               <span className="character-workshop__drag-overlay-kind">
-                {activeDrag.kind === "field" ? "Field" : "Section"}
+                {activeDrag.kind === "field"
+                  ? "Field"
+                  : activeDrag.kind === "slot"
+                    ? "Portrait slot"
+                    : "Section"}
               </span>
             </span>
           )}

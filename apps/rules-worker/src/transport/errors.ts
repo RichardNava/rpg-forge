@@ -56,6 +56,13 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   SHEET_FINAL_GENERATION_FAILED: 500,
   SHEET_FINAL_RUN_NOT_FOUND: 404,
   SHEET_FINAL_RUN_NOT_READY: 409,
+  SHEET_PORTRAIT_INVALID_REQUEST: 400,
+  SHEET_PORTRAIT_INVALID_TYPE: 415,
+  SHEET_PORTRAIT_INVALID_CONTENT: 400,
+  SHEET_PORTRAIT_TOO_LARGE: 413,
+  SHEET_PORTRAIT_UNAVAILABLE: 503,
+  SHEET_PORTRAIT_GENERATION_FAILED: 500,
+  SHEET_PORTRAIT_NOT_FOUND: 404,
   INTERNAL_ERROR: 500,
 };
 
@@ -151,6 +158,20 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "No final-generation run was found for the given session and run id.",
   SHEET_FINAL_RUN_NOT_READY:
     "The final-generation run is not ready for download.",
+  SHEET_PORTRAIT_INVALID_REQUEST:
+    "The portrait request is malformed or invalid.",
+  SHEET_PORTRAIT_INVALID_TYPE:
+    "Only PNG and JPEG portrait images are supported.",
+  SHEET_PORTRAIT_INVALID_CONTENT:
+    "The portrait image contents do not match a valid PNG or JPEG image.",
+  SHEET_PORTRAIT_TOO_LARGE:
+    "The portrait image is empty or exceeds the 8 MiB import limit.",
+  SHEET_PORTRAIT_UNAVAILABLE:
+    "Portrait generation is temporarily unavailable. Please try again later.",
+  SHEET_PORTRAIT_GENERATION_FAILED:
+    "The portrait image could not be generated.",
+  SHEET_PORTRAIT_NOT_FOUND:
+    "No portrait asset was found for the given session and asset id.",
   INTERNAL_ERROR: "An internal error occurred.",
 };
 

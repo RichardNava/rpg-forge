@@ -164,18 +164,40 @@ describe("FinalGenerationRequestV1Schema", () => {
     }
   });
 
-  it("rejects portrait upload/url/ai", () => {
+  it("accepts asset-backed portrait configs with exactly one active source", () => {
     const npcDraft = makeConfirmedNpcDraft();
     for (const portrait of [
-      { kind: "upload", dataUrl: "data:..." },
-      { kind: "url", url: "https://..." },
-      { kind: "ai", prompt: "a goblin" },
+      { kind: "none" },
+      { kind: "upload", assetId: "11111111-1111-4111-8111-111111111111" },
+      { kind: "url", assetId: "22222222-2222-4222-8222-222222222222" },
+      { kind: "ai", assetId: "33333333-3333-4333-8333-333333333333" },
     ] as const) {
       const request = buildFinalGenerationRequestV1(npcDraft, {
         threat: "medium",
         visualStyle: "fantasy",
         instructions: null,
-        portrait: portrait as any,
+        portrait,
+        seed: "seed-1",
+      });
+      const result = FinalGenerationRequestV1Schema.safeParse(request);
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("rejects raw portrait payloads (bytes, dataUrl, URL, prompt)", () => {
+    const npcDraft = makeConfirmedNpcDraft();
+    for (const portrait of [
+      { kind: "upload", dataUrl: "data:..." },
+      { kind: "url", url: "https://..." },
+      { kind: "ai", prompt: "a goblin" },
+      { kind: "upload", assetId: "../escape" },
+      { kind: "none", assetId: "extra" },
+    ]) {
+      const request = buildFinalGenerationRequestV1(npcDraft, {
+        threat: "medium",
+        visualStyle: "fantasy",
+        instructions: null,
+        portrait: portrait as never,
         seed: "seed-1",
       });
       const result = FinalGenerationRequestV1Schema.safeParse(request);
@@ -183,7 +205,7 @@ describe("FinalGenerationRequestV1Schema", () => {
     }
   });
 
-  it("accepts only portrait { kind: 'none' }", () => {
+  it("accepts only portrait { kind: 'none' } without asset", () => {
     const npcDraft = makeConfirmedNpcDraft();
     const request = buildFinalGenerationRequestV1(npcDraft, {
       threat: "medium",

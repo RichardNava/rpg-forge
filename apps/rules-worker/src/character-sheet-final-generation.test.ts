@@ -4,6 +4,7 @@ import {
   type CharacterSheetDraftV2,
 } from "@repo/character-sheet-draft";
 import type { CharacterSheetArtifactStore } from "@repo/character-sheet-artifacts";
+import type { CharacterSheetPortraitAssetStore } from "@repo/character-sheet-portraits";
 import type {
   FinalPresentationPort,
   FinalPresentationPlanV1,
@@ -149,6 +150,64 @@ function deterministicPresentation(
   };
 }
 
+class InMemoryPortraitStore implements CharacterSheetPortraitAssetStore {
+  readonly assets = new Map<
+    string,
+    {
+      metadata: {
+        schemaVersion: "1";
+        assetId: string;
+        sessionId: string;
+        source: "upload" | "url" | "ai";
+        mimeType: "image/png" | "image/jpeg";
+        sizeBytes: number;
+        width: number | null;
+        height: number | null;
+      };
+      imageBytes: Uint8Array;
+    }
+  >();
+
+  async putAsset(input: {
+    sessionId: string;
+    assetId: string;
+    source: "upload" | "url" | "ai";
+    mimeType: "image/png" | "image/jpeg";
+    sizeBytes: number;
+    width: number | null;
+    height: number | null;
+    imageBytes: Uint8Array;
+  }) {
+    const metadata = {
+      schemaVersion: "1" as const,
+      assetId: input.assetId,
+      sessionId: input.sessionId,
+      source: input.source,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      width: input.width,
+      height: input.height,
+    };
+    this.assets.set(`${input.sessionId}:${input.assetId}`, {
+      metadata,
+      imageBytes: input.imageBytes.slice(),
+    });
+    return metadata;
+  }
+
+  async getAsset(identity: { sessionId: string; assetId: string }) {
+    const row = this.assets.get(`${identity.sessionId}:${identity.assetId}`);
+    if (row === undefined) return null;
+    return {
+      metadata: { ...row.metadata },
+      imageBytes: row.imageBytes.slice(),
+    };
+  }
+
+  async deleteAsset(): Promise<void> {}
+  async deleteSessionAssets(): Promise<void> {}
+}
+
 interface FinalHarness {
   deps: AppDeps;
   clock: FakeClock;
@@ -156,6 +215,7 @@ interface FinalHarness {
   rateLimiter: FakeRateLimiter;
   runs: FakeSheetRunRepository;
   bucket: MemoryBucket;
+  portraits: InMemoryPortraitStore;
 }
 
 function makeFinalHarness(
@@ -167,6 +227,7 @@ function makeFinalHarness(
   const rateLimiter = new FakeRateLimiter();
   const bucket = new MemoryBucket();
   const runs = new FakeSheetRunRepository();
+  const portraits = new InMemoryPortraitStore();
   const deps: AppDeps = {
     crypto,
     clock,
@@ -183,8 +244,9 @@ function makeFinalHarness(
       artifacts ?? createR2CharacterSheetArtifactStore(bucket),
     sheetRunRepository: runs,
     finalPresentationPort: presentation,
+    portraitAssetStore: portraits,
   };
-  return { deps, clock, crypto, rateLimiter, runs, bucket };
+  return { deps, clock, crypto, rateLimiter, runs, bucket, portraits };
 }
 
 function makePcDraft(sessionId: string, draftId = "draft.pc.final"): CharacterSheetDraftV2 {
@@ -581,6 +643,192 @@ describe("final generation (14.12)", () => {
     expect(response.status).toBe(503);
     const body = (await response.json()) as { error: { code: string } };
     expect(body.error.code).toBe("SHEET_FINAL_GENERATION_UNAVAILABLE");
+  });
+});
+
+describe("final generation with portrait slot (14.13)", () => {
+  const PNG = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48,
+    0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00,
+    0x00, 0x90, 0x77, 0x53, 0xde, 0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, 0x54, 0x08,
+    0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xfb, 0x03,
+    0x0c, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+  ]);
+
+  function slottedPcDraft(sessionId: string, draftId = "draft.slotted.final"): CharacterSheetDraftV2 {
+    return {
+      schemaVersion: CHARACTER_SHEET_DRAFT_V2_VERSION,
+      draftId,
+      sessionId,
+      baseVersion: 1,
+      version: 1,
+      mode: "pc",
+      characterName: "Aria Stone",
+      rulesContextId: null,
+      fields: [
+        { key: "character_name", label: "Character Name", type: "text", locked: false },
+        { key: "strength", label: "Strength", type: "number", min: 1, max: 20, locked: false },
+      ],
+      sections: [{ key: "core", title: "Core" }],
+      slots: [{ key: "portrait", type: "portrait" }],
+      structure: [
+        { kind: "section", key: "core", parentKey: null },
+        { kind: "field", key: "character_name", parentKey: "core" },
+        { kind: "field", key: "strength", parentKey: "core" },
+        { kind: "slot", key: "portrait", parentKey: "core" },
+      ],
+      values: { character_name: "Aria Stone", strength: 12 },
+      source: { sourceSheetId: "sheet.0001", sourceRunId: null },
+      confirmed: false,
+      layout: {
+        schemaVersion: "1",
+        root: { columns: 1 },
+        sections: { core: { columns: 2 } },
+        nodes: {
+          core: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          character_name: { columnStart: 1, columnSpan: 2, rowSpan: 1, breakBefore: false },
+          strength: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          portrait: { columnStart: 2, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        },
+        slotDetails: { portrait: { aspectRatio: "3:4" } },
+      },
+    };
+  }
+
+  async function setupSlottedPc(
+    harness: FinalHarness,
+  ): Promise<{ sessionId: string; accessToken: string; draftId: string }> {
+    const { sessionId, accessToken } = await createSession(harness);
+    const draftId = "draft.slotted.final";
+    const created = await createDraft(
+      harness,
+      sessionId,
+      accessToken,
+      slottedPcDraft(sessionId, draftId),
+    );
+    expect(created.status).toBe(201);
+    const confirmed = await confirmDraft(harness, sessionId, accessToken, draftId, 1);
+    expect(confirmed.status).toBe(200);
+    return { sessionId, accessToken, draftId };
+  }
+
+  it("slot + none portrait stays valid and renders", async () => {
+    const harness = makeFinalHarness();
+    const { sessionId, accessToken, draftId } = await setupSlottedPc(harness);
+    const response = await postGenerate(harness, sessionId, accessToken, draftId, generateBody());
+    expect(response.status).toBe(200);
+  });
+
+  it("no slot + asset config is rejected", async () => {
+    const harness = makeFinalHarness();
+    const { sessionId, accessToken, draftId } = await setupConfirmedPc(harness);
+    const response = await postGenerate(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      generateBody({
+        options: {
+          threat: null,
+          visualStyle: "medieval",
+          instructions: null,
+          portrait: { kind: "upload", assetId: "00000000-0000-4000-8000-000000000001" },
+        },
+      }),
+    );
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("SHEET_FINAL_GENERATION_INVALID");
+    expect(await harness.runs.getCurrentForSession(sessionId)).toBeNull();
+  });
+
+  it("slot + stored asset renders the portrait into the final PDF", async () => {
+    const harness = makeFinalHarness();
+    const { sessionId, accessToken, draftId } = await setupSlottedPc(harness);
+    await harness.portraits.putAsset({
+      sessionId,
+      assetId: "00000000-0000-4000-8000-000000000001",
+      source: "upload",
+      mimeType: "image/png",
+      sizeBytes: PNG.length,
+      width: 1,
+      height: 1,
+      imageBytes: PNG,
+    });
+    const response = await postGenerate(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      generateBody({
+        options: {
+          threat: null,
+          visualStyle: "medieval",
+          instructions: null,
+          portrait: { kind: "upload", assetId: "00000000-0000-4000-8000-000000000001" },
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    const { runId } = (await response.json()) as { runId: string };
+    const pdf = await getPdf(harness, sessionId, accessToken, runId);
+    expect(pdf.status).toBe(200);
+    const raw = new TextDecoder("latin1").decode(new Uint8Array(await pdf.arrayBuffer()));
+    expect(raw).toContain("/Subtype /Image");
+  });
+
+  it("slot + missing asset fails the run without a PDF", async () => {
+    const harness = makeFinalHarness();
+    const { sessionId, accessToken, draftId } = await setupSlottedPc(harness);
+    const response = await postGenerate(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      generateBody({
+        options: {
+          threat: null,
+          visualStyle: "medieval",
+          instructions: null,
+          portrait: { kind: "ai", assetId: "00000000-0000-4000-8000-000000000002" },
+        },
+      }),
+    );
+    expect(response.status).toBe(500);
+    const current = await harness.runs.getCurrentForSession(sessionId);
+    expect(current?.status).toBe("FAILED");
+    const pdf = await getPdf(harness, sessionId, accessToken, current!.runId);
+    expect(pdf.status).toBe(409);
+  });
+
+  it("slot + source-mismatched asset fails the run", async () => {
+    const harness = makeFinalHarness();
+    const { sessionId, accessToken, draftId } = await setupSlottedPc(harness);
+    await harness.portraits.putAsset({
+      sessionId,
+      assetId: "00000000-0000-4000-8000-000000000003",
+      source: "url",
+      mimeType: "image/png",
+      sizeBytes: PNG.length,
+      width: 1,
+      height: 1,
+      imageBytes: PNG,
+    });
+    const response = await postGenerate(
+      harness,
+      sessionId,
+      accessToken,
+      draftId,
+      generateBody({
+        options: {
+          threat: null,
+          visualStyle: "medieval",
+          instructions: null,
+          portrait: { kind: "upload", assetId: "00000000-0000-4000-8000-000000000003" },
+        },
+      }),
+    );
+    expect(response.status).toBe(500);
   });
 });
 

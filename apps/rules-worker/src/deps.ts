@@ -10,6 +10,8 @@ import { createD1SheetSessionRepository } from "./infrastructure/db/sheet-sessio
 import { createD1SheetRunRepository } from "./infrastructure/db/sheet-run-repository.js";
 import { createD1DraftHeadRepository } from "./infrastructure/db/draft-head-repository.js";
 import { createCloudflareAiFinalPresentation } from "./infrastructure/sheet-final-presentation.js";
+import { createCloudflarePortraitGeneration } from "./infrastructure/sheet-portrait-generation.js";
+import { createR2CharacterSheetPortraitAssetStore } from "./infrastructure/r2-character-sheet-portraits.js";
 import { createPdfJsPageExtractor } from "./infrastructure/pdfjs-extractor.js";
 import { createRateLimitPort } from "./infrastructure/rate-limit.js";
 import {
@@ -70,7 +72,17 @@ export function createAppDeps(env: Env): AppDeps {
   const sheetRunRepository = createD1SheetRunRepository(env.DB, { clock });
   const sheetDraftHeadRepository = createD1DraftHeadRepository(env.DB);
   const finalPresentationPort =
-    env.AI === undefined ? undefined : createCloudflareAiFinalPresentation(env.AI);
+    env.AI === undefined || env.SHEET_PRESENTATION_MODEL === undefined
+      ? undefined
+      : createCloudflareAiFinalPresentation(env.AI, env.SHEET_PRESENTATION_MODEL);
+  const portraitAssetStore =
+    env.SHEET_ARTIFACTS === undefined
+      ? undefined
+      : createR2CharacterSheetPortraitAssetStore(env.SHEET_ARTIFACTS);
+  const portraitGenerationPort =
+    env.AI === undefined || env.SHEET_PORTRAIT_MODEL === undefined
+      ? undefined
+      : createCloudflarePortraitGeneration(env.AI, env.SHEET_PORTRAIT_MODEL);
   // The V2 draft store shares the same bucket and key layout as run
   // artifacts; it writes V2 only and reads V1-or-V2 as canonical V2.
   const sheetDraftStoreV2 =
@@ -126,6 +138,8 @@ export function createAppDeps(env: Env): AppDeps {
     ...(sheetArtifactStore === undefined ? {} : { sheetArtifactStore }),
     ...(sheetVisualExtraction === undefined ? {} : { sheetVisualExtraction }),
     ...(finalPresentationPort === undefined ? {} : { finalPresentationPort }),
+    ...(portraitAssetStore === undefined ? {} : { portraitAssetStore }),
+    ...(portraitGenerationPort === undefined ? {} : { portraitGenerationPort }),
     debugSheetDrafts: env.SHEET_DRAFT_DEBUG === "true",
   };
 }

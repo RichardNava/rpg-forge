@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CharacterSheetDraftV2,
   DraftLayoutNodeV1,
@@ -40,6 +40,7 @@ import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
+import { WorkshopPortraitSelector } from "./WorkshopPortraitSelector";
 import type {
   ThreatLevelPreference,
   VisualStyleKey,
@@ -315,6 +316,24 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     [applyMutation],
   );
 
+  const handleAddPortraitSlot = useCallback(() => {
+    void applyMutation({ op: "add_portrait_slot", key: "portrait" });
+  }, [applyMutation]);
+
+  const handleRemovePortraitSlot = useCallback(
+    (key: string) => {
+      void applyMutation({ op: "remove_portrait_slot", key });
+    },
+    [applyMutation],
+  );
+
+  const handleSetPortraitAspectRatio = useCallback(
+    (key: string, aspectRatio: "1:1" | "3:4" | "4:5" | "16:9") => {
+      void applyMutation({ op: "set_portrait_aspect_ratio", key, aspectRatio });
+    },
+    [applyMutation],
+  );
+
   const handleUndo = useCallback(async () => {
     if (!draft) return;
     setPending(true);
@@ -583,6 +602,8 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
       onSetNodeLayout: handleSetNodeLayout,
       onAddField: () => setModal("add-field"),
       onOpenAddSection: () => setModal("add-section"),
+      onRemovePortraitSlot: handleRemovePortraitSlot,
+      onSetPortraitAspectRatio: handleSetPortraitAspectRatio,
     }),
     [
       handleSetValue,
@@ -598,15 +619,109 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
       handlePlaceNode,
       handleSetContainerLayout,
       handleSetNodeLayout,
+      handleRemovePortraitSlot,
+      handleSetPortraitAspectRatio,
     ],
   );
 
   const labelOf = useCallback(
-    (key: string): string =>
-      draft?.fields.find((entry) => entry.key === key)?.label ??
-      draft?.sections.find((entry) => entry.key === key)?.title ??
-      key,
+    (key: string): string => {
+      const fieldLabel = draft?.fields.find((entry) => entry.key === key)?.label;
+      if (fieldLabel !== undefined) return fieldLabel;
+      const sectionTitle = draft?.sections.find((entry) => entry.key === key)?.title;
+      if (sectionTitle !== undefined) return sectionTitle;
+      if ((draft?.slots ?? []).some((entry) => entry.key === key)) return "Portrait";
+      return key;
+    },
     [draft],
+  );
+
+  const hasPortraitSlot = (draft?.slots ?? []).length > 0;
+
+  const [portraitPreviewUrl, setPortraitPreviewUrl] = useState<string | null>(null);
+  const [portraitPreviewLoading, setPortraitPreviewLoading] = useState(false);
+  const previewUrlRef = useRef<string | null>(null);
+  const portraitConfig = state.workshop.portrait;
+
+  // Ephemeral browser preview: fetch protected bytes, render via object URL,
+  // revoke when replaced or unmounted. Never persisted in Draft or Workshop.
+  // All state updates happen in async continuations (never synchronously in
+  // the effect body) so preview fetching cannot cascade renders.
+  useEffect(() => {
+    let cancelled = false;
+    async function syncPortraitPreview(): Promise<void> {
+      if (portraitConfig.kind === "none") {
+        if (previewUrlRef.current !== null) {
+          URL.revokeObjectURL(previewUrlRef.current);
+          previewUrlRef.current = null;
+        }
+        if (!cancelled) {
+          setPortraitPreviewUrl(null);
+          setPortraitPreviewLoading(false);
+        }
+        return;
+      }
+      if (!cancelled) {
+        setPortraitPreviewLoading(true);
+      }
+      let result: Awaited<ReturnType<typeof store.downloadPortraitImage>>;
+      try {
+        result = await store.downloadPortraitImage(portraitConfig.assetId);
+      } catch {
+        result = null;
+      }
+      if (cancelled) return;
+      if (result === null) {
+        setPortraitPreviewUrl(null);
+        setPortraitPreviewLoading(false);
+        return;
+      }
+      const blob = new Blob([result.bytes.buffer as ArrayBuffer], {
+        type: result.mimeType,
+      });
+      const url = URL.createObjectURL(blob);
+      if (previewUrlRef.current !== null) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      previewUrlRef.current = url;
+      setPortraitPreviewUrl(url);
+      setPortraitPreviewLoading(false);
+    }
+    void syncPortraitPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [portraitConfig, store]);
+
+  useEffect(
+    () => () => {
+      if (previewUrlRef.current !== null) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const portraitHandlers = useMemo(
+    () => ({
+      onUpload: async (file: File) => {
+        const outcome = await store.uploadPortraitImage(file);
+        return { kind: outcome.kind };
+      },
+      onImportUrl: async (url: string) => {
+        const outcome = await store.importPortraitUrl(url);
+        return { kind: outcome.kind };
+      },
+      onGenerate: async (prompt: string) => {
+        const outcome = await store.generatePortraitImage(prompt);
+        return { kind: outcome.kind };
+      },
+      onSelectNone: () => {
+        store.setWorkshopPreferences({ portrait: { kind: "none" } });
+      },
+    }),
+    [store],
   );
 
   return (
@@ -653,6 +768,25 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
                 draft.confirmed || pending || state.saveStatus === "saving"
               }
               onChange={handleWorkshopPreferences}
+            />
+            {!draft.confirmed && !hasPortraitSlot && (
+              <button
+                type="button"
+                className="character-workshop__btn character-workshop__btn--secondary"
+                onClick={handleAddPortraitSlot}
+                disabled={pending || state.saveStatus === "saving"}
+              >
+                Add portrait
+              </button>
+            )}
+            <WorkshopPortraitSelector
+              hasSlot={hasPortraitSlot}
+              portrait={portraitConfig}
+              disabled={draft.confirmed || pending || state.saveStatus === "saving"}
+              busy={pending}
+              previewUrl={portraitPreviewUrl}
+              previewLoading={portraitPreviewLoading}
+              handlers={portraitHandlers}
             />
           </div>
           {transientError !== null && (
@@ -777,6 +911,15 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
                 </div>
               </div>
             )}
+            <WorkshopPortraitSelector
+              hasSlot={hasPortraitSlot}
+              portrait={portraitConfig}
+              disabled={pending || state.finalGeneration.status === "generating"}
+              busy={pending || state.finalGeneration.status === "generating"}
+              previewUrl={portraitPreviewUrl}
+              previewLoading={portraitPreviewLoading}
+              handlers={portraitHandlers}
+            />
             <div className="character-workshop__identity-field">
               <label
                 className="character-workshop__identity-label"

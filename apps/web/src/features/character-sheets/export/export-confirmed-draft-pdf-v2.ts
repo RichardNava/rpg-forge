@@ -8,12 +8,21 @@ import { renderCharacterSheetPdf } from "@repo/character-sheet-pdf-renderer";
  * Renders a confirmed V2 browser draft directly through the V2 projection.
  * This intentionally creates no server artifact: standalone sheets remain
  * temporary until downloaded. No V1 projection is involved.
+ *
+ * The flat technical projection cannot represent Portrait Slots, so technical
+ * export refuses drafts that contain one instead of silently dropping the
+ * slot. Use the final styled PDF for slotted sheets.
  */
 export async function downloadConfirmedDraftPdfV2(
   draft: CharacterSheetDraftV2,
 ): Promise<void> {
   if (!draft.confirmed) {
     throw new Error("Confirm the sheet before downloading it.");
+  }
+  if ((draft.slots ?? []).length > 0) {
+    throw new Error(
+      "Technical export does not include portrait slots. Use Download Final PDF.",
+    );
   }
 
   const { bytes } = await renderCharacterSheetPdf({

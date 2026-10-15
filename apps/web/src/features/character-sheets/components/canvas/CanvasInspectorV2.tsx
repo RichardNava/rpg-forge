@@ -83,6 +83,24 @@ export function CanvasInspectorV2({
       />
     );
   }
+  if (selection.kind === "slot") {
+    const slot = (draft.slots ?? []).find((entry) => entry.key === selection.key);
+    if (slot === undefined) {
+      return (
+        <SheetOverview draft={draft} callbacks={callbacks} disabled={disabled} />
+      );
+    }
+    return (
+      <SlotInspector
+        draft={draft}
+        surface={surface}
+        slotKey={slot.key}
+        callbacks={callbacks}
+        disabled={disabled}
+        labelOf={labelOf}
+      />
+    );
+  }
   const section = draft.sections.find((entry) => entry.key === selection.key);
   if (section === undefined) {
     return (
@@ -456,6 +474,122 @@ function SectionInspector({
   );
 }
 
+function SlotInspector({
+  draft,
+  surface,
+  slotKey,
+  callbacks,
+  disabled,
+  labelOf,
+}: {
+  draft: CharacterSheetDraftV2;
+  surface: SpatialSurface;
+  slotKey: string;
+  callbacks: SheetCanvasCallbacks;
+  disabled: boolean;
+  labelOf: (key: string) => string;
+}) {
+  const placement = surface.readModel.nodeByKey.get(slotKey);
+  const aspectRatio =
+    surface.layout.slotDetails?.[slotKey]?.aspectRatio ?? "3:4";
+  if (placement?.kind !== "slot") {
+    return null;
+  }
+  const parentTitle =
+    placement.parentKey === null
+      ? "Top level"
+      : (labelOf(placement.parentKey) ?? placement.parentKey);
+  return (
+    <div>
+      <h2 className="character-workshop__panel-title">Portrait slot</h2>
+      <p className="canvas-inspector__meta">Inside {parentTitle}</p>
+      {!disabled && (
+        <>
+          <label className="character-workshop__form-field">
+            <span>Parent section</span>
+            <select
+              aria-label="Parent section for Portrait slot"
+              value={placement.parentKey ?? ""}
+              onChange={(event) =>
+                callbacks.onPlaceNode(slotKey, {
+                  position: "inside",
+                  parentKey: event.currentTarget.value || null,
+                })
+              }
+            >
+              <option value="">Top level</option>
+              {draft.sections.map((candidate) => (
+                <option key={candidate.key} value={candidate.key}>
+                  {candidate.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <PositionSection
+            nameFor="Portrait slot"
+            title="Node position"
+            geometry={
+              surface.layout.nodes[slotKey] ?? {
+                ...DEFAULT_DRAFT_NODE_LAYOUT_V1,
+              }
+            }
+            parentColumns={parentColumnsOf(surface, slotKey)}
+            onChange={(geometry) =>
+              callbacks.onSetNodeLayout(slotKey, geometry)
+            }
+          />
+          <label className="character-workshop__form-field">
+            <span>Aspect ratio</span>
+            <select
+              aria-label="Aspect ratio for Portrait slot"
+              value={aspectRatio}
+              onChange={(event) =>
+                callbacks.onSetPortraitAspectRatio(
+                  slotKey,
+                  event.currentTarget.value as
+                    | "1:1"
+                    | "3:4"
+                    | "4:5"
+                    | "16:9",
+                )
+              }
+            >
+              {(
+                [
+                  ["1:1", "Square (1:1)"],
+                  ["3:4", "Portrait (3:4)"],
+                  ["4:5", "Portrait (4:5)"],
+                  ["16:9", "Wide (16:9)"],
+                ] as const
+              ).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <MoveControl
+            draft={draft}
+            surface={surface}
+            sourceKey={slotKey}
+            sourceKind="slot"
+            onMove={(destination) =>
+              callbacks.onPlaceNode(slotKey, destination)
+            }
+          />
+          <button
+            type="button"
+            className="character-workshop__btn character-workshop__btn--ghost"
+            onClick={() => callbacks.onRemovePortraitSlot(slotKey)}
+          >
+            Remove portrait slot
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Visual placement: mini-grid occupancy + precise numeric fallback. */
 function PositionSection({
   nameFor,
@@ -555,7 +689,7 @@ function MoveControl({
   draft: CharacterSheetDraftV2;
   surface: SpatialSurface;
   sourceKey: string;
-  sourceKind: "field" | "section";
+  sourceKind: "field" | "section" | "slot";
   onMove(
     destination: Extract<DraftMutationV2, { op: "place_node" }>["destination"],
   ): void;
@@ -571,7 +705,9 @@ function MoveControl({
         (key) =>
           draft.fields.find((entry) => entry.key === key)?.label ??
           draft.sections.find((entry) => entry.key === key)?.title ??
-          key,
+          ((draft.slots ?? []).some((entry) => entry.key === key)
+            ? "Portrait"
+            : key),
       ),
     [surface, draft, sourceKey, sourceKind],
   );

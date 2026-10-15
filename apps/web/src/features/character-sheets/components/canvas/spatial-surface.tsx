@@ -74,6 +74,7 @@ export interface SpatialTreeProps {
     children: ReactNode,
   ): ReactNode;
   renderField(node: Extract<DraftReadNodeV2, { kind: "field" }>): ReactNode;
+  renderSlot?: (node: Extract<DraftReadNodeV2, { kind: "slot" }>) => ReactNode;
 }
 
 /** Single canonical traversal shared by Preview and Canvas. */
@@ -82,6 +83,7 @@ export function SpatialNodes({
   nodes,
   renderSection,
   renderField,
+  renderSlot,
 }: SpatialTreeProps) {
   return (
     <>
@@ -97,8 +99,14 @@ export function SpatialNodes({
                   nodes={surface.readModel.childrenByParent.get(node.key) ?? []}
                   renderSection={renderSection}
                   renderField={renderField}
+                  {...(renderSlot === undefined ? {} : { renderSlot })}
                 />,
               )}
+            </>
+          ) : node.kind === "slot" ? (
+            <>
+              {geometryOf(surface, node.key).breakBefore && <SpatialBreaker />}
+              {renderSlot?.(node)}
             </>
           ) : (
             <>

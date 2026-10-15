@@ -41,7 +41,7 @@ export type DraftStructureRange = {
 
 export type DraftNodePlacementPlan = {
   nodeKey: string;
-  nodeKind: "field" | "section";
+  nodeKind: "field" | "section" | "slot";
 
   movingRange: DraftStructureRange;
 
@@ -285,7 +285,8 @@ function getMovingRange(
   index: DraftStructuralIndex,
   placement: DraftPlacement,
 ): DraftStructureRange {
-  if (placement.kind === "field") {
+  // Fields and Slots are leaves: exactly one placement entry.
+  if (placement.kind === "field" || placement.kind === "slot") {
     const idx = structure.findIndex((p) => p.key === placement.key);
     return { start: idx, endExclusive: idx + 1 };
   } else {

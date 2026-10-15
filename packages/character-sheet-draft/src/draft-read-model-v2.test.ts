@@ -438,9 +438,12 @@ describe("read model BLOCK D registry resolution", () => {
     const model = buildDraftStructuralReadModelV2(draft);
     const fieldKeys = new Set(draft.fields.map((field) => field.key));
     const sectionKeys = new Set(draft.sections.map((section) => section.key));
+    const slotKeys = new Set((draft.slots ?? []).map((slot) => slot.key));
     for (const node of model.preorder) {
       if (node.kind === "field") {
         expect(fieldKeys.has(node.field.key)).toBe(true);
+      } else if (node.kind === "slot") {
+        expect(slotKeys.has(node.slot.key)).toBe(true);
       } else {
         expect(sectionKeys.has(node.section.key)).toBe(true);
       }

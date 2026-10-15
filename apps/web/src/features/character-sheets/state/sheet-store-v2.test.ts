@@ -93,6 +93,28 @@ function makeApiClient(
       draftVersion: 4,
     })),
     downloadFinalPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])),
+    uploadPortrait: vi.fn(async () => ({
+      schemaVersion: "1" as const,
+      assetId: "asset-up",
+      source: "upload" as const,
+      mimeType: "image/png" as const,
+    })),
+    importPortraitUrl: vi.fn(async () => ({
+      schemaVersion: "1" as const,
+      assetId: "asset-url",
+      source: "url" as const,
+      mimeType: "image/jpeg" as const,
+    })),
+    generatePortrait: vi.fn(async () => ({
+      schemaVersion: "1" as const,
+      assetId: "asset-ai",
+      source: "ai" as const,
+      mimeType: "image/png" as const,
+    })),
+    downloadPortrait: vi.fn(async () => ({
+      bytes: new Uint8Array([137, 80]),
+      mimeType: "image/png",
+    })),
     ...overrides,
   };
 }
@@ -433,6 +455,101 @@ describe("createSheetStoreV2", () => {
     expect(seen).toHaveLength(2);
     expect(seen[0]).toBe(seen[1]);
     expect(seen[0]).toContain(DRAFT_ID);
+  });
+
+  it("O7. generateFinalSheet carries the workshop portrait config", async () => {
+    let seen: unknown;
+    const generateFinalSheet = vi.fn(
+      async (_s: string, _t: string, _d: string, request: unknown) => {
+        seen = request;
+        return {
+          schemaVersion: "1" as const,
+          runId: "run.final.1",
+          status: "READY" as const,
+          draftId: DRAFT_ID,
+          draftVersion: 4,
+        };
+      },
+    );
+    const draft = makeDraftV2({
+      version: 4,
+      confirmed: true,
+      slots: [{ key: "portrait", type: "portrait" }],
+    });
+    const { store } = await readyStore({ generateFinalSheet }, draft);
+    store.setWorkshopPreferences({
+      portrait: { kind: "upload", assetId: "asset-1" },
+    });
+    const outcome = await store.generateFinalSheet({
+      threat: null,
+      visualStyle: "medieval",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    expect(outcome.kind).toBe("ok");
+    expect(seen).toMatchObject({
+      options: { portrait: { kind: "upload", assetId: "asset-1" } },
+    });
+  });
+
+  it("O8. generateFinalSheet rejects asset config without a slot", async () => {
+    const generateFinalSheet = vi.fn();
+    const confirmed = makeDraftV2({ version: 4, confirmed: true });
+    const { store } = await readyStore({ generateFinalSheet }, confirmed);
+    store.setWorkshopPreferences({
+      portrait: { kind: "ai", assetId: "asset-9" },
+    });
+    const outcome = await store.generateFinalSheet({
+      threat: null,
+      visualStyle: "medieval",
+      instructions: null,
+      seed: "final-seed-1",
+    });
+    expect(outcome).toEqual({
+      kind: "rejected",
+      code: "PORTRAIT_WITHOUT_SLOT",
+      message: "Add a Portrait Slot before generating with a portrait image.",
+    });
+    expect(generateFinalSheet).not.toHaveBeenCalled();
+  });
+
+  it("O9. portrait source actions switch config only on success", async () => {
+    const uploadPortrait = vi.fn(async () => ({
+      schemaVersion: "1" as const,
+      assetId: "asset-up",
+      source: "upload" as const,
+      mimeType: "image/png" as const,
+    }));
+    const importPortraitUrl = vi.fn(async () => {
+      throw new Error("nope");
+    });
+    const { store } = await readyStore({ uploadPortrait, importPortraitUrl });
+    const uploaded = await store.uploadPortraitImage(
+      new File([new Uint8Array([1])], "a.png", { type: "image/png" }),
+    );
+    expect(uploaded).toEqual({ kind: "ok", assetId: "asset-up", source: "upload" });
+    expect(store.getState().workshop.portrait).toEqual({
+      kind: "upload",
+      assetId: "asset-up",
+    });
+    const failed = await store.importPortraitUrl("https://example.com/a.png");
+    expect(failed.kind).toBe("error");
+    // Failed source change retains the previous valid config.
+    expect(store.getState().workshop.portrait).toEqual({
+      kind: "upload",
+      assetId: "asset-up",
+    });
+  });
+
+  it("O10. downloadPortraitImage returns bytes or null", async () => {
+    const bytes = new Uint8Array([137, 80]);
+    const downloadPortrait = vi.fn(async () => ({ bytes, mimeType: "image/png" }));
+    const { store } = await readyStore({ downloadPortrait });
+    expect(await store.downloadPortraitImage("asset-1")).toEqual({
+      bytes,
+      mimeType: "image/png",
+    });
+    expect(downloadPortrait).toHaveBeenCalledWith(SESSION_ID, "token.123", "asset-1");
   });
 
   it("O. the session token lives in memory-only store state", async () => {

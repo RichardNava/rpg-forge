@@ -30,6 +30,11 @@ import {
   DraftModeMutationV2Schema,
   parseDraftModeMutationV2,
 } from "./draft-mode-mutation-v2";
+import {
+  applyDraftSlotRegistryMutationWithExpectedVersionV2,
+  DraftSlotRegistryMutationV2Schema,
+  parseDraftSlotRegistryMutationV2,
+} from "./draft-slot-registry-mutation-v2";
 import { MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
 import { draftKeyPattern, type CharacterSheetDraftV2 } from "./draft-schema-v2";
 import { DraftNodeDestinationSchema } from "./draft-structure-placement-plan";
@@ -62,6 +67,8 @@ export type DraftPlaceNodeMutationV2 = z.infer<
  * - set_container_layout, set_node_layout: spatial layout mutations (14.8;
  *   geometry only, never structure)
  * - set_mode: PC/NPC mode switch (14.11)
+ * - add_portrait_slot, remove_portrait_slot, set_portrait_aspect_ratio:
+ *   portrait Slot registry mutations (14.13; Slot is structural, never a Field)
  * - undo: one-level server-authoritative undo (14.10)
  *
  * `expectedVersion` is deliberately OUT of the payload; pass it to
@@ -78,6 +85,7 @@ export const DraftMutationV2Schema = z.discriminatedUnion("op", [
   ...DraftSectionRegistryMutationV2Schema.options,
   ...DraftLayoutMutationV2Schema.options,
   ...DraftModeMutationV2Schema.options,
+  ...DraftSlotRegistryMutationV2Schema.options,
   ...DraftUndoMutationV2Schema.options,
 ]);
 export type DraftMutationV2 = z.infer<typeof DraftMutationV2Schema>;
@@ -127,6 +135,10 @@ export function parseDraftMutationV2(input: unknown): DraftMutationV2 {
       return parseDraftLayoutMutationV2(mutation);
     case "set_mode":
       return parseDraftModeMutationV2(mutation);
+    case "add_portrait_slot":
+    case "remove_portrait_slot":
+    case "set_portrait_aspect_ratio":
+      return parseDraftSlotRegistryMutationV2(mutation);
     case "undo":
       return parseDraftUndoMutationV2(mutation);
     default:
@@ -196,6 +208,14 @@ export function applyDraftMutationV2(
       );
     case "set_mode":
       return applyDraftModeMutationWithExpectedVersionV2(
+        draft,
+        mutation,
+        expectedVersion,
+      );
+    case "add_portrait_slot":
+    case "remove_portrait_slot":
+    case "set_portrait_aspect_ratio":
+      return applyDraftSlotRegistryMutationWithExpectedVersionV2(
         draft,
         mutation,
         expectedVersion,

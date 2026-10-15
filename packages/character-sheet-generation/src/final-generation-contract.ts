@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CharacterSheetDraftV2Schema } from "@repo/character-sheet-draft";
+import { PortraitAssetIdSchema } from "@repo/character-sheet-portraits";
 import { NPCThreatLevelSchema } from "./authoring.js";
 import type { CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
 
@@ -44,11 +45,18 @@ export const CANONICAL_VISUAL_STYLE_LABELS: Record<CanonicalVisualStyle, string>
 } as const;
 
 /**
- * Portrait configuration boundary (14.11 boundary, 14.13 implementation).
- * For 14.11, only `none` is valid. Future phases will extend this.
+ * Portrait configuration (14.13).
+ *
+ * Exactly one source is active by construction. Asset-backed sources carry
+ * only the server-minted temporary `assetId` — never raw bytes, base64,
+ * dataUrls, remote URLs, or AI prompts. The asset itself lives in the
+ * temporary session portrait-asset layer and is revalidated server-side.
  */
 export const PortraitConfigSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("none") }),
+  z.strictObject({ kind: z.literal("upload"), assetId: PortraitAssetIdSchema }),
+  z.strictObject({ kind: z.literal("url"), assetId: PortraitAssetIdSchema }),
+  z.strictObject({ kind: z.literal("ai"), assetId: PortraitAssetIdSchema }),
 ]);
 export type PortraitConfig = z.infer<typeof PortraitConfigSchema>;
 

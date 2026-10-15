@@ -287,6 +287,76 @@ describe("SheetApiClientV2", () => {
     expect(bytes[0]).toBe(37);
   });
 
+  it("M2. uploadPortrait posts multipart without JSON body", async () => {
+    const { client, fetchImpl } = makeClient(async (input, init) => {
+      expect(String(input)).toBe(
+        `${SESSION_URL}/sessions/${SESSION_ID}/portraits/upload`,
+      );
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBeInstanceOf(FormData);
+      return jsonResponse(201, {
+        schemaVersion: "1",
+        assetId: "asset-up",
+        source: "upload",
+        mimeType: "image/png",
+      });
+    });
+    const file = new File([new Uint8Array([1])], "a.png", { type: "image/png" });
+    const ref = await client.uploadPortrait(SESSION_ID, "token.123", file);
+    expect(ref).toMatchObject({ assetId: "asset-up", source: "upload" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("M3. importPortraitUrl and generatePortrait send bounded bodies", async () => {
+    const { client } = makeClient(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/portraits/import-url")) {
+        expect(JSON.parse(String(init?.body))).toEqual({ url: "https://example.com/a.png" });
+        return jsonResponse(201, {
+          schemaVersion: "1",
+          assetId: "asset-url",
+          source: "url",
+          mimeType: "image/jpeg",
+        });
+      }
+      expect(url.endsWith("/portraits/generate")).toBe(true);
+      expect(JSON.parse(String(init?.body))).toEqual({ prompt: "a ranger" });
+      return jsonResponse(201, {
+        schemaVersion: "1",
+        assetId: "asset-ai",
+        source: "ai",
+        mimeType: "image/png",
+      });
+    });
+    const imported = await client.importPortraitUrl(
+      SESSION_ID,
+      "token.123",
+      "https://example.com/a.png",
+    );
+    expect(imported.source).toBe("url");
+    const generated = await client.generatePortrait(SESSION_ID, "token.123", "a ranger");
+    expect(generated.source).toBe("ai");
+    await expect(
+      client.generatePortrait(SESSION_ID, "token.123", "   "),
+    ).rejects.toThrowError(SheetApiError);
+  });
+
+  it("M4. downloadPortrait returns raw bytes with mime type", async () => {
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    const { client } = makeClient(async (input) => {
+      expect(String(input)).toBe(
+        `${SESSION_URL}/sessions/${SESSION_ID}/portraits/asset-1`,
+      );
+      return new Response(bytes.buffer as ArrayBuffer, {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      });
+    });
+    const result = await client.downloadPortrait(SESSION_ID, "token.123", "asset-1");
+    expect([...result.bytes]).toEqual([...bytes]);
+    expect(result.mimeType).toBe("image/png");
+  });
+
   it("L. unsafe identity segments are rejected before any request", async () => {
     const draft = makeDraftV2({ version: 1 });
     const { client, fetchImpl } = makeClient(async () =>

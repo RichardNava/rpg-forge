@@ -21,6 +21,15 @@ import {
   FinalGenerationStartResponseV1Schema,
 } from "@repo/character-sheet-generation";
 import {
+  PORTRAIT_MAX_BYTES,
+  PortraitAssetRefSchema,
+  PortraitGenerateRequestSchema,
+  PortraitGenerationPromptSchema,
+  PortraitImportUrlRequestSchema,
+  validatePortraitImageBytes,
+} from "@repo/character-sheet-portraits";
+import { importPortraitFromUrl } from "./infrastructure/portrait-url-import.js";
+import {
   readCurrentDraftV2,
   type DraftV2Runtime,
 } from "./features/character-sheets/draft-v2-runtime.js";
@@ -70,8 +79,17 @@ const SHEET_DRAFT_GENERATE_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/generate$/;
 const SHEET_RUN_PDF_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/runs\/([^/]+)\/pdf$/;
+const SHEET_PORTRAIT_UPLOAD_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/portraits\/upload$/;
+const SHEET_PORTRAIT_IMPORT_URL_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/portraits\/import-url$/;
+const SHEET_PORTRAIT_GENERATE_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/portraits\/generate$/;
+const SHEET_PORTRAIT_PREVIEW_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/portraits\/([^/]+)$/;
 const SHEET_DOCUMENT_EXTRACTION_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/extraction$/;
+const PORTRAIT_UPLOAD_MAX_REQUEST_BYTES = 8 * 1024 * 1024 + 64 * 1024;
 const SHEET_DOCUMENT_MAX_BYTES = 8 * 1024 * 1024;
 const SHEET_DOCUMENT_MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 const SHEET_DOCUMENT_MAX_REQUEST_BYTES =
@@ -202,6 +220,31 @@ export async function handleCharacterSheetRequest(
     if (method === "GET") {
       return handleGetFinalPdf(sessionId, runId, request, deps);
     }
+  }
+
+  const portraitUploadMatch = SHEET_PORTRAIT_UPLOAD_PATH_PATTERN.exec(path);
+  if (portraitUploadMatch !== null && method === "POST") {
+    return handleUploadPortrait(portraitUploadMatch[1] ?? "", request, deps);
+  }
+
+  const portraitImportMatch = SHEET_PORTRAIT_IMPORT_URL_PATH_PATTERN.exec(path);
+  if (portraitImportMatch !== null && method === "POST") {
+    return handleImportPortraitUrl(portraitImportMatch[1] ?? "", request, deps);
+  }
+
+  const portraitGenerateMatch = SHEET_PORTRAIT_GENERATE_PATH_PATTERN.exec(path);
+  if (portraitGenerateMatch !== null && method === "POST") {
+    return handleGeneratePortrait(portraitGenerateMatch[1] ?? "", request, deps);
+  }
+
+  const portraitPreviewMatch = SHEET_PORTRAIT_PREVIEW_PATH_PATTERN.exec(path);
+  if (portraitPreviewMatch !== null && method === "GET") {
+    return handleGetPortraitPreview(
+      portraitPreviewMatch[1] ?? "",
+      portraitPreviewMatch[2] ?? "",
+      request,
+      deps,
+    );
   }
 
   const draftMatch = SHEET_DRAFT_PATH_PATTERN.exec(path);
@@ -930,6 +973,9 @@ async function handleGenerateFinal(
         ...(deps.finalPresentationPort === undefined
           ? {}
           : { presentation: deps.finalPresentationPort }),
+        ...(deps.portraitAssetStore === undefined
+          ? {}
+          : { portraits: deps.portraitAssetStore }),
         clock: deps.clock,
         crypto: deps.crypto,
       },
@@ -970,6 +1016,291 @@ async function handleGenerateFinal(
     case "failed":
       return errorResponse("SHEET_FINAL_GENERATION_FAILED", outcome.message);
   }
+}
+
+async function handleUploadPortrait(
+  sessionId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (deps.portraitAssetStore === undefined) {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  if (!request.headers.get("content-type")?.startsWith("multipart/form-data")) {
+    return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
+  }
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-upload:${clientIp}`);
+  if (rateLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (rateLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
+  const requestBytes = await readBoundedBytes(request, PORTRAIT_UPLOAD_MAX_REQUEST_BYTES);
+  if (requestBytes === null) {
+    return errorResponse("SHEET_PORTRAIT_TOO_LARGE");
+  }
+  let form: FormData;
+  try {
+    form = await new Request(request.url, {
+      method: "POST",
+      headers: request.headers,
+      body: requestBytes,
+    }).formData();
+  } catch {
+    return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
+  }
+  const images = form.getAll("image");
+  const image = images.length === 1 ? images[0] : null;
+  if (!(image instanceof File)) {
+    return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
+  }
+  if (image.size === 0 || image.size > PORTRAIT_MAX_BYTES) {
+    return errorResponse("SHEET_PORTRAIT_TOO_LARGE");
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await image.arrayBuffer());
+  } catch {
+    return errorResponse("SHEET_PORTRAIT_INVALID_CONTENT");
+  }
+  const validated = validatePortraitImageBytes(bytes);
+  if (!validated.valid || validated.mimeType === null) {
+    if (validated.code === "unsupported_type") {
+      return errorResponse("SHEET_PORTRAIT_INVALID_TYPE");
+    }
+    if (validated.code === "too_large" || validated.code === "too_many_pixels") {
+      return errorResponse("SHEET_PORTRAIT_TOO_LARGE");
+    }
+    return errorResponse("SHEET_PORTRAIT_INVALID_CONTENT");
+  }
+  const assetId = deps.crypto.uuid();
+  try {
+    await deps.portraitAssetStore.putAsset({
+      sessionId: auth.sessionId,
+      assetId,
+      source: "upload",
+      mimeType: validated.mimeType,
+      sizeBytes: bytes.length,
+      width: validated.width,
+      height: validated.height,
+      imageBytes: bytes,
+    });
+  } catch {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  return jsonResponse(
+    201,
+    PortraitAssetRefSchema.parse({
+      schemaVersion: "1",
+      assetId,
+      source: "upload",
+      mimeType: validated.mimeType,
+    }),
+  );
+}
+
+async function handleImportPortraitUrl(
+  sessionId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (deps.portraitAssetStore === undefined) {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  if (!hasJsonContentType(request)) {
+    return errorResponse("INVALID_REQUEST", "Expected application/json.");
+  }
+  const body = await readBoundedJson(request);
+  if (body === null) {
+    return errorResponse("INVALID_REQUEST", "Request body is malformed or too large.");
+  }
+  const parsed = PortraitImportUrlRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
+  }
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-url:${clientIp}`);
+  if (rateLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (rateLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
+  const imported = await importPortraitFromUrl(parsed.data.url);
+  if (imported.kind === "rejected") {
+    switch (imported.code) {
+      case "insecure_scheme":
+      case "invalid_url":
+      case "forbidden_host":
+      case "too_many_redirects":
+        return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST", imported.message);
+      case "too_large":
+        return errorResponse("SHEET_PORTRAIT_TOO_LARGE", imported.message);
+      case "fetch_failed":
+        return errorResponse("SHEET_PORTRAIT_UNAVAILABLE", imported.message);
+      case "invalid_content":
+        return errorResponse("SHEET_PORTRAIT_INVALID_CONTENT", imported.message);
+    }
+  }
+  const validated = validatePortraitImageBytes(imported.bytes);
+  if (!validated.valid || validated.mimeType === null) {
+    return errorResponse("SHEET_PORTRAIT_INVALID_CONTENT");
+  }
+  const assetId = deps.crypto.uuid();
+  try {
+    await deps.portraitAssetStore.putAsset({
+      sessionId: auth.sessionId,
+      assetId,
+      source: "url",
+      mimeType: validated.mimeType,
+      sizeBytes: imported.bytes.length,
+      width: validated.width,
+      height: validated.height,
+      imageBytes: imported.bytes,
+    });
+  } catch {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  return jsonResponse(
+    201,
+    PortraitAssetRefSchema.parse({
+      schemaVersion: "1",
+      assetId,
+      source: "url",
+      mimeType: validated.mimeType,
+    }),
+  );
+}
+
+async function handleGeneratePortrait(
+  sessionId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (deps.portraitAssetStore === undefined) {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  if (!hasJsonContentType(request)) {
+    return errorResponse("INVALID_REQUEST", "Expected application/json.");
+  }
+  const body = await readBoundedJson(request);
+  if (body === null) {
+    return errorResponse("INVALID_REQUEST", "Request body is malformed or too large.");
+  }
+  const parsed = PortraitGenerateRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
+  }
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-generate:${clientIp}`);
+  if (rateLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (rateLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
+  if (deps.portraitGenerationPort === undefined) {
+    return errorResponse("SHEET_PORTRAIT_UNAVAILABLE");
+  }
+  const promptParsed = PortraitGenerationPromptSchema.safeParse(parsed.data.prompt);
+  if (!promptParsed.success) {
+    return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
+  }
+  let generated;
+  try {
+    generated = await deps.portraitGenerationPort.generate({
+      prompt: promptParsed.data,
+      styleContext: null,
+    });
+  } catch (error) {
+    if (
+      error !== null &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: string }).code === "INVALID_OUTPUT"
+    ) {
+      return errorResponse("SHEET_PORTRAIT_GENERATION_FAILED");
+    }
+    return errorResponse("SHEET_PORTRAIT_UNAVAILABLE");
+  }
+  const validated = validatePortraitImageBytes(generated.bytes);
+  if (!validated.valid || validated.mimeType === null || validated.mimeType !== generated.mimeType) {
+    return errorResponse("SHEET_PORTRAIT_GENERATION_FAILED");
+  }
+  const assetId = deps.crypto.uuid();
+  try {
+    await deps.portraitAssetStore.putAsset({
+      sessionId: auth.sessionId,
+      assetId,
+      source: "ai",
+      mimeType: validated.mimeType,
+      sizeBytes: generated.bytes.length,
+      width: validated.width,
+      height: validated.height,
+      imageBytes: generated.bytes,
+    });
+  } catch {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  return jsonResponse(
+    201,
+    PortraitAssetRefSchema.parse({
+      schemaVersion: "1",
+      assetId,
+      source: "ai",
+      mimeType: validated.mimeType,
+    }),
+  );
+}
+
+async function handleGetPortraitPreview(
+  sessionId: string,
+  assetId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (deps.portraitAssetStore === undefined) {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  let record;
+  try {
+    record = await deps.portraitAssetStore.getAsset({
+      sessionId: auth.sessionId,
+      assetId,
+    });
+  } catch {
+    return errorResponse("SHEET_DRAFT_STORAGE_UNAVAILABLE");
+  }
+  if (record === null) {
+    return errorResponse("SHEET_PORTRAIT_NOT_FOUND");
+  }
+  const body = new Uint8Array(record.imageBytes.length);
+  body.set(record.imageBytes);
+  return new Response(body.buffer as ArrayBuffer, {
+    status: 200,
+    headers: {
+      "content-type": record.metadata.mimeType,
+      "cache-control": "no-store",
+    },
+  });
 }
 
 function safePdfFilename(value: string): string {

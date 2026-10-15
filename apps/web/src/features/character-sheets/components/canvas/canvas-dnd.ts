@@ -29,7 +29,7 @@ import type {
  * only resolves and pre-validates intent.
  */
 
-export type CanvasNodeKind = "field" | "section";
+export type CanvasNodeKind = "field" | "section" | "slot";
 
 export type CanvasDropIntent =
   | { kind: "before"; targetKind: CanvasNodeKind; key: string }
@@ -74,7 +74,7 @@ export function parseDropIntentId(id: string): CanvasDropIntent | null {
   if (
     (parts[1] === "before" || parts[1] === "after") &&
     parts.length === 4 &&
-    (parts[2] === "field" || parts[2] === "section") &&
+    (parts[2] === "field" || parts[2] === "section" || parts[2] === "slot") &&
     parts[3] !== undefined &&
     parts[3] !== ""
   ) {

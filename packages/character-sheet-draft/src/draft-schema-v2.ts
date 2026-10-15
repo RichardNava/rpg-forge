@@ -27,6 +27,11 @@ import {
   DraftLayoutV1Schema,
   assertDraftLayoutComplete,
 } from "./draft-layout-v1";
+import {
+  DraftSlotV1Schema,
+  MAX_PORTRAIT_SLOTS,
+  type DraftSlotV1,
+} from "./draft-slot-v2";
 
 export const CHARACTER_SHEET_DRAFT_V2_VERSION = "2" as const;
 
@@ -40,7 +45,14 @@ export const DraftSectionV2Schema = z.strictObject({
 export type DraftSectionV2 = z.infer<typeof DraftSectionV2Schema>;
 
 /** V2 Placement is the ONLY structural authority. */
-export const DraftPlacementKindSchema = z.enum(["field", "section"]);
+export const DraftPlacementKindSchema = z.enum(["field", "section", "slot"]);
+
+const DraftPlacementParentKeySchema = z
+  .string()
+  .min(1)
+  .max(MAX_DRAFT_FIELD_KEY_CHARS)
+  .regex(draftKeyPattern)
+  .nullable();
 
 export const DraftPlacementSchema = z.discriminatedUnion("kind", [
   z.strictObject({
@@ -50,12 +62,7 @@ export const DraftPlacementSchema = z.discriminatedUnion("kind", [
       .min(1)
       .max(MAX_DRAFT_FIELD_KEY_CHARS)
       .regex(draftKeyPattern),
-    parentKey: z
-      .string()
-      .min(1)
-      .max(MAX_DRAFT_FIELD_KEY_CHARS)
-      .regex(draftKeyPattern)
-      .nullable(),
+    parentKey: DraftPlacementParentKeySchema,
   }),
   z.strictObject({
     kind: z.literal("section"),
@@ -64,12 +71,16 @@ export const DraftPlacementSchema = z.discriminatedUnion("kind", [
       .min(1)
       .max(MAX_DRAFT_FIELD_KEY_CHARS)
       .regex(draftKeyPattern),
-    parentKey: z
+    parentKey: DraftPlacementParentKeySchema,
+  }),
+  z.strictObject({
+    kind: z.literal("slot"),
+    key: z
       .string()
       .min(1)
       .max(MAX_DRAFT_FIELD_KEY_CHARS)
-      .regex(draftKeyPattern)
-      .nullable(),
+      .regex(draftKeyPattern),
+    parentKey: DraftPlacementParentKeySchema,
   }),
 ]);
 export type DraftPlacement = z.infer<typeof DraftPlacementSchema>;
@@ -87,6 +98,12 @@ export const CharacterSheetDraftV2Schema = z
     rulesContextId: z.string().max(128).nullable(),
     fields: z.array(DraftFieldSchema).min(1).max(MAX_DRAFT_SURFACE_FIELDS),
     sections: z.array(DraftSectionV2Schema).max(MAX_DRAFT_SECTIONS),
+    /**
+     * Optional Portrait Slot registry (14.13). Absent on all historical
+     * snapshots, which remain valid. At most one portrait Slot; the slot is a
+     * structural placeholder, never a Field.
+     */
+    slots: z.array(DraftSlotV1Schema).max(MAX_PORTRAIT_SLOTS).optional(),
     structure: z.array(DraftPlacementSchema),
     values: z
       .record(z.string(), DraftValueSchema)
@@ -132,6 +149,29 @@ export const CharacterSheetDraftV2Schema = z
       }
     }
 
+    const slots = draft.slots ?? [];
+    const slotKeys = new Set(slots.map((s) => s.key));
+    if (slotKeys.size !== slots.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Draft slot keys must be unique.",
+      });
+    }
+    for (const slot of slots) {
+      if (slot.type !== "portrait") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Slot "${slot.key}" has an unsupported slot type.`,
+        });
+      }
+      if (fieldKeys.has(slot.key) || sectionKeys.has(slot.key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Key "${slot.key}" is used by both a slot and a field or section.`,
+        });
+      }
+    }
+
     const structure = draft.structure;
     const placementKeys = new Set<string>();
 
@@ -150,6 +190,13 @@ export const CharacterSheetDraftV2Schema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message: `Field placement references unknown field "${placement.key}".`,
+          });
+        }
+      } else if (placement.kind === "slot") {
+        if (!slotKeys.has(placement.key)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Slot placement references unknown slot "${placement.key}".`,
           });
         }
       } else {
@@ -179,6 +226,7 @@ export const CharacterSheetDraftV2Schema = z
 
     const fieldPlacements = structure.filter((p) => p.kind === "field");
     const sectionPlacements = structure.filter((p) => p.kind === "section");
+    const slotPlacements = structure.filter((p) => p.kind === "slot");
     if (fieldPlacements.length !== draft.fields.length) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -190,6 +238,21 @@ export const CharacterSheetDraftV2Schema = z
         code: z.ZodIssueCode.custom,
         message: "Every section must have exactly one placement.",
       });
+    }
+    if (slotPlacements.length !== slots.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Every slot must have exactly one placement.",
+      });
+    }
+    // Slots are terminal: nothing may be parented by a slot.
+    for (const placement of structure) {
+      if (placement.parentKey !== null && slotKeys.has(placement.parentKey)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Node "${placement.key}" cannot be parented by slot "${placement.parentKey}": slots are terminal.`,
+        });
+      }
     }
 
     const parentMap = new Map<string, string | null>();

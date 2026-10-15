@@ -101,6 +101,12 @@ export interface SheetStoreV2FinalGenerationInput {
   seed?: string;
 }
 
+export type SheetStoreV2PortraitOutcome =
+  | { kind: "ok"; assetId: string; source: "upload" | "url" | "ai" }
+  | { kind: "not_ready" }
+  | { kind: "rejected"; code: string; message: string }
+  | { kind: "error"; error: SheetApiError };
+
 export interface SheetStoreV2 {
   getState(): SheetStoreV2State;
   subscribe(listener: SheetStoreV2Listener): () => void;
@@ -109,6 +115,10 @@ export interface SheetStoreV2 {
   hydrate(draftId: string): Promise<void>;
   createDraft(snapshot: CharacterSheetDraftV2): Promise<void>;
   setWorkshopPreferences(patch: Partial<WorkshopPreferences>): void;
+  uploadPortraitImage(file: File): Promise<SheetStoreV2PortraitOutcome>;
+  importPortraitUrl(url: string): Promise<SheetStoreV2PortraitOutcome>;
+  generatePortraitImage(prompt: string): Promise<SheetStoreV2PortraitOutcome>;
+  downloadPortraitImage(assetId: string): Promise<{ bytes: Uint8Array; mimeType: string } | null>;
   applyMutation(
     mutation: DraftMutationV2,
   ): Promise<SheetStoreV2MutationOutcome>;

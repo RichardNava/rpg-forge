@@ -68,6 +68,8 @@ describe("SheetCanvasV2", () => {
       onSetNodeLayout: vi.fn(),
       onAddField: vi.fn(),
       onOpenAddSection: vi.fn(),
+      onRemovePortraitSlot: vi.fn(),
+      onSetPortraitAspectRatio: vi.fn(),
     };
   }
 
@@ -78,6 +80,7 @@ describe("SheetCanvasV2", () => {
       current:
         | { kind: "field"; key: string }
         | { kind: "section"; key: string }
+        | { kind: "slot"; key: string }
         | null;
     } = { current: null };
     const utils = render(
@@ -245,6 +248,132 @@ describe("SheetCanvasV2", () => {
     // Content itself stays visible and identical.
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "First" })).toBeTruthy();
+  });
+
+  function makeSlottedDraft(): CharacterSheetDraftV2 {
+    return initialDraftVersionV2({
+      schemaVersion: "2",
+      draftId: "draft.canvas.slot",
+      sessionId: "session.canvas.slot",
+      mode: "pc",
+      characterName: null,
+      rulesContextId: null,
+      fields: [
+        { key: "a", label: "Alpha", type: "text", locked: false },
+        { key: "b", label: "Beta", type: "text", locked: false },
+      ],
+      sections: [{ key: "s1", title: "First" }],
+      slots: [{ key: "portrait", type: "portrait" }],
+      structure: [
+        { kind: "field", key: "a", parentKey: null },
+        { kind: "section", key: "s1", parentKey: null },
+        { kind: "field", key: "b", parentKey: "s1" },
+        { kind: "slot", key: "portrait", parentKey: "s1" },
+      ],
+      values: { a: "A", b: "B" },
+      source: { sourceSheetId: null, sourceRunId: null },
+      confirmed: false,
+      layout: {
+        schemaVersion: "1",
+        root: { columns: 2 },
+        sections: { s1: { columns: 2 } },
+        nodes: {
+          a: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          s1: { columnStart: 1, columnSpan: 2, rowSpan: 1, breakBefore: false },
+          b: { columnStart: 2, columnSpan: 1, rowSpan: 1, breakBefore: false },
+          portrait: { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false },
+        },
+        slotDetails: { portrait: { aspectRatio: "3:4" } },
+      },
+    });
+  }
+
+  it("renders a portrait slot as a distinct grid item", () => {
+    render(
+      <SheetCanvasV2
+        draft={makeSlottedDraft()}
+        callbacks={callbacks()}
+        disabled={false}
+        selection={null}
+        onSelectionChange={() => {}}
+      />,
+    );
+    expect(
+      document.querySelector('[data-canvas-node="portrait"]'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector(".canvas-slot__placeholder")?.textContent,
+    ).toBe("Portrait");
+  });
+
+  it("selects a portrait slot on click", () => {
+    const selectionState: {
+      current:
+        | { kind: "field"; key: string }
+        | { kind: "section"; key: string }
+        | { kind: "slot"; key: string }
+        | null;
+    } = { current: null };
+    render(
+      <SheetCanvasV2
+        draft={makeSlottedDraft()}
+        callbacks={callbacks()}
+        disabled={false}
+        selection={null}
+        onSelectionChange={(selection) => {
+          selectionState.current = selection;
+        }}
+      />,
+    );
+    fireEvent.click(document.querySelector('[data-canvas-node="portrait"]')!);
+    expect(selectionState.current).toEqual({ kind: "slot", key: "portrait" });
+  });
+
+  it("opens a keyboard move menu from the slot handle and commits", () => {
+    const cb = callbacks();
+    render(
+      <SheetCanvasV2
+        draft={makeSlottedDraft()}
+        callbacks={cb}
+        disabled={false}
+        selection={null}
+        onSelectionChange={() => {}}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: "Move Portrait slot" }), {
+      key: " ",
+    });
+    const dialog = screen.getByRole("dialog", { name: "Move Portrait" });
+    expect(dialog).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Destination for Portrait"), {
+      target: { value: "canvas:inside:root" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Move here" }));
+    expect(cb.onPlaceNode).toHaveBeenCalledWith("portrait", {
+      position: "inside",
+      parentKey: null,
+    });
+  });
+
+  it("resizes a portrait slot through the resize handles", () => {
+    const cb = callbacks();
+    render(
+      <SheetCanvasV2
+        draft={makeSlottedDraft()}
+        callbacks={cb}
+        disabled={false}
+        selection={{ kind: "slot", key: "portrait" }}
+        onSelectionChange={() => {}}
+      />,
+    );
+    const width = screen.getByLabelText("Width of Portrait slot");
+    fireEvent.keyDown(width, { key: "ArrowRight" });
+    expect(cb.onSetNodeLayout).toHaveBeenCalledWith("portrait", {
+      columnStart: 1,
+      columnSpan: 2,
+      rowSpan: 1,
+      breakBefore: false,
+    });
   });
 
   it("shows an empty inside target for empty sections", () => {

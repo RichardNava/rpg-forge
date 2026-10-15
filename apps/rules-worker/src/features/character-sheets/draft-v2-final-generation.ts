@@ -54,6 +54,10 @@ import {
   type SheetRunRepositoryPort,
   type SheetSessionRepositoryPort,
 } from "@repo/character-sheet-session";
+import {
+  validatePortraitImageBytes,
+  type CharacterSheetPortraitAssetStore,
+} from "@repo/character-sheet-portraits";
 import type { Clock, SessionCrypto } from "@repo/rules-analysis-session";
 import { renderStyledCharacterSheetPdf } from "@repo/character-sheet-pdf-renderer";
 import { getStyleProfile } from "@repo/character-sheet-generation";
@@ -65,6 +69,7 @@ export interface FinalGenerationDeps {
   readonly artifacts: CharacterSheetArtifactStore;
   readonly sessions: SheetSessionRepositoryPort;
   readonly presentation?: FinalPresentationPort;
+  readonly portraits?: CharacterSheetPortraitAssetStore;
   readonly clock: Clock;
   readonly crypto: SessionCrypto;
 }
@@ -82,7 +87,9 @@ export type FinalGenerationInvalidCode =
   | "pc_threat"
   | "npc_threat_missing"
   | "unsupported_style"
-  | "invalid_options";
+  | "invalid_options"
+  | "portrait_without_slot"
+  | "portrait_asset_invalid";
 
 export interface FinalGenerationRequest {
   readonly identity: DraftHeadIdentity;
@@ -138,6 +145,25 @@ export async function generateFinalCharacterSheet(
     };
   }
   const style = styleCheck.data;
+
+  // 5b. Portrait Slot/config coherence (14.13). The slot is spatial Draft
+  // authority; the image is temporary content. No slot + asset config is
+  // rejected; a slot with `none` stays valid (portrait is optional).
+  const draftSlots = draft.slots ?? [];
+  const portraitConfig = built.options.portrait;
+  if (draftSlots.length === 0 && portraitConfig.kind !== "none") {
+    return {
+      kind: "invalid",
+      code: "portrait_without_slot",
+      message: "A portrait asset requires a Portrait Slot on the draft.",
+    };
+  }
+  if (portraitConfig.kind !== "none" && deps.portraits === undefined) {
+    return {
+      kind: "unavailable",
+      message: "Portrait asset storage is unavailable.",
+    };
+  }
 
   // 6. Create the PENDING run (repost-as-reroll current). Expiry borrows the session.
   const session = await deps.sessions.findById(request.identity.sessionId);
@@ -226,6 +252,50 @@ export async function generateFinalCharacterSheet(
   }
   plan = planParsed.data;
 
+  // 9b. Resolve the portrait image (14.13). The assetId is revalidated:
+  // the asset must exist, belong to this session, match the configured
+  // source kind, and carry valid bytes. The assetId alone is never trusted.
+  let portraitImage: { slotKey: string; bytes: Uint8Array; mimeType: "image/png" | "image/jpeg" } | null = null;
+  if (portraitConfig.kind !== "none") {
+    const slot = draftSlots[0];
+    if (slot === undefined) {
+      return fail("GENERATION_FAILED", {
+        kind: "failed",
+        message: "A portrait asset requires a Portrait Slot on the draft.",
+      });
+    }
+    let record;
+    try {
+      record = await deps.portraits!.getAsset({
+        sessionId: request.identity.sessionId,
+        assetId: portraitConfig.assetId,
+      });
+    } catch {
+      return fail("INTERNAL_ERROR", {
+        kind: "failed",
+        message: "Portrait asset storage is unavailable.",
+      });
+    }
+    if (record === null || record.metadata.source !== portraitConfig.kind) {
+      return fail("GENERATION_FAILED", {
+        kind: "failed",
+        message: "The portrait asset is missing or does not match its configured source.",
+      });
+    }
+    const imageCheck = validatePortraitImageBytes(record.imageBytes);
+    if (!imageCheck.valid || imageCheck.mimeType === null) {
+      return fail("GENERATION_FAILED", {
+        kind: "failed",
+        message: "The stored portrait image is invalid.",
+      });
+    }
+    portraitImage = {
+      slotKey: slot.key,
+      bytes: record.imageBytes,
+      mimeType: imageCheck.mimeType,
+    };
+  }
+
   // 10. Draft-native styled PDF render.
   let pdfBytes: Uint8Array;
   try {
@@ -234,6 +304,7 @@ export async function generateFinalCharacterSheet(
       resolvedValues: resolved,
       presentation: plan,
       profile: getStyleProfile(style),
+      portrait: portraitImage,
     });
     pdfBytes = rendered.bytes;
   } catch (error) {

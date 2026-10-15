@@ -46,13 +46,19 @@ import {
 
 export interface StyledDraftNodeState {
   readonly key: string;
-  readonly kind: "field" | "section";
+  readonly kind: "field" | "section" | "slot";
   readonly parentKey: string | null;
   readonly canonicalOrder: number;
   readonly layout: DraftLayoutNodeV1;
   readonly containerColumns: number;
   readonly valueState: "explicit" | "generated" | "blank" | "n/a";
   readonly editable: boolean;
+  /** Present only for slot nodes. */
+  readonly slotType?: "portrait";
+  /** Frame aspect from layout.slotDetails; present only for slot nodes. */
+  readonly aspectRatio?: "1:1" | "3:4" | "4:5" | "16:9";
+  /** Portrait content state; "asset" only when resolved image bytes exist. */
+  readonly contentState?: "empty" | "asset";
 }
 
 export interface StyledDraftPdfManifest {
@@ -72,6 +78,12 @@ export interface StyledDraftPdfManifest {
   };
 }
 
+export interface StyledDraftPortraitInput {
+  readonly slotKey: string;
+  readonly bytes: Uint8Array;
+  readonly mimeType: "image/png" | "image/jpeg";
+}
+
 export interface RenderStyledDraftPdfInput {
   readonly draft: CharacterSheetDraftV2;
   readonly resolvedValues: {
@@ -80,11 +92,184 @@ export interface RenderStyledDraftPdfInput {
   };
   readonly presentation: FinalPresentationPlanV1;
   readonly profile: StyleProfileV1;
+  /**
+   * Optional resolved portrait image. The renderer never fetches URLs, calls
+   * AI, reads R2, or interprets the source kind: it only receives validated
+   * image bytes plus the slot they belong to.
+   */
+  readonly portrait?: StyledDraftPortraitInput | null;
 }
 
 export interface RenderStyledDraftPdfOutput {
   readonly bytes: Uint8Array;
   readonly manifest: StyledDraftPdfManifest;
+}
+
+export interface StyledDraftPlannedMember {
+  readonly kind: "field" | "section" | "slot";
+  readonly key: string;
+  readonly geometry: DraftLayoutNodeV1;
+  readonly row: number;
+  readonly x: number;
+  readonly w: number;
+  readonly height: number;
+  readonly nested: StyledDraftPlannedContainer | null;
+}
+
+const PORTRAIT_ASPECT_HEIGHT: Record<"1:1" | "3:4" | "4:5" | "16:9", number> = {
+  "1:1": 1,
+  "3:4": 4 / 3,
+  "4:5": 5 / 4,
+  "16:9": 9 / 16,
+};
+
+export function portraitSlotFrameHeight(width: number, aspectRatio: "1:1" | "3:4" | "4:5" | "16:9"): number {
+  return Math.max(40, width) * (PORTRAIT_ASPECT_HEIGHT[aspectRatio] ?? 4 / 3) + 8;
+}
+
+export interface StyledDraftPlannedRow {
+  readonly members: readonly StyledDraftPlannedMember[];
+  readonly height: number;
+  readonly gapBefore: number;
+  readonly yTop: number;
+}
+
+export interface StyledDraftPlannedContainer {
+  readonly rows: readonly StyledDraftPlannedRow[];
+  readonly totalHeight: number;
+}
+
+function fieldBlockHeight(field: DraftField, geometry: DraftLayoutNodeV1): number {
+  const rowSpan = Math.max(geometry.rowSpan, 1);
+  const widgetHeight =
+    (field.type === "textarea" || field.type === "list" ? ROW_HEIGHT * 2 : ROW_HEIGHT) * rowSpan -
+    LABEL_BAND_HEIGHT;
+  return LABEL_BAND_HEIGHT + widgetHeight + 6;
+}
+
+/**
+ * Container-local deterministic grid planning for a Draft V2 snapshot.
+ *
+ * Each Root/Section container packs its DIRECT children in canonical sibling
+ * order using its own column count. Siblings in different columns share
+ * visual rows; `rowSpan` reserves rows; `breakBefore` begins a new row;
+ * nested Section grids are planned independently inside their grid cell.
+ * Derived PDF coordinates are renderer-only: nothing is persisted.
+ */
+export function planStyledDraftLayout(
+  draft: CharacterSheetDraftV2,
+  x0: number = PAGE_MARGIN,
+  width: number = LETTER_WIDTH - PAGE_MARGIN * 2,
+): StyledDraftPlannedContainer {
+  const draftParsed = CharacterSheetDraftV2Schema.safeParse(draft);
+  if (!draftParsed.success) {
+    throw new CharacterSheetPdfRenderError("invalid_draft", "The provided draft failed V2 validation.");
+  }
+  const valid = draftParsed.data;
+  const layout = resolveEffectiveDraftLayoutV1(valid);
+  const fieldsByKey = new Map(valid.fields.map((f) => [f.key, f]));
+  const containerColumnsFor = (parentKey: string | null): number => {
+    if (parentKey === null) return layout.root.columns;
+    return layout.sections[parentKey]?.columns ?? 1;
+  };
+  const geometryOf = (key: string): DraftLayoutNodeV1 =>
+    layout.nodes[key] ?? { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false };
+
+  const planContainer = (
+    parentKey: string | null,
+    originX: number,
+    originWidth: number,
+    columns: number,
+    baseYTop: number,
+  ): StyledDraftPlannedContainer => {
+    const cols = Math.max(1, Math.min(columns, 4));
+    const direct = valid.structure.filter((p) => (p.parentKey ?? null) === parentKey);
+    const occupied: boolean[][] = [];
+    const assignments: { kind: "field" | "section" | "slot"; key: string; geometry: DraftLayoutNodeV1; row: number }[] = [];
+    let cursor = 0;
+    for (const child of direct) {
+      const g = geometryOf(child.key);
+      const colStart = Math.min(Math.max(g.columnStart, 1), cols);
+      const colSpan = Math.min(Math.max(g.columnSpan, 1), cols - colStart + 1);
+      const rowSpan = Math.max(g.rowSpan, 1);
+      if (g.breakBefore) cursor = occupied.length;
+      const fits = (r: number): boolean => {
+        for (let rr = r; rr < r + rowSpan; rr += 1) {
+          for (let cc = colStart - 1; cc < colStart - 1 + colSpan; cc += 1) {
+            if (occupied[rr]?.[cc] === true) return false;
+          }
+        }
+        return true;
+      };
+      let r = cursor;
+      while (!fits(r)) r += 1;
+      for (let rr = r; rr < r + rowSpan; rr += 1) {
+        occupied[rr] ??= [];
+        for (let cc = colStart - 1; cc < colStart - 1 + colSpan; cc += 1) {
+          occupied[rr]![cc] = true;
+        }
+      }
+      assignments.push({ kind: child.kind, key: child.key, geometry: g, row: r });
+    }
+
+    const byRow = new Map<number, typeof assignments>();
+    for (const a of assignments) {
+      const list = byRow.get(a.row) ?? [];
+      list.push(a);
+      byRow.set(a.row, list);
+    }
+    const rowIndices = [...byRow.keys()].sort((a, b) => a - b);
+    const columnWidth = originWidth / cols;
+    const rows: StyledDraftPlannedRow[] = [];
+    let yTop = baseYTop;
+    let first = true;
+    for (const r of rowIndices) {
+      const starters = byRow.get(r)!;
+      let height = 0;
+      const members: StyledDraftPlannedMember[] = [];
+      for (const s of starters) {
+        const colStart = Math.min(Math.max(s.geometry.columnStart, 1), cols);
+        const colSpan = Math.min(Math.max(s.geometry.columnSpan, 1), cols - colStart + 1);
+        const x = originX + (colStart - 1) * columnWidth + WIDGET_PADDING;
+        const w = Math.max(40, colSpan * columnWidth - WIDGET_PADDING * 2);
+        let memberHeight: number;
+        let nested: StyledDraftPlannedContainer | null = null;
+        if (s.kind === "section") {
+          const nestedCols = layout.sections[s.key]?.columns ?? 1;
+          nested = planContainer(s.key, x + 12, Math.max(40, w - 12), nestedCols, 0);
+          memberHeight = SECTION_TITLE_HEIGHT + SECTION_GAP + nested.totalHeight;
+        } else if (s.kind === "slot") {
+          const aspect = layout.slotDetails?.[s.key]?.aspectRatio ?? "3:4";
+          memberHeight = portraitSlotFrameHeight(w, aspect);
+        } else {
+          const field = fieldsByKey.get(s.key);
+          if (!field) {
+            throw new CharacterSheetPdfRenderError("invalid_draft", `Field "${s.key}" not found.`);
+          }
+          memberHeight = fieldBlockHeight(field, s.geometry);
+        }
+        height = Math.max(height, memberHeight);
+        members.push({
+          kind: s.kind,
+          key: s.key,
+          geometry: s.geometry,
+          row: r,
+          x,
+          w,
+          height: memberHeight,
+          nested,
+        });
+      }
+      const gapBefore = first ? 0 : starters.some((s) => s.geometry.breakBefore) ? 8 : 4;
+      first = false;
+      yTop += gapBefore;
+      rows.push({ members, height, gapBefore, yTop });
+      yTop += height;
+    }
+    return { rows, totalHeight: yTop - baseYTop };
+  };
+
+  return planContainer(null, x0, width, containerColumnsFor(null), 0);
 }
 
 function parseColor(hex: string): ReturnType<typeof rgb> {
@@ -107,22 +292,6 @@ function draftTextValue(field: DraftField, raw: unknown): string | null {
     "unsupported_field_value",
     `Field "${field.key}" has a non-scalar value that cannot be rendered.`,
   );
-}
-
-function depthOf(
-  key: string,
-  parentByKey: Map<string, string | null>,
-): number {
-  let depth = 0;
-  let current = parentByKey.get(key) ?? null;
-  const seen = new Set<string>([key]);
-  while (current !== null) {
-    if (seen.has(current)) break;
-    seen.add(current);
-    depth += 1;
-    current = parentByKey.get(current) ?? null;
-  }
-  return depth;
 }
 
 export async function renderStyledCharacterSheetPdf(
@@ -188,11 +357,6 @@ export async function renderStyledCharacterSheetPdf(
   const form = document.getForm();
 
   const ink = parseColor(profile.palette.ink);
-  const paper = parseColor(profile.palette.paper);
-  const accent = parseColor(profile.palette.accent);
-  const rule = parseColor(profile.palette.rule);
-  const valueColor = parseColor(profile.fieldTreatment.valueColor);
-  const labelColor = parseColor(profile.fieldTreatment.labelColor);
 
   const page = document.addPage([LETTER_WIDTH, LETTER_HEIGHT]);
   drawStyledBackground(page, profile, plan);
@@ -212,55 +376,121 @@ export async function renderStyledCharacterSheetPdf(
   const semanticNodes: StyledDraftNodeState[] = [];
   const seenFieldNames = new Set<string>();
 
-  let cursorTop = PAGE_MARGIN + HEADER_HEIGHT;
+  const contentTop = PAGE_MARGIN + HEADER_HEIGHT;
   const maxBottom = LETTER_HEIGHT - PAGE_MARGIN - FOOTER_HEIGHT;
-  const parentByKey = new Map<string, string | null>(
-    draft.structure.map((p) => [p.key, p.parentKey ?? null]),
-  );
+  const availableHeight = maxBottom - contentTop;
 
   const containerColumnsFor = (parentKey: string | null): number => {
     if (parentKey === null) return layout.root.columns;
     return layout.sections[parentKey]?.columns ?? 1;
   };
+  const geometryOf = (key: string): DraftLayoutNodeV1 =>
+    layout.nodes[key] ?? { columnStart: 1, columnSpan: 1, rowSpan: 1, breakBefore: false };
 
-  // Canonical preorder walk. draft.structure is already canonical preorder.
+  const rootPlan = planStyledDraftLayout(draft, PAGE_MARGIN, LETTER_WIDTH - PAGE_MARGIN * 2);
+  if (rootPlan.totalHeight > availableHeight) {
+    throw new CharacterSheetPdfRenderError(
+      "layout_overflow",
+      `Draft content needs ${Math.round(rootPlan.totalHeight)}pt but only ${Math.round(availableHeight)}pt fit the page.`,
+    );
+  }
+
+  // Draw pass mirrors planStyledDraftLayout row coordinates, offset to the
+  // content origin. Row yTop values are plan-relative (from y=0), so shift
+  // them by contentTop.
+  const drawPlannedContainer = async (
+    planned: StyledDraftPlannedContainer,
+    yOffset: number,
+  ): Promise<void> => {
+    for (const row of planned.rows) {
+      const cursor = row.yTop + yOffset;
+      for (const member of row.members) {
+        if (member.kind === "section") {
+          const section = sectionsByKey.get(member.key);
+          if (!section) {
+            throw new CharacterSheetPdfRenderError("invalid_draft", `Section "${member.key}" not found.`);
+          }
+          drawStyledSectionHeader(
+            page,
+            section.title,
+            member.x,
+            LETTER_HEIGHT - cursor - 8,
+            member.w,
+            headingFont,
+            profile,
+            plan,
+          );
+          if (member.nested !== null && member.nested.rows.length > 0) {
+            const nestedOrigin = member.nested.rows[0]!.yTop;
+            await drawPlannedContainer(
+              member.nested,
+              cursor + SECTION_TITLE_HEIGHT + SECTION_GAP - nestedOrigin,
+            );
+          }
+        } else if (member.kind === "slot") {
+          const aspect = layout.slotDetails?.[member.key]?.aspectRatio ?? "3:4";
+          const hasImage =
+            input.portrait !== undefined &&
+            input.portrait !== null &&
+            input.portrait.slotKey === member.key;
+          await drawPortraitSlotFrame(
+            document,
+            page,
+            member.x,
+            cursor,
+            Math.max(60, member.w),
+            member.height,
+            aspect,
+            hasImage ? input.portrait! : null,
+            headingFont,
+            profile,
+            plan,
+          );
+        } else {
+          const field = fieldsByKey.get(member.key);
+          if (!field) {
+            throw new CharacterSheetPdfRenderError("invalid_draft", `Field "${member.key}" not found.`);
+          }
+          const raw = input.resolvedValues.values[field.key];
+          const valueState =
+            generated.has(field.key) ? "generated" : raw === undefined || raw === null ? "blank" : "explicit";
+          const editable = valueState === "blank" && field.type !== "label" && field.locked !== true;
+          const widgetHeight =
+            (field.type === "textarea" || field.type === "list" ? ROW_HEIGHT * 2 : ROW_HEIGHT) *
+              Math.max(member.geometry.rowSpan, 1) -
+            LABEL_BAND_HEIGHT;
+          drawDraftFieldControl(
+            page,
+            form,
+            field,
+            raw,
+            valueState,
+            editable,
+            member.x,
+            cursor,
+            Math.max(60, member.w),
+            widgetHeight,
+            bodyFont,
+            profile,
+            plan,
+            seenFieldNames,
+          );
+        }
+      }
+    }
+  };
+
+  await drawPlannedContainer(rootPlan, contentTop);
+
+  // Semantic manifest walk in canonical preorder (independent of drawing).
   for (let order = 0; order < draft.structure.length; order += 1) {
     const placement = draft.structure[order]!;
     const parentKey = placement.parentKey ?? null;
-    const geometry = layout.nodes[placement.key] ?? {
-      columnStart: 1,
-      columnSpan: 1,
-      rowSpan: 1,
-      breakBefore: false,
-    };
+    const geometry = geometryOf(placement.key);
     const columns = containerColumnsFor(parentKey);
-    const depth = depthOf(placement.key, parentByKey);
-    const indent = Math.min(depth, 4) * 12;
-
-    if (geometry.breakBefore) cursorTop += 8;
-
     if (placement.kind === "section") {
-      const section = sectionsByKey.get(placement.key);
-      if (!section) {
-        throw new CharacterSheetPdfRenderError("invalid_draft", `Section "${placement.key}" not found.`);
-      }
-      const blockHeight = SECTION_TITLE_HEIGHT + SECTION_GAP;
-      if (cursorTop + blockHeight > maxBottom) {
-        throw new CharacterSheetPdfRenderError(
-          "layout_overflow",
-          `Section "${section.key}" does not fit the remaining page height.`,
-        );
-      }
-      const usableWidth = LETTER_WIDTH - PAGE_MARGIN * 2 - indent;
-      const cols = Math.max(1, Math.min(columns, 4));
-      const colStart = Math.min(Math.max(geometry.columnStart, 1), cols);
-      const colSpan = Math.min(Math.max(geometry.columnSpan, 1), cols - colStart + 1);
-      const columnWidth = usableWidth / cols;
-      const x = PAGE_MARGIN + indent + (colStart - 1) * columnWidth + WIDGET_PADDING;
-      const w = Math.max(40, colSpan * columnWidth - WIDGET_PADDING * 2);
-      drawStyledSectionHeader(page, section.title, x, LETTER_HEIGHT - cursorTop - 8, w, headingFont, profile, plan);
       semanticNodes.push({
-        key: section.key,
+        key: placement.key,
         kind: "section",
         parentKey,
         canonicalOrder: order,
@@ -269,57 +499,36 @@ export async function renderStyledCharacterSheetPdf(
         valueState: "n/a",
         editable: false,
       });
-      cursorTop += blockHeight;
       continue;
     }
-
+    if (placement.kind === "slot") {
+      const aspect = layout.slotDetails?.[placement.key]?.aspectRatio ?? "3:4";
+      const hasImage =
+        input.portrait !== undefined &&
+        input.portrait !== null &&
+        input.portrait.slotKey === placement.key;
+      semanticNodes.push({
+        key: placement.key,
+        kind: "slot",
+        parentKey,
+        canonicalOrder: order,
+        layout: geometry,
+        containerColumns: columns,
+        valueState: "n/a",
+        editable: false,
+        slotType: "portrait",
+        aspectRatio: aspect,
+        contentState: hasImage ? "asset" : "empty",
+      });
+      continue;
+    }
     const field = fieldsByKey.get(placement.key);
     if (!field) {
       throw new CharacterSheetPdfRenderError("invalid_draft", `Field "${placement.key}" not found.`);
     }
     const raw = input.resolvedValues.values[field.key];
-    const valueState = generated.has(field.key) ? "generated" : raw === undefined || raw === null ? "blank" : "explicit";
-    const editable = valueState === "blank" && field.type !== "label" && field.locked !== true;
-
-    const cols = Math.max(1, Math.min(columns, 4));
-    const colStart = Math.min(Math.max(geometry.columnStart, 1), cols);
-    const colSpan = Math.min(Math.max(geometry.columnSpan, 1), cols - colStart + 1);
-    const rowSpan = Math.max(geometry.rowSpan, 1);
-    const usableWidth = LETTER_WIDTH - PAGE_MARGIN * 2 - indent;
-    const columnWidth = usableWidth / cols;
-    const x = PAGE_MARGIN + indent + (colStart - 1) * columnWidth + WIDGET_PADDING;
-    const w = Math.max(60, colSpan * columnWidth - WIDGET_PADDING * 2);
-    const widgetHeight =
-      (field.type === "textarea" || field.type === "list" ? ROW_HEIGHT * 2 : ROW_HEIGHT) * rowSpan - LABEL_BAND_HEIGHT;
-    const blockHeight = LABEL_BAND_HEIGHT + widgetHeight + 6;
-    if (cursorTop + blockHeight > maxBottom) {
-      throw new CharacterSheetPdfRenderError(
-        "layout_overflow",
-        `Field "${field.key}" does not fit the remaining page height.`,
-      );
-    }
-
-    drawDraftFieldControl(
-      page,
-      form,
-      field,
-      raw,
-      valueState,
-      editable,
-      x,
-      cursorTop,
-      w,
-      widgetHeight,
-      bodyFont,
-      profile,
-      plan,
-      seenFieldNames,
-    );
-    void valueColor;
-    void labelColor;
-    void accent;
-    void rule;
-
+    const valueState =
+      generated.has(field.key) ? "generated" : raw === undefined || raw === null ? "blank" : "explicit";
     semanticNodes.push({
       key: field.key,
       kind: "field",
@@ -328,9 +537,8 @@ export async function renderStyledCharacterSheetPdf(
       layout: geometry,
       containerColumns: columns,
       valueState,
-      editable,
+      editable: valueState === "blank" && field.type !== "label" && field.locked !== true,
     });
-    cursorTop += blockHeight;
   }
 
   drawStyledCornerOrnaments(page, profile, plan);
@@ -367,7 +575,6 @@ export async function renderStyledCharacterSheetPdf(
       fieldEmphasis: plan.fieldEmphasis,
     },
   };
-  void paper;
 
   return { bytes, manifest };
 }
@@ -643,6 +850,94 @@ function drawDraftFieldControl(
     borderWidth: 0.6,
     backgroundColor: editable ? parseColor(profile.palette.paper) : parseColor(profile.palette.background),
     textColor: valueColor,
+  });
+}
+
+function portraitMagicOk(bytes: Uint8Array, mimeType: "image/png" | "image/jpeg"): boolean {
+  if (mimeType === "image/png") {
+    return (
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47
+    );
+  }
+  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+}
+
+async function drawPortraitSlotFrame(
+  document: PDFDocument,
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number,
+  aspect: "1:1" | "3:4" | "4:5" | "16:9",
+  image: { bytes: Uint8Array; mimeType: "image/png" | "image/jpeg" } | null,
+  headingFont: PDFFont,
+  profile: StyleProfileV1,
+  plan: { ornamentDensity: string },
+): Promise<void> {
+  void aspect;
+  const frame = parseColor(profile.pageFrame.color);
+  const paperColor = parseColor(profile.palette.paper);
+  const labelColor = parseColor(profile.fieldTreatment.labelColor);
+  const yBottom = LETTER_HEIGHT - (yTop + height);
+  page.drawRectangle({
+    x,
+    y: yBottom,
+    width,
+    height,
+    borderColor: frame,
+    borderWidth: profile.key === "medieval" ? 1.2 : 0.9,
+    color: paperColor,
+  });
+  if (profile.key === "medieval" && plan.ornamentDensity !== "none") {
+    page.drawRectangle({
+      x: x + 3,
+      y: yBottom + 3,
+      width: Math.max(1, width - 6),
+      height: Math.max(1, height - 6),
+      borderColor: frame,
+      borderWidth: 0.4,
+    });
+  }
+
+  if (image === null) {
+    const label = "PORTRAIT";
+    const size = 9;
+    const textWidth = headingFont.widthOfTextAtSize(label, size);
+    page.drawText(label, {
+      x: x + (width - textWidth) / 2,
+      y: yBottom + height / 2 - 4,
+      size,
+      font: headingFont,
+      color: labelColor,
+    });
+    return;
+  }
+
+  if (!portraitMagicOk(image.bytes, image.mimeType)) {
+    throw new CharacterSheetPdfRenderError(
+      "unsupported_field_value",
+      "The portrait image bytes do not match their declared image type.",
+    );
+  }
+  const embedded =
+    image.mimeType === "image/png"
+      ? await document.embedPng(image.bytes)
+      : await document.embedJpg(image.bytes);
+  const naturalWidth = embedded.width;
+  const naturalHeight = embedded.height;
+  const scale = Math.min((width - 8) / naturalWidth, (height - 8) / naturalHeight);
+  const drawWidth = naturalWidth * scale;
+  const drawHeight = naturalHeight * scale;
+  page.drawImage(embedded, {
+    x: x + (width - drawWidth) / 2,
+    y: yBottom + (height - drawHeight) / 2,
+    width: drawWidth,
+    height: drawHeight,
   });
 }
 

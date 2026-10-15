@@ -2,6 +2,12 @@ import { z } from "zod";
 import { draftError } from "./errors";
 import { MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema";
 import type { CharacterSheetDraftV2 } from "./draft-schema-v2";
+import {
+  DEFAULT_PORTRAIT_ASPECT_RATIO,
+  SlotDetailsV1Schema,
+  type PortraitAspectRatio,
+  type SlotDetailsV1,
+} from "./draft-slot-v2.js";
 
 /**
  * Canonical spatial layout contract, version 1 (14.8 spatial foundation).
@@ -76,17 +82,31 @@ export const DraftLayoutNodeV1Schema = z.strictObject({
 export type DraftLayoutNodeV1 = z.infer<typeof DraftLayoutNodeV1Schema>;
 
 /**
+ * Portrait Slot aspect ratio and slot details live in `draft-slot-v2` next to
+ * the Slot registry record (single authority, no duplicated enum). Re-exported
+ * here with layout-oriented aliases for existing consumers.
+ */
+export {
+  PortraitAspectRatioSchema as PortraitAspectRatioV1Schema,
+  DEFAULT_PORTRAIT_ASPECT_RATIO as DEFAULT_PORTRAIT_ASPECT_RATIO_V1,
+} from "./draft-slot-v2.js";
+export type { PortraitAspectRatio as PortraitAspectRatioV1 } from "./draft-slot-v2.js";
+export type { SlotDetailsV1 } from "./draft-slot-v2.js";
+
+/**
  * Complete spatial layout for one draft snapshot. When present on a draft it
  * must be COMPLETE: every current Section has exactly one container entry,
- * and every current structural node (Field or Section) has exactly one node
- * entry. Upper geometry bounds (against the current parent container) are
- * enforced by `assertDraftLayoutComplete`, not by this shape alone.
+ * every current structural node (Field, Section or Slot) has exactly one node
+ * entry, and every current portrait Slot has exactly one slot detail. Upper
+ * geometry bounds (against the current parent container) are enforced by
+ * `assertDraftLayoutComplete`, not by this shape alone.
  */
 export const DraftLayoutV1Schema = z.strictObject({
   schemaVersion: z.literal(DRAFT_LAYOUT_V1_VERSION),
   root: DraftLayoutContainerV1Schema,
   sections: z.record(layoutKeySchema, DraftLayoutContainerV1Schema),
   nodes: z.record(layoutKeySchema, DraftLayoutNodeV1Schema),
+  slotDetails: z.record(layoutKeySchema, SlotDetailsV1Schema).optional(),
 });
 export type DraftLayoutV1 = z.infer<typeof DraftLayoutV1Schema>;
 
@@ -103,13 +123,17 @@ export const DEFAULT_DRAFT_CONTAINER_LAYOUT_V1: DraftLayoutContainerV1 = {
   columns: 1,
 };
 
-type DraftStructureLike = Pick<CharacterSheetDraftV2, "sections" | "structure">;
+type DraftStructureLike = Pick<
+  CharacterSheetDraftV2,
+  "sections" | "structure" | "slots"
+>;
 
 /**
  * Builds the complete deterministic default layout for a draft's current
  * structure: single-column Root, single-column Sections, 1x1 nodes, no
- * breaks. This exactly preserves pre-14.8 behavior and is the materialization
- * source for layoutless drafts.
+ * breaks, and the default 3:4 aspect for every current portrait Slot. This
+ * exactly preserves pre-14.8 behavior for slotless drafts (no `slotDetails`
+ * key at all) and is the materialization source for layoutless drafts.
  */
 export function defaultDraftLayoutV1(draft: DraftStructureLike): DraftLayoutV1 {
   const sections: Record<string, DraftLayoutContainerV1> = {};
@@ -120,11 +144,25 @@ export function defaultDraftLayoutV1(draft: DraftStructureLike): DraftLayoutV1 {
   for (const placement of draft.structure) {
     nodes[placement.key] = { ...DEFAULT_DRAFT_NODE_LAYOUT_V1 };
   }
+  const slots = draft.slots ?? [];
+  if (slots.length === 0) {
+    return {
+      schemaVersion: DRAFT_LAYOUT_V1_VERSION,
+      root: { ...DEFAULT_DRAFT_CONTAINER_LAYOUT_V1 },
+      sections,
+      nodes,
+    };
+  }
+  const slotDetails: Record<string, SlotDetailsV1> = {};
+  for (const slot of slots) {
+    slotDetails[slot.key] = { aspectRatio: DEFAULT_PORTRAIT_ASPECT_RATIO };
+  }
   return {
     schemaVersion: DRAFT_LAYOUT_V1_VERSION,
     root: { ...DEFAULT_DRAFT_CONTAINER_LAYOUT_V1 },
     sections,
     nodes,
+    slotDetails,
   };
 }
 
@@ -188,7 +226,9 @@ export function parentContainerColumnsForNode(
  * - sections map holds exactly every current Section key (no missing, no
  *   unknown)
  * - nodes map holds exactly every current structural node key (no missing,
- *   no unknown — so every Field and every Section has exactly one entry)
+ *   no unknown — so every Field, Section and Slot has exactly one entry)
+ * - slotDetails holds exactly every current portrait Slot key (no missing,
+ *   no unknown — Field/Section keys are rejected there)
  * - every node geometry fits its CURRENT parent container: columnStart within
  *   columns, and columnStart + columnSpan - 1 within columns
  */
@@ -227,6 +267,25 @@ export function assertDraftLayoutComplete(
       throw draftError(
         "invalid_draft",
         `Node layout references unknown node "${key}".`,
+      );
+    }
+  }
+
+  const slotKeys = new Set((draft.slots ?? []).map((entry) => entry.key));
+  const layoutSlotKeys = new Set(Object.keys(layout.slotDetails ?? {}));
+  for (const key of slotKeys) {
+    if (!layoutSlotKeys.has(key)) {
+      throw draftError(
+        "invalid_draft",
+        `Portrait slot "${key}" has no slot detail.`,
+      );
+    }
+  }
+  for (const key of layoutSlotKeys) {
+    if (!slotKeys.has(key)) {
+      throw draftError(
+        "invalid_draft",
+        `Slot detail references unknown slot "${key}".`,
       );
     }
   }

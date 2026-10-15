@@ -40,6 +40,8 @@ export default {
       try {
         // This prefix sweep removes every snapshot, including extracted drafts.
         await deps.sheetArtifactStore?.deleteSessionArtifacts(session.sessionId);
+        // Portrait assets live under the same session tenant and are swept too.
+        await deps.portraitAssetStore?.deleteSessionAssets(session.sessionId);
         await deps.sheetDraftHeadRepository.deleteSessionHeads(session.sessionId);
         await deps.sheetSessionRepository.delete(session.sessionId);
       } catch {

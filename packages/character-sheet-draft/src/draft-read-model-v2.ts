@@ -5,6 +5,7 @@ import {
   type DraftPlacement,
   type DraftSectionV2,
 } from "./draft-schema-v2";
+import type { DraftSlotV1 } from "./draft-slot-v2";
 import {
   buildDraftStructuralIndex,
   getDraftDepth,
@@ -44,13 +45,31 @@ export type DraftSectionReadNodeV2 = {
 };
 
 /**
+ * A canonical Slot placement resolved against the Slot registry.
+ *
+ * `placement` and `slot` are the EXACT objects owned by `draft.structure`
+ * and `draft.slots`; the read model only wraps them.
+ */
+export type DraftSlotReadNodeV2 = {
+  readonly kind: "slot";
+  readonly key: string;
+  readonly parentKey: string | null;
+  readonly depth: number;
+  readonly placement: Extract<DraftPlacement, { kind: "slot" }>;
+  readonly slot: DraftSlotV1;
+};
+
+/**
  * One resolved structural node.
  *
  * Deliberately flat: a node carries no `children[]`, because the child
  * relationships stay derived in `childrenByParent` and are never duplicated into
  * a second tree whose copies could diverge.
  */
-export type DraftReadNodeV2 = DraftFieldReadNodeV2 | DraftSectionReadNodeV2;
+export type DraftReadNodeV2 =
+  | DraftFieldReadNodeV2
+  | DraftSectionReadNodeV2
+  | DraftSlotReadNodeV2;
 
 /**
  * Derived, read-only structural view of a canonical V2 draft.
@@ -111,6 +130,10 @@ export function buildDraftStructuralReadModelV2(
   for (const section of draft.sections) {
     sectionByKey.set(section.key, section);
   }
+  const slotByKey = new Map<string, DraftSlotV1>();
+  for (const slot of draft.slots ?? []) {
+    slotByKey.set(slot.key, slot);
+  }
 
   const preorder: DraftReadNodeV2[] = [];
   const nodeByKey = new Map<string, DraftReadNodeV2>();
@@ -119,7 +142,7 @@ export function buildDraftStructuralReadModelV2(
   // One pass over structure[] in canonical order produces the preorder, the
   // node lookup and the direct-child buckets, preserving sibling order exactly.
   for (const placement of draft.structure) {
-    const node = resolveReadNodeV2(placement, index, fieldByKey, sectionByKey);
+    const node = resolveReadNodeV2(placement, index, fieldByKey, sectionByKey, slotByKey);
     preorder.push(node);
     nodeByKey.set(node.key, node);
     const parentKey = node.parentKey;
@@ -144,6 +167,7 @@ function resolveReadNodeV2(
   index: DraftStructuralIndex,
   fieldByKey: ReadonlyMap<string, DraftField>,
   sectionByKey: ReadonlyMap<string, DraftSectionV2>,
+  slotByKey: ReadonlyMap<string, DraftSlotV1>,
 ): DraftReadNodeV2 {
   // Depth is owned by the approved structural index; this layer never
   // recomputes it independently.
@@ -171,6 +195,24 @@ function resolveReadNodeV2(
       depth,
       placement,
       field,
+    };
+  }
+
+  if (placement.kind === "slot") {
+    const slot = slotByKey.get(placement.key);
+    if (slot === undefined) {
+      throw draftError(
+        "invalid_draft",
+        `Draft placement references unknown Slot "${placement.key}".`,
+      );
+    }
+    return {
+      kind: "slot",
+      key: placement.key,
+      parentKey,
+      depth,
+      placement,
+      slot,
     };
   }
 

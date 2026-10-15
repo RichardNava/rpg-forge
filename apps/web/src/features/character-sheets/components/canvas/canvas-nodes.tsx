@@ -442,6 +442,149 @@ export function CanvasSectionNode({
   );
 }
 
+export function CanvasSlotNode({
+  draft,
+  surface,
+  node,
+  callbacks,
+  disabled,
+  selected,
+  invalidIntents,
+  dragActive,
+  onSelect,
+  onOpenKeyboardMove,
+  onResizeActive,
+}: CanvasNodeFrame & { node: Extract<DraftReadNodeV2, { kind: "slot" }> }) {
+  const stored = surface.layout.nodes[node.key] ?? {
+    ...DEFAULT_DRAFT_NODE_LAYOUT_V1,
+  };
+  const [preview, setPreview] = useState<DraftLayoutNodeV1 | null>(null);
+  const geometry = preview ?? stored;
+  const aspectRatio =
+    surface.layout.slotDetails?.[node.key]?.aspectRatio ?? "3:4";
+
+  const draggable = useDraggable({
+    id: `slot:${node.key}`,
+    disabled,
+    data: { kind: "slot", key: node.key, label: "Portrait" },
+  });
+
+  const parentLabel =
+    node.parentKey === null
+      ? ""
+      : (draft.sections.find((entry) => entry.key === node.parentKey)?.title ??
+        node.parentKey);
+
+  const cardAttributes: Record<string, unknown> = { ...draggable.attributes };
+  delete cardAttributes.role;
+  delete cardAttributes["aria-roledescription"];
+  delete cardAttributes.tabIndex;
+
+  return (
+    <div style={gridItemStyle(geometry)}>
+      {!disabled && (
+        <IntentRail
+          intent={{ kind: "before", targetKind: "slot", key: node.key }}
+          targetKey={node.key}
+          targetLabel="Portrait"
+          parentLabel={parentLabel}
+          invalid={invalidIntents.has(
+            dropIntentId({
+              kind: "before",
+              targetKind: "slot",
+              key: node.key,
+            }),
+          )}
+          active={dragActive}
+        />
+      )}
+      <div
+        // eslint-disable-next-line react-hooks/refs
+        ref={draggable.setNodeRef}
+        data-canvas-node={node.key}
+        data-canvas-selected={selected}
+        className={
+          selected
+            ? "character-workshop__field-card canvas-card canvas-slot canvas-card--selected"
+            : "character-workshop__field-card canvas-card canvas-slot"
+        }
+        style={gridItemStyle(geometry)}
+        // eslint-disable-next-line react-hooks/refs
+        {...draggable.listeners}
+        {...cardAttributes}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect({ kind: "slot", key: node.key });
+        }}
+      >
+        {!disabled && (
+          <button
+            type="button"
+            className="character-workshop__drag-handle"
+            aria-label="Move Portrait slot"
+            data-canvas-handle={node.key}
+            // eslint-disable-next-line react-hooks/refs
+            ref={draggable.setActivatorNodeRef}
+            onKeyDown={(event) => {
+              if (event.key === " " || event.key === "Enter") {
+                event.preventDefault();
+                onOpenKeyboardMove({
+                  kind: "slot",
+                  key: node.key,
+                  label: "Portrait",
+                });
+              }
+            }}
+          >
+            Move
+          </button>
+        )}
+        <span className="character-workshop__field-label">Portrait</span>
+        <div
+          className="canvas-slot__frame"
+          data-slot-aspect={aspectRatio}
+          aria-label={`Portrait slot, aspect ratio ${aspectRatio}`}
+        >
+          <span className="canvas-slot__placeholder">Portrait</span>
+        </div>
+        {selected && !disabled && (
+          <CanvasResizeHandles
+            label="Portrait slot"
+            geometry={stored}
+            preview={preview}
+            parentColumns={parentColumnsOf(surface, node.parentKey)}
+            onPreview={(next) => {
+              setPreview(next);
+              onResizeActive(next === null ? null : node.key);
+            }}
+            onCommit={(next) => {
+              setPreview(null);
+              onResizeActive(null);
+              callbacks.onSetNodeLayout(node.key, next);
+            }}
+          />
+        )}
+      </div>
+      {!disabled && (
+        <IntentRail
+          intent={{ kind: "after", targetKind: "slot", key: node.key }}
+          targetKey={node.key}
+          targetLabel="Portrait"
+          parentLabel={parentLabel}
+          invalid={invalidIntents.has(
+            dropIntentId({
+              kind: "after",
+              targetKind: "slot",
+              key: node.key,
+            }),
+          )}
+          active={dragActive}
+        />
+      )}
+    </div>
+  );
+}
+
 /** Root-level inside target: the sheet workspace end zone. */
 export function RootDropZone({
   invalid,

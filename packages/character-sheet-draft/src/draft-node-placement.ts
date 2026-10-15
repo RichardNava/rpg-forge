@@ -9,6 +9,7 @@ import {
 } from "./draft-structure-placement-plan";
 import { placeDraftFieldV2 } from "./draft-field-placement";
 import { placeDraftSectionV2 } from "./draft-section-placement";
+import { placeDraftSlotV2 } from "./draft-slot-placement";
 import { draftError } from "./errors";
 import { MAX_DRAFT_SECTION_DEPTH } from "./draft-schema";
 
@@ -25,6 +26,7 @@ import { MAX_DRAFT_SECTION_DEPTH } from "./draft-schema";
  *
  * Then dispatches to:
  * - placeDraftFieldV2() for Fields
+ * - placeDraftSlotV2() for Slots (leaf semantics, no depth check)
  * - placeDraftSectionV2() for Sections
  *
  * @param draft - The canonical V2 draft (must already be valid V2)
@@ -55,6 +57,12 @@ export function placeDraftNodeV2(
   // 3. FIELD DISPATCH - no depth check needed
   if (movingPlacement.kind === "field") {
     return placeDraftFieldV2(draft, nodeKey, destination);
+  }
+
+  // 3b. SLOT DISPATCH - leaf like a Field, no depth check needed.
+  // Slots are terminal: they carry no subtree, so only the leaf move applies.
+  if (movingPlacement.kind === "slot") {
+    return placeDraftSlotV2(draft, nodeKey, destination);
   }
 
   // 4. SECTION DISPATCH - with depth preflight
