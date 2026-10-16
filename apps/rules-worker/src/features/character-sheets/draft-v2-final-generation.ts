@@ -8,7 +8,8 @@
  *   -> build FinalGenerationRequestV1 server-side
  *   -> validate style is medieval | sci-fi
  *   -> create PENDING SheetGenerationRun (repost-as-reroll current)
- *   -> resolve final values (deterministic, Draft never mutated)
+ *   -> optional NpcValueAuthoringPort (NPC + npcInstructions only)
+ *   -> resolve final values (explicit > AI > threat fallback; Draft intact)
  *   -> invoke FinalPresentationPort (bounded AI plan)
  *   -> validate FinalPresentationPlanV1
  *   -> render Draft-native styled PDF
@@ -38,13 +39,17 @@
 import {
   buildFinalGenerationRequestV1,
   createStructuralSummary,
+  deriveNpcAuthoringContext,
   FinalPresentationPlanV1Schema,
   FinalPresentationStyleV1Schema,
   resolveFinalValues,
+  validateNpcAuthoringPlan,
   validatePresentationPlanForStyle,
   type FinalGenerationStartRequestV1,
   type FinalPresentationPlanV1,
   type FinalPresentationPort,
+  type NpcValueAssignment,
+  type NpcValueAuthoringPort,
 } from "@repo/character-sheet-generation";
 import type { CharacterSheetArtifactStore } from "@repo/character-sheet-artifacts";
 import {
@@ -70,6 +75,7 @@ export interface FinalGenerationDeps {
   readonly sessions: SheetSessionRepositoryPort;
   readonly presentation?: FinalPresentationPort;
   readonly portraits?: CharacterSheetPortraitAssetStore;
+  readonly authoring?: NpcValueAuthoringPort;
   readonly clock: Clock;
   readonly crypto: SessionCrypto;
 }
@@ -86,6 +92,7 @@ export type FinalGenerationInvalidCode =
   | "unconfirmed"
   | "pc_threat"
   | "npc_threat_missing"
+  | "pc_npc_instructions"
   | "unsupported_style"
   | "invalid_options"
   | "portrait_without_slot"
@@ -121,11 +128,15 @@ export async function generateFinalCharacterSheet(
       threat: request.options.threat ?? null,
       visualStyle: request.options.visualStyle,
       instructions: request.options.instructions ?? null,
+      npcInstructions: request.options.npcInstructions ?? null,
       portrait: request.options.portrait,
       seed: request.seed,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The final-generation options are invalid.";
+    if (message.includes("NPC authoring instructions")) {
+      return { kind: "invalid", code: "pc_npc_instructions", message };
+    }
     if (message.includes("PC draft")) {
       return { kind: "invalid", code: "pc_threat", message };
     }
@@ -205,10 +216,60 @@ export async function generateFinalCharacterSheet(
     return outcome;
   };
 
-  // 7. Resolve final values (Draft never mutated).
+  // 6b. Optional NPC instruction-driven authoring (14.14). Null
+  // instructions preserve 14.12 behavior: no authoring-model call, explicit
+  // values preserved, deterministic threat fallback only. A provided
+  // instruction that cannot be honored fails the run — the instructions are
+  // never silently ignored in favor of threat.
+  const npcInstructions = built.options.npcInstructions ?? null;
+  let authored: readonly NpcValueAssignment[] | null = null;
+  if (draft.mode === "npc" && npcInstructions !== null) {
+    if (deps.authoring === undefined) {
+      return fail("INTERNAL_ERROR", {
+        kind: "unavailable",
+        message: "NPC value authoring is unavailable.",
+      });
+    }
+    const context = deriveNpcAuthoringContext(draft);
+    if (context !== null && context.blanks.length > 0) {
+      let plan: unknown;
+      try {
+        plan = await deps.authoring.generateAssignments({
+          blanks: context.blanks,
+          explicit: context.explicit,
+          npcInstructions,
+          threat: built.options.threat!,
+          seed: built.seed,
+        });
+      } catch {
+        return fail("GENERATION_FAILED", {
+          kind: "unavailable",
+          message: "NPC value authoring is unavailable.",
+        });
+      }
+      try {
+        authored = validateNpcAuthoringPlan(plan, draft);
+      } catch (error) {
+        return fail("GENERATION_FAILED", {
+          kind: "failed",
+          message:
+            error instanceof Error
+              ? error.message
+              : "The NPC authoring plan was invalid.",
+        });
+      }
+    }
+  }
+
+  // 7. Resolve final values (Draft never mutated). Priority: explicit user
+  // values > validated AI assignments > threat/default deterministic fallback.
   let resolved: ReturnType<typeof resolveFinalValues>;
   try {
-    resolved = resolveFinalValues(draft, { threat: built.options.threat ?? null, seed: built.seed });
+    resolved = resolveFinalValues(draft, {
+      threat: built.options.threat ?? null,
+      seed: built.seed,
+      authoredAssignments: authored,
+    });
   } catch (error) {
     return fail("GENERATION_FAILED", {
       kind: "failed",

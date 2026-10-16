@@ -17,7 +17,7 @@ This is the single authoritative source for Character Sheets product behavior. A
 
 1. **Upload an existing character sheet** — user provides PDF/PNG/JPG; AI/vision extracts visible structure into editable form
 2. **Create manually** — user builds the sheet structure from scratch in the editor
-3. **AI-assisted creation** — may exist as a future/product flow but must not bypass the deterministic/editor architecture
+3. **Generate Character with AI** — user picks PC/NPC and describes the character; AI proposes a sheet that compiles into an ordinary **unconfirmed editable Draft V2** entering the normal Workshop. AI never controls IDs, versions, confirmation, layout, or persistence. This is distinct from **Generate Final Sheet with AI** (post-confirm styled PDF).
 
 ### Existing-sheet flow
 
@@ -320,6 +320,12 @@ embedding with contain-fit.
 ### NPC (Non-Player Character)
 
 - blank fields may be populated by AI during final generation
+- optional **NPC generation instructions** orient AI values for eligible
+  blanks only: explicit user values (including `false`, `0`, `""`) always
+  win, instructions outrank threat, and threat/default generation fills only
+  what instructions leave blank. Priority: explicit > AI > threat/default.
+  Presentation instructions remain a separate field that never changes
+  values. PC sheets cannot carry NPC instructions.
 - supports **threat level** (canonical five-level contract):
 
 | Level       | Description         |
@@ -464,6 +470,8 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | Final generation contract (14.11)                    | IMPLEMENTED (14.11)       | FinalGenerationRequestV1 (confirmed Draft + options + required seed); canonical five-level threat; set_mode without confirmClear; Web adapter; no AI/PDF execution                   |
 | AI final presentation (14.12)                        | IMPLEMENTED (14.12)       | Bounded FinalPresentationPlanV1; Medieval + Sci-fi StyleProfiles; deterministic NPC bounded-numeric resolution; Draft-native styled PDF (primary); server-built request; sync PENDING → READY runs; temporary R2 final PDF |
 | Portrait integration (14.13)                         | IMPLEMENTED (14.13)       | Portrait Slot spatial authority; upload/URL/AI converge to one session asset; protected preview; server ownership validation; contain-fit styled embedding with style-invariant semantics |
+| NPC instruction-driven authoring (14.14)           | IMPLEMENTED (14.14)       | Bounded npcInstructions fill eligible blank NPC fields only; explicit > AI > threat/default; null preserves 14.12; failures fail the run, never silent fallback; style-independent content |
+| AI-assisted character creation (14.14)             | IMPLEMENTED (14.14)       | Generate Character with AI proposes an editable sheet compiled by app-owned code into an ordinary unconfirmed Draft V2; single Workshop downstream; no runs, no auto-confirm; no Portrait Slot from AI |
 
 ### V2 response policy (after runtime cutover)
 
@@ -484,9 +492,10 @@ Full transport, concurrency and error contract:
 - **Architecture:** `docs/architecture/phase-14.7/character-sheet-integration.md` (for implementation details, labeled with CURRENT/COMPLETED/SUPERSEDED/DEFERRED)
 - **V2 transport contract:** `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md` (FROZEN FOR 4E CUTOVER)
 - **Data Model:** `docs/architecture/data-model.md` (persistence direction)
-- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**, **ADR-062**, **ADR-063**
+- **ADRs:** ADR-056, ADR-057, ADR-015, ADR-052, ADR-054, ADR-058, ADR-059, **ADR-060**, **ADR-061**, **ADR-062**, **ADR-063**, **ADR-064**
 - **Phase 14.10:** `docs/architecture/phase-14.10/character-sheet-authoring-completeness.md`
 - **Phase 14.11:** `docs/architecture/phase-14.11/character-sheet-final-generation.md`
 - **Phase 14.12:** `docs/architecture/phase-14.12/character-sheet-ai-final-presentation.md`
 - **Phase 14.13:** `docs/architecture/phase-14.13/character-sheet-portrait-integration.md`
+- **Phase 14.14:** `docs/architecture/phase-14.14/character-sheet-advanced-ai-authoring.md`
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`

@@ -92,6 +92,7 @@ function makeApiClient(
       draftId: DRAFT_ID,
       draftVersion: 4,
     })),
+    generateAiDraft: vi.fn(async () => makeDraftV2()),
     downloadFinalPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])),
     uploadPortrait: vi.fn(async () => ({
       schemaVersion: "1" as const,
@@ -370,6 +371,7 @@ describe("createSheetStoreV2", () => {
         threat: null,
         visualStyle: "medieval",
         instructions: null,
+        npcInstructions: null,
         portrait: { kind: "none" },
       },
       seed: "final-seed-1",
@@ -416,6 +418,90 @@ describe("createSheetStoreV2", () => {
       seed: "final-seed-1",
     });
     expect(outcome.kind).toBe("rejected");
+  });
+
+  it("O4b. generateFinalSheet carries npcInstructions for NPC and nulls them for PC", async () => {
+    const seen: unknown[] = [];
+    const generateFinalSheet = vi.fn(
+      async (_s: string, _t: string, _d: string, request: unknown) => {
+        seen.push(request);
+        return {
+          schemaVersion: "1" as const,
+          runId: "run.final.1",
+          status: "READY" as const,
+          draftId: DRAFT_ID,
+          draftVersion: 4,
+        };
+      },
+    );
+    const npc = makeDraftV2({ version: 4, confirmed: true, mode: "npc" });
+    const { store: npcStore } = await readyStore({ generateFinalSheet }, npc);
+    await npcStore.generateFinalSheet({
+      threat: "medium",
+      visualStyle: "sci-fi",
+      instructions: "Keep it restrained.",
+      npcInstructions: "Big and clumsy.",
+      seed: "final-seed-1",
+    });
+    expect(seen[0]).toMatchObject({
+      options: {
+        threat: "medium",
+        visualStyle: "sci-fi",
+        instructions: "Keep it restrained.",
+        npcInstructions: "Big and clumsy.",
+      },
+    });
+
+    const pc = makeDraftV2({ version: 4, confirmed: true, mode: "pc" });
+    const { store: pcStore } = await readyStore({ generateFinalSheet }, pc);
+    await pcStore.generateFinalSheet({
+      threat: null,
+      visualStyle: "medieval",
+      instructions: null,
+      npcInstructions: "ignored for PC",
+      seed: "final-seed-1",
+    });
+    expect(seen[1]).toMatchObject({
+      options: { threat: null, npcInstructions: null },
+    });
+  });
+
+  it("P1. generateAiDraft hydrates the returned canonical draft without confirm", async () => {
+    const aiDraft = makeDraftV2({ version: 1, confirmed: false, mode: "npc" });
+    const generateAiDraft = vi.fn(async () => aiDraft);
+    const { store } = await readyStore({ generateAiDraft });
+    const outcome = await store.generateAiDraft({
+      mode: "npc",
+      prompt: "A large orc.",
+    });
+    expect(outcome).toEqual({ kind: "ok", draft: aiDraft });
+    expect(generateAiDraft).toHaveBeenCalledWith(SESSION_ID, "token.123", {
+      schemaVersion: "1",
+      mode: "npc",
+      prompt: "A large orc.",
+    });
+    expect(store.getState().draft).toEqual(aiDraft);
+    expect(store.getState().draft?.confirmed).toBe(false);
+    expect(store.getState().aiDraft.status).toBe("idle");
+  });
+
+  it("P2. generateAiDraft rejects empty prompts locally and surfaces errors", async () => {
+    const generateAiDraft = vi.fn(async () => makeDraftV2());
+    const { store } = await readyStore({ generateAiDraft });
+    const rejected = await store.generateAiDraft({ mode: "pc", prompt: "   " });
+    expect(rejected.kind).toBe("rejected");
+    expect(generateAiDraft).not.toHaveBeenCalled();
+
+    const failing = vi.fn(async () => {
+      throw new Error("down");
+    });
+    const { store: errorStore } = await readyStore({ generateAiDraft: failing });
+    const outcome = await errorStore.generateAiDraft({
+      mode: "pc",
+      prompt: "A scout.",
+    });
+    expect(outcome.kind).toBe("error");
+    expect(errorStore.getState().aiDraft.status).toBe("error");
   });
 
   it("O5. downloadFinalPdf uses the ready runId", async () => {

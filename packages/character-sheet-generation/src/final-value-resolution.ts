@@ -27,11 +27,18 @@ export type FinalResolvedValuesV1 = z.infer<typeof FinalResolvedValuesV1Schema>;
 /**
  * Resolves final values for a confirmed draft.
  *
- * PC: preserves explicit values, blanks remain absent.
- * NPC: preserves explicit values, generates bounded numeric values for blank fields
- * with complete min/max ranges.
+ * Priority (14.14): explicit user values > validated AI assignments driven by
+ * npcInstructions > threat/default deterministic fallback. Remaining
+ * unsupported blanks stay blank.
  *
- * Does not mutate the input draft.
+ * PC: preserves explicit values, blanks remain absent.
+ * NPC: preserves explicit values, applies validated AI assignments to blank
+ * fields, then generates bounded numeric values for still-blank fields with
+ * complete min/max ranges.
+ *
+ * Does not mutate the input draft. AI assignments never overwrite an explicit
+ * value: a conflicting assignment is skipped defensively (the validation
+ * layer rejects such plans before resolution).
  */
 export function resolveFinalValues(
   draft: {
@@ -48,6 +55,7 @@ export function resolveFinalValues(
   options: {
     threat?: ThreatLevel | null;
     seed: string;
+    authoredAssignments?: readonly { key: string; value: unknown }[] | null;
   },
 ): FinalResolvedValuesV1 {
   const { mode, fields, values } = draft;
@@ -85,9 +93,20 @@ export function resolveFinalValues(
   }
 
   const bias = THREAT_BIAS[threat] ?? NEUTRAL_THREAT_BIAS;
+  const fieldKeys = new Set(fields.map((field) => field.key));
+
+  // AI assignments (npcInstructions) apply only to still-blank known fields.
+  // Content generation is style-independent: no style reaches this resolver.
+  for (const assignment of options.authoredAssignments ?? []) {
+    if (!fieldKeys.has(assignment.key)) continue;
+    const current = resolvedValues[assignment.key];
+    if (current !== undefined && current !== null) continue;
+    resolvedValues[assignment.key] = assignment.value;
+    generatedKeys.push(assignment.key);
+  }
 
   for (const field of fields) {
-    const value = values[field.key];
+    const value = resolvedValues[field.key];
 
     // Explicit value provided - preserve it
     if (value !== undefined && value !== null) {

@@ -38,6 +38,7 @@ import {
 import { ConfirmDialog } from "./ConfirmDialog";
 import { DestructiveConfirmDialog } from "./DestructiveConfirmDialog";
 import { UploadSheetDialog } from "./UploadSheetDialog";
+import { GenerateAiDraftDialog } from "./GenerateAiDraftDialog";
 import { WorkshopIdentitySelector } from "./WorkshopIdentitySelector";
 import type { WorkshopIdentityPatch } from "./WorkshopIdentitySelector";
 import { WorkshopPortraitSelector } from "./WorkshopPortraitSelector";
@@ -125,12 +126,10 @@ const LANDING_CHOICES = [
   },
   {
     id: "generate-ai",
-    title: "Generate with AI",
+    title: "Generate Character with AI",
     description:
-      "Create a new character concept. AI generation arrives in a later phase.",
-    cta: "Coming soon",
-    badge: "Soon",
-    disabled: true,
+      "Describe a character; AI drafts an editable starting sheet you fully control.",
+    cta: "Describe a character",
   },
 ];
 
@@ -141,6 +140,7 @@ type WorkshopModal =
   | "add-section"
   | "confirm"
   | "upload"
+  | "generate-ai"
   | "delete-field"
   | "delete-section";
 
@@ -159,6 +159,9 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
   >(null);
   const [finalStyle, setFinalStyle] = useState<"medieval" | "sci-fi">("medieval");
   const [finalInstructions, setFinalInstructions] = useState("");
+  const [finalNpcInstructions, setFinalNpcInstructions] = useState("");
+  const [aiDraftMode, setAiDraftMode] = useState<"pc" | "npc">("pc");
+  const [aiDraftPrompt, setAiDraftPrompt] = useState("");
 
   const draft = state.draft;
 
@@ -234,10 +237,48 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
         void beginDraft(createBlankDraftV2);
       } else if (id === "upload") {
         setModal("upload");
+      } else if (id === "generate-ai") {
+        setAiDraftPrompt("");
+        setModal("generate-ai");
       }
     },
     [beginDraft],
   );
+
+  const handleGenerateAiDraft = useCallback(async () => {
+    const prompt = aiDraftPrompt.trim();
+    if (prompt === "") {
+      setTransientError("Describe the character before generating a draft.");
+      return;
+    }
+    setPending(true);
+    setTransientError(null);
+    try {
+      await store.startSession(await resolveSessionToken());
+      const outcome = await store.generateAiDraft({
+        mode: aiDraftMode,
+        prompt: prompt.slice(0, 5000),
+      });
+      if (outcome.kind === "ok") {
+        setModal("none");
+        setScreen("editing");
+      } else if (outcome.kind === "rejected") {
+        setTransientError(outcome.message);
+      } else if (outcome.kind === "error") {
+        setTransientError(outcome.error.message);
+      } else {
+        setTransientError("The AI draft could not be created.");
+      }
+    } catch (error) {
+      setTransientError(
+        error instanceof Error
+          ? error.message
+          : "The AI draft could not be created.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }, [aiDraftMode, aiDraftPrompt, store, resolveSessionToken]);
 
   const applyMutation = useCallback(
     async (mutation: DraftMutationV2) => {
@@ -518,10 +559,15 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     try {
       const instructions =
         finalInstructions.trim() === "" ? null : finalInstructions.slice(0, 5000);
+      const npcInstructions =
+        draft.mode !== "npc" || finalNpcInstructions.trim() === ""
+          ? null
+          : finalNpcInstructions.slice(0, 5000);
       const outcome = await store.generateFinalSheet({
         threat: state.workshop.threatLevel,
         visualStyle: finalStyle as VisualStyleKey,
         instructions,
+        npcInstructions,
         seed: finalSeed,
       });
       if (outcome.kind === "rejected") {
@@ -534,7 +580,7 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
     } finally {
       setPending(false);
     }
-  }, [draft, finalSeed, finalStyle, finalInstructions, state.workshop.threatLevel, store]);
+  }, [draft, finalSeed, finalStyle, finalInstructions, finalNpcInstructions, state.workshop.threatLevel, store]);
 
   const handleDownloadFinalPdf = useCallback(async () => {
     setPending(true);
@@ -942,6 +988,30 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
                 request like “make Strength high” will not change Strength.
               </span>
             </div>
+            {draft.mode === "npc" && (
+              <div className="character-workshop__identity-field">
+                <label
+                  className="character-workshop__identity-label"
+                  htmlFor="workshop-final-npc-instructions"
+                >
+                  NPC generation instructions (optional)
+                </label>
+                <textarea
+                  id="workshop-final-npc-instructions"
+                  className="character-workshop__final-textarea"
+                  value={finalNpcInstructions}
+                  maxLength={5000}
+                  rows={3}
+                  placeholder="Big and clumsy: high Strength, low agility."
+                  onChange={(event) => setFinalNpcInstructions(event.target.value)}
+                  disabled={pending || state.finalGeneration.status === "generating"}
+                />
+                <span className="character-workshop__final-note">
+                  Describe how remaining blank character values should be
+                  oriented. Explicit values will never be changed.
+                </span>
+              </div>
+            )}
             {state.finalGeneration.status === "error" &&
               state.finalGeneration.error !== null && (
                 <p className="character-workshop__alert" role="alert">
@@ -1004,6 +1074,17 @@ export function CharacterWorkshopV2(props: CharacterWorkshopV2Props = {}) {
         error={transientError}
         onClose={() => setModal("none")}
         onSubmit={beginUploadedDraft}
+      />
+      <GenerateAiDraftDialog
+        open={modal === "generate-ai"}
+        mode={aiDraftMode}
+        prompt={aiDraftPrompt}
+        busy={pending || state.aiDraft.status === "generating"}
+        error={transientError ?? state.aiDraft.error?.message ?? null}
+        onModeChange={setAiDraftMode}
+        onPromptChange={setAiDraftPrompt}
+        onClose={() => setModal("none")}
+        onSubmit={() => void handleGenerateAiDraft()}
       />
       <AddFieldDialog
         open={modal === "add-field"}

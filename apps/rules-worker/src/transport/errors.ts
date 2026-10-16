@@ -63,6 +63,8 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   SHEET_PORTRAIT_UNAVAILABLE: 503,
   SHEET_PORTRAIT_GENERATION_FAILED: 500,
   SHEET_PORTRAIT_NOT_FOUND: 404,
+  SHEET_AI_DRAFT_UNAVAILABLE: 503,
+  SHEET_AI_DRAFT_FAILED: 500,
   INTERNAL_ERROR: 500,
 };
 
@@ -172,6 +174,10 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "The portrait image could not be generated.",
   SHEET_PORTRAIT_NOT_FOUND:
     "No portrait asset was found for the given session and asset id.",
+  SHEET_AI_DRAFT_UNAVAILABLE:
+    "AI draft creation is temporarily unavailable. Please try again later.",
+  SHEET_AI_DRAFT_FAILED:
+    "The AI proposal could not be converted into an editable character sheet.",
   INTERNAL_ERROR: "An internal error occurred.",
 };
 

@@ -183,6 +183,24 @@ describe("draft-native styled renderer", () => {
     expect(document.getTitle()).toBe("Aria Stone");
   });
 
+  it("prefers a resolved character_name for the final title without mutating the draft", async () => {
+    const base = buildRichDraft();
+    const { character_name: _removed, ...values } = base.values;
+    const draft: CharacterSheetDraftV2 = { ...base, characterName: null, values };
+    const { bytes } = await renderStyledCharacterSheetPdf({
+      draft,
+      resolvedValues: {
+        values: { ...values, character_name: "Generated Name" },
+        generatedKeys: ["character_name"],
+      },
+      presentation: MEDIEVAL_PLAN,
+      profile: MEDIEVAL_STYLE_PROFILE,
+    });
+    const { document } = await loadForm(bytes);
+    expect(document.getTitle()).toBe("Generated Name");
+    expect(draft.characterName).toBeNull();
+  });
+
   it("renders a valid sci-fi PDF from the same draft", async () => {
     const draft = buildRichDraft();
     const resolved = resolveFinalValues(draft, { threat: null, seed: "seed-1" });

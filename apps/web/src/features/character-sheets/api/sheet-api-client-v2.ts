@@ -16,8 +16,10 @@ import {
   type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
 import {
+  AiDraftCreationRequestV1Schema,
   FinalGenerationStartRequestV1Schema,
   FinalGenerationStartResponseV1Schema,
+  type AiDraftCreationRequestV1,
   type FinalGenerationStartRequestV1,
   type FinalGenerationStartResponseV1,
 } from "@repo/character-sheet-generation";
@@ -109,6 +111,11 @@ export interface SheetApiClientV2Port {
     draftId: string,
     request: FinalGenerationStartRequestV1,
   ): Promise<FinalGenerationStartResponseV1>;
+  generateAiDraft(
+    sessionId: string,
+    accessToken: string,
+    request: AiDraftCreationRequestV1,
+  ): Promise<CharacterSheetDraftV2>;
   downloadFinalPdf(
     sessionId: string,
     accessToken: string,
@@ -344,6 +351,28 @@ const response = await this.request({
     return parseJsonBody(response, FinalGenerationStartResponseV1Schema);
   }
 
+  async generateAiDraft(
+    sessionId: string,
+    accessToken: string,
+    request: AiDraftCreationRequestV1,
+  ): Promise<CharacterSheetDraftV2> {
+    const validated = AiDraftCreationRequestV1Schema.safeParse(request);
+    if (!validated.success) {
+      throw new SheetApiError(
+        "INVALID_REQUEST",
+        "The AI draft request must carry a mode and a non-empty prompt.",
+        400,
+      );
+    }
+    const response = await this.request({
+      method: "POST",
+      url: this.aiDraftUrl(sessionId),
+      accessToken,
+      body: validated.data,
+    });
+    return parseJsonBody(response, SheetDraftSnapshotResponseV2Schema);
+  }
+
   async downloadFinalPdf(
     sessionId: string,
     accessToken: string,
@@ -528,6 +557,11 @@ const response = await this.request({
     assertIdentitySegment(sessionId, "sessionId");
     assertIdentitySegment(draftId, "draftId");
     return `${this.baseUrl}/sessions/${sessionId}/drafts/${draftId}/generate`;
+  }
+
+  private aiDraftUrl(sessionId: string): string {
+    assertIdentitySegment(sessionId, "sessionId");
+    return `${this.baseUrl}/sessions/${sessionId}/drafts/generate-ai`;
   }
 
   private finalPdfUrl(sessionId: string, runId: string): string {

@@ -17,8 +17,12 @@ import { confirmDraftV2 } from "./features/character-sheets/draft-v2-confirm.js"
 import { undoDraftV2 } from "./features/character-sheets/draft-v2-undo.js";
 import { generateFinalCharacterSheet } from "./features/character-sheets/draft-v2-final-generation.js";
 import {
+  AiDraftCreationError,
+  AiDraftCreationRequestV1Schema,
   FinalGenerationStartRequestV1Schema,
   FinalGenerationStartResponseV1Schema,
+  compileAiProposalToDraftV2,
+  validateAiDraftProposal,
 } from "@repo/character-sheet-generation";
 import {
   PORTRAIT_MAX_BYTES,
@@ -77,6 +81,8 @@ const SHEET_DRAFT_UNDO_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/undo$/;
 const SHEET_DRAFT_GENERATE_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/([^/]+)\/generate$/;
+const SHEET_AI_DRAFT_CREATE_PATH_PATTERN =
+  /^\/v1\/character-sheets\/sessions\/([^/]+)\/drafts\/generate-ai$/;
 const SHEET_RUN_PDF_PATH_PATTERN =
   /^\/v1\/character-sheets\/sessions\/([^/]+)\/runs\/([^/]+)\/pdf$/;
 const SHEET_PORTRAIT_UPLOAD_PATH_PATTERN =
@@ -201,6 +207,13 @@ export async function handleCharacterSheetRequest(
     const draftId = draftUndoMatch[2] ?? "";
     if (method === "POST") {
       return handleUndoDraft(sessionId, draftId, request, deps);
+    }
+  }
+
+  const aiDraftCreateMatch = SHEET_AI_DRAFT_CREATE_PATH_PATTERN.exec(path);
+  if (aiDraftCreateMatch !== null) {
+    if (method === "POST") {
+      return handleGenerateAiDraft(aiDraftCreateMatch[1] ?? "", request, deps);
     }
   }
 
@@ -614,6 +627,107 @@ async function handleCreateDraft(
   return draftV2CreatedResponse(created.draft);
 }
 
+/**
+ * AI-assisted draft creation (14.14): a bounded proposal becomes an ordinary
+ * unconfirmed Draft V2 through the canonical creation path. No
+ * sheet_generation_runs are created — this is Draft creation, not final
+ * generation. The returned draft enters the normal Workshop lifecycle.
+ */
+async function handleGenerateAiDraft(
+  sessionId: string,
+  request: Request,
+  deps: AppDeps,
+): Promise<Response> {
+  const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
+  if (auth.kind === "response") {
+    return auth.response;
+  }
+  if (!hasJsonContentType(request)) {
+    return errorResponse("INVALID_REQUEST", "Expected application/json.");
+  }
+  const body = await readBoundedJson(request);
+  if (body === null) {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "Request body is malformed or too large.",
+    );
+  }
+
+  const parsed = AiDraftCreationRequestV1Schema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("SHEET_DRAFT_INVALID");
+  }
+
+  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateLimit = await deps.rateLimiter.consume(`sheet-ai-draft:${clientIp}`);
+  if (rateLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (rateLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
+
+  const runtime = v2DraftRuntime(deps);
+  if (runtime === null) {
+    return draftStorageUnavailable();
+  }
+  if (deps.aiDraftCreationPort === undefined) {
+    return errorResponse("SHEET_AI_DRAFT_UNAVAILABLE");
+  }
+
+  let proposal: unknown;
+  try {
+    proposal = await deps.aiDraftCreationPort.createProposal({
+      mode: parsed.data.mode,
+      prompt: parsed.data.prompt,
+    });
+  } catch (error) {
+    if (
+      error instanceof AiDraftCreationError &&
+      error.code === "INVALID_OUTPUT"
+    ) {
+      return errorResponse("SHEET_AI_DRAFT_FAILED");
+    }
+    return errorResponse("SHEET_AI_DRAFT_UNAVAILABLE");
+  }
+
+  let validated: ReturnType<typeof validateAiDraftProposal>;
+  try {
+    validated = validateAiDraftProposal(proposal);
+  } catch {
+    return errorResponse("SHEET_AI_DRAFT_FAILED");
+  }
+
+  let draft: CharacterSheetDraftV2;
+  try {
+    draft = compileAiProposalToDraftV2({
+      proposal: validated,
+      sessionId: auth.sessionId,
+      draftId: deps.crypto.uuid(),
+      mode: parsed.data.mode,
+    });
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+
+  let created;
+  try {
+    created = await createDraftV2(
+      { heads: runtime.heads, store: runtime.store },
+      auth.sessionId,
+      draft,
+    );
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+  if (created.kind === "already_exists") {
+    return errorResponse("SHEET_DRAFT_ALREADY_EXISTS");
+  }
+
+  traceSheetDraft(deps, "ai draft create response", created.draft);
+  return draftV2CreatedResponse(created.draft);
+}
+
 async function handleGetDraft(
   sessionId: string,
   draftId: string,
@@ -976,6 +1090,9 @@ async function handleGenerateFinal(
         ...(deps.portraitAssetStore === undefined
           ? {}
           : { portraits: deps.portraitAssetStore }),
+        ...(deps.npcAuthoringPort === undefined
+          ? {}
+          : { authoring: deps.npcAuthoringPort }),
         clock: deps.clock,
         crypto: deps.crypto,
       },

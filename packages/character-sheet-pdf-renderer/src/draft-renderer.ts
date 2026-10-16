@@ -328,7 +328,14 @@ export async function renderStyledCharacterSheetPdf(
   const fieldsByKey = new Map(draft.fields.map((f) => [f.key, f]));
   const sectionsByKey = new Map(draft.sections.map((s) => [s.key, s]));
 
-  assertSupportedGlyphs(draft.characterName ?? "Character Sheet", "sheet title");
+  // Generated character name (14.14): a resolved character_name value takes
+  // precedence for the final PDF title without mutating the Draft.
+  const resolvedName = input.resolvedValues.values["character_name"];
+  const displayName =
+    typeof resolvedName === "string" && resolvedName.trim() !== ""
+      ? resolvedName
+      : (draft.characterName ?? "Character Sheet");
+  assertSupportedGlyphs(displayName, "sheet title");
   for (const section of draft.sections) {
     assertSupportedGlyphs(section.title, `section title "${section.title}"`);
   }
@@ -362,7 +369,7 @@ export async function renderStyledCharacterSheetPdf(
   drawStyledBackground(page, profile, plan);
   drawStyledFrame(page, profile);
 
-  const title = draft.characterName ?? "Character Sheet";
+  const title = displayName;
   const titleSize = fitSectionTitle(headingFont, title, LETTER_WIDTH - PAGE_MARGIN * 2, "Sheet title");
   page.drawText(title, {
     x: PAGE_MARGIN,

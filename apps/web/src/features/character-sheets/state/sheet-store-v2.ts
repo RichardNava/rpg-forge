@@ -421,6 +421,9 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           message: "Add a Portrait Slot before generating with a portrait image.",
         };
       }
+      // PC drafts never carry NPC authoring instructions (server rejects).
+      const npcInstructions =
+        draft.mode === "npc" ? (input.npcInstructions ?? null) : null;
       const seed = (input.seed ?? stableFinalSeed(draft.draftId)).slice(0, 64);
       setState({
         finalGeneration: { status: "generating", runId: null, draftVersion: draft.version, error: null },
@@ -433,6 +436,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
             threat: draft.mode === "npc" ? (input.threat ?? null) : null,
             visualStyle: input.visualStyle,
             instructions: input.instructions ?? null,
+            npcInstructions,
             portrait,
           },
           seed,
@@ -451,6 +455,55 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
         setState({
           finalGeneration: { status: "error", runId: null, draftVersion: draft.version, error: sheetError },
         });
+        return { kind: "error", error: sheetError };
+      }
+    },
+
+    async generateAiDraft(input: {
+      mode: "pc" | "npc";
+      prompt: string;
+    }): Promise<import("./sheet-store-v2-types").SheetStoreV2AiDraftOutcome> {
+      const { sessionId, accessToken } = state;
+      if (
+        state.phase !== "ready" ||
+        sessionId === null ||
+        accessToken === null
+      ) {
+        return { kind: "not_ready" };
+      }
+      if (state.aiDraft.status === "generating") {
+        return { kind: "inflight" };
+      }
+      const prompt = input.prompt.trim();
+      if (prompt === "") {
+        return {
+          kind: "rejected",
+          code: "PROMPT_REQUIRED",
+          message: "Describe the character before generating a draft.",
+        };
+      }
+      setState({ aiDraft: { status: "generating", error: null }, error: null });
+      try {
+        const draft = await options.api.generateAiDraft(sessionId, accessToken, {
+          schemaVersion: "1",
+          mode: input.mode,
+          prompt: prompt.slice(0, 5000),
+        });
+        setState({
+          phase: "ready",
+          draft,
+          saveStatus: "saved",
+          savedVersion: draft.version,
+          workshop: workshopForDraft(draft.mode),
+          rerolledKeys: null,
+          finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
+          aiDraft: { status: "idle", error: null },
+          error: null,
+        });
+        return { kind: "ok", draft };
+      } catch (error) {
+        const sheetError = toSheetApiError(error);
+        setState({ aiDraft: { status: "error", error: sheetError } });
         return { kind: "error", error: sheetError };
       }
     },

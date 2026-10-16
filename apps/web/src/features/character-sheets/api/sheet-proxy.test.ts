@@ -121,6 +121,20 @@ describe("resolveCharacterSheetProxyPath", () => {
     });
   });
 
+  it("accepts the AI draft-creation endpoint", () => {
+    expect(
+      resolveCharacterSheetProxyPath("POST", [
+        "sessions",
+        SESSION_ID,
+        "drafts",
+        "generate-ai",
+      ]),
+    ).toMatchObject({
+      kind: "ok",
+      upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/drafts/generate-ai`,
+    });
+  });
+
   it("accepts the authenticated document extraction endpoint", () => {
     expect(
       resolveCharacterSheetProxyPath("POST", [

@@ -14,12 +14,20 @@ import {
   type SheetDraftUndoRequestV2,
 } from "@repo/character-sheet-draft";
 import {
+  AiDraftCreationRequestV1Schema,
   buildFinalGenerationRequestV1,
+  compileAiProposalToDraftV2,
+  deriveNpcAuthoringContext,
   getStyleProfile,
   resolveFinalValues,
+  validateAiDraftProposal,
+  validateNpcAuthoringPlan,
+  type AiDraftCreationRequestV1,
+  type AiDraftProposalV1,
   type FinalGenerationStartRequestV1,
   type FinalGenerationStartResponseV1,
   type FinalPresentationPlanV1,
+  type NpcValueAssignment,
 } from "@repo/character-sheet-generation";
 import {
   validatePortraitImageBytes,
@@ -47,6 +55,64 @@ export interface LocalSheetBackendV2Options {
  * `expectedVersion` against the stored current version first, mirroring the
  * Worker precondition order.
  */
+/**
+ * Deterministic local NPC authoring fake (LOCAL/test only, never a
+ * production fallback). Fills every eligible blank with a bounded
+ * deterministic value through the real semantic validation, so local runs
+ * exercise the genuine validation + merge path without AI quota.
+ */
+function fakeLocalAuthoredAssignments(
+  draft: CharacterSheetDraftV2,
+): readonly NpcValueAssignment[] {
+  const context = deriveNpcAuthoringContext(draft);
+  if (context === null) return [];
+  const plan = {
+    schemaVersion: "1",
+    assignments: context.blanks.map((blank) => {
+      switch (blank.type) {
+        case "number":
+          return { key: blank.key, value: blank.min ?? 0 };
+        case "choice":
+          return { key: blank.key, value: blank.options?.[0] ?? "local" };
+        case "date":
+          return { key: blank.key, value: "1400-01-01" };
+        case "checkbox":
+          return { key: blank.key, value: false };
+        case "list":
+          return { key: blank.key, value: [`Local ${blank.label}`] };
+        default:
+          return { key: blank.key, value: `Local ${blank.label}` };
+      }
+    }),
+  };
+  return validateNpcAuthoringPlan(plan, draft);
+}
+
+/**
+ * Deterministic local AI-draft proposal (LOCAL/test only). A small fixed
+ * shape carrying the user's prompt as the character name; the real compiler
+ * owns keys, versions, and persistence fields.
+ */
+function fakeLocalAiProposal(request: AiDraftCreationRequestV1): AiDraftProposalV1 {
+  const name = request.prompt.trim().slice(0, 256);
+  return {
+    schemaVersion: "1",
+    characterName: name === "" ? null : name,
+    sections: [{ id: "core", title: "Core", parentId: null }],
+    fields: [
+      { id: "character_name", label: "Character name", type: "text" },
+      { id: "strength", label: "Strength", type: "number", min: 1, max: 10 },
+      { id: "notes", label: "Notes", type: "textarea" },
+    ],
+    structure: [
+      { kind: "field", id: "character_name", parentId: null },
+      { kind: "section", id: "core", parentId: null },
+      { kind: "field", id: "strength", parentId: "core" },
+      { kind: "field", id: "notes", parentId: "core" },
+    ],
+  };
+}
+
 export function createLocalSheetBackendV2(
   options: LocalSheetBackendV2Options = {},
 ): SheetApiClientV2Port {
@@ -160,6 +226,35 @@ export function createLocalSheetBackendV2(
           "A draft with this id already exists for this session.",
         );
       }
+      drafts.set(key, draft);
+      draftHeads.set(key, { undoSourceVersion: null, undoConsumed: false });
+      return draft;
+    },
+
+    async generateAiDraft(
+      sessionId: string,
+      accessToken: string,
+      request: AiDraftCreationRequestV1,
+    ): Promise<CharacterSheetDraftV2> {
+      requireSession(sessionId, accessToken);
+      const validated = AiDraftCreationRequestV1Schema.safeParse(request);
+      if (!validated.success) {
+        throw new DraftError(
+          "invalid_draft",
+          "The AI draft request must carry a mode and a non-empty prompt.",
+        );
+      }
+      // Deterministic local fake (LOCAL/test only): a small fixed proposal
+      // shaped by the prompt, compiled through the real proposal validation
+      // and application-owned compiler. Never calls Workers AI.
+      const proposal = fakeLocalAiProposal(validated.data);
+      const draft = compileAiProposalToDraftV2({
+        proposal: validateAiDraftProposal(proposal),
+        sessionId,
+        draftId: crypto.randomUUID(),
+        mode: validated.data.mode,
+      });
+      const key = keyOf(sessionId, draft.draftId);
       drafts.set(key, draft);
       draftHeads.set(key, { undoSourceVersion: null, undoConsumed: false });
       return draft;
@@ -347,6 +442,7 @@ export function createLocalSheetBackendV2(
         threat: request.options.threat ?? null,
         visualStyle: request.options.visualStyle,
         instructions: request.options.instructions ?? null,
+        npcInstructions: request.options.npcInstructions ?? null,
         portrait: request.options.portrait,
         seed: request.seed,
       });
@@ -376,9 +472,18 @@ export function createLocalSheetBackendV2(
         }
         portraitImage = { slotKey: slot.key, bytes: row.bytes, mimeType: row.mimeType };
       }
+      // Deterministic local authoring fake (LOCAL/test only, never a
+      // production fallback): fills blanks with bounded deterministic values
+      // through the real validation + merge path. No AI quota consumed.
+      const localNpcInstructions = built.options.npcInstructions ?? null;
+      const authored =
+        localNpcInstructions === null
+          ? null
+          : fakeLocalAuthoredAssignments(current);
       const resolved = resolveFinalValues(current, {
         threat: built.options.threat ?? null,
         seed: built.seed,
+        authoredAssignments: authored,
       });
       const plan: FinalPresentationPlanV1 = {
         schemaVersion: "1",

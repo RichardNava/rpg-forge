@@ -62,9 +62,21 @@ export type PortraitConfig = z.infer<typeof PortraitConfigSchema>;
 
 /**
  * User instructions for final generation (bounded, optional).
+ * Presentation guidance only — it never changes field values.
  */
 export const InstructionsSchema = z.string().max(5000).nullable().optional();
 export type Instructions = z.infer<typeof InstructionsSchema>;
+
+/**
+ * NPC content/value authoring instructions (bounded, optional, 14.14).
+ *
+ * Separate authority from `instructions`: these orient AI-generated VALUES
+ * for eligible blank NPC fields (explicit user values always win; threat and
+ * deterministic defaults apply only where instructions do not specify
+ * enough). PC requests must carry null/absent (enforced below).
+ */
+export const NpcInstructionsSchema = z.string().max(5000).nullable().optional();
+export type NpcInstructions = z.infer<typeof NpcInstructionsSchema>;
 
 /**
  * Canonical final generation request — carries confirmed Draft + options.
@@ -78,6 +90,7 @@ export const FinalGenerationRequestV1Schema = z.strictObject({
     threat: ThreatLevelSchema.nullish(),
     visualStyle: CanonicalVisualStyleSchema,
     instructions: InstructionsSchema,
+    npcInstructions: NpcInstructionsSchema,
     portrait: PortraitConfigSchema,
   }).strict(),
   seed: z.string().min(1).max(64),
@@ -104,6 +117,13 @@ export const FinalGenerationRequestV1Schema = z.strictObject({
       message: "NPC draft requires threat",
     });
   }
+  if (draft.mode === "pc" && options.npcInstructions) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["options", "npcInstructions"],
+      message: "PC draft cannot have NPC authoring instructions",
+    });
+  }
 });
 export type FinalGenerationRequestV1 = z.infer<typeof FinalGenerationRequestV1Schema>;
 
@@ -112,6 +132,7 @@ export type FinalGenerationRequestV1 = z.infer<typeof FinalGenerationRequestV1Sc
  * @throws if draft.confirmed !== true
  * @throws if PC draft has threat option
  * @throws if NPC draft lacks threat option
+ * @throws if PC draft has NPC authoring instructions
  */
 export function buildFinalGenerationRequestV1(
   draft: CharacterSheetDraftV2,
@@ -119,6 +140,7 @@ export function buildFinalGenerationRequestV1(
     threat?: ThreatLevel | null;
     visualStyle: CanonicalVisualStyle;
     instructions?: string | null;
+    npcInstructions?: string | null;
     portrait?: PortraitConfig;
     seed: string;
   },
@@ -133,6 +155,17 @@ export function buildFinalGenerationRequestV1(
   if (draft.mode === "npc" && !options.threat) {
     throw new Error("NPC draft requires threat");
   }
+  // Whitespace-only NPC instructions normalize to null; any remaining
+  // non-null value on a PC draft is rejected (no silent content authority).
+  const npcInstructions =
+    options.npcInstructions === undefined || options.npcInstructions === null
+      ? null
+      : options.npcInstructions.trim() === ""
+        ? null
+        : options.npcInstructions.slice(0, 5000);
+  if (draft.mode === "pc" && npcInstructions !== null) {
+    throw new Error("PC draft cannot have NPC authoring instructions");
+  }
 
   // Build the request preserving all Draft content exactly
   const threatOption = draft.mode === "npc" ? options.threat : null;
@@ -143,6 +176,7 @@ export function buildFinalGenerationRequestV1(
       threat: threatOption,
       visualStyle: options.visualStyle,
       instructions: options.instructions ?? null,
+      npcInstructions,
       portrait: options.portrait ?? { kind: "none" as const },
     },
     seed: options.seed,

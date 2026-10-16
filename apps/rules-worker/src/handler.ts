@@ -22,7 +22,11 @@ import type {
 } from "@repo/character-sheet-session";
 import type { CharacterSheetDraftStoreV2 } from "@repo/character-sheet-draft";
 import type { CharacterSheetArtifactStore } from "@repo/character-sheet-artifacts";
-import type { FinalPresentationPort } from "@repo/character-sheet-generation";
+import type {
+  AiDraftCreationPort,
+  FinalPresentationPort,
+  NpcValueAuthoringPort,
+} from "@repo/character-sheet-generation";
 import type {
   CharacterSheetPortraitAssetStore,
   PortraitGenerationPort,
@@ -81,6 +85,8 @@ export interface AppDeps {
   finalPresentationPort?: FinalPresentationPort;
   portraitAssetStore?: CharacterSheetPortraitAssetStore;
   portraitGenerationPort?: PortraitGenerationPort;
+  npcAuthoringPort?: NpcValueAuthoringPort;
+  aiDraftCreationPort?: AiDraftCreationPort;
   debugSheetDrafts?: boolean;
 }
 

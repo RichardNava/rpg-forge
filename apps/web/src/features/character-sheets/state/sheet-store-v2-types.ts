@@ -38,6 +38,8 @@ export interface SheetStoreV2State {
   undoSourceVersion: number | null;
   /** Final-generation operational state (14.12). Never holds PDF bytes. */
   finalGeneration: FinalGenerationState;
+  /** AI draft-creation operational state (14.14). Never holds proposals. */
+  aiDraft: SheetStoreV2AiDraftState;
   error: SheetApiError | null;
 }
 
@@ -57,6 +59,7 @@ export const INITIAL_SHEET_STORE_V2_STATE: SheetStoreV2State = {
   undoAvailable: false,
   undoSourceVersion: null,
   finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
+  aiDraft: { status: "idle", error: null },
   error: null,
 };
 
@@ -98,8 +101,24 @@ export interface SheetStoreV2FinalGenerationInput {
   threat: import("./sheet-workshop-types").ThreatLevelPreference | null;
   visualStyle: import("./sheet-workshop-types").VisualStyleKey;
   instructions?: string | null;
+  /** NPC content/value instructions (14.14). PC callers must pass null. */
+  npcInstructions?: string | null;
   seed?: string;
 }
+
+export type SheetStoreV2AiDraftStatus = "idle" | "generating" | "error";
+
+export interface SheetStoreV2AiDraftState {
+  status: SheetStoreV2AiDraftStatus;
+  error: SheetApiError | null;
+}
+
+export type SheetStoreV2AiDraftOutcome =
+  | { kind: "ok"; draft: CharacterSheetDraftV2 }
+  | { kind: "rejected"; code: string; message: string }
+  | { kind: "not_ready" }
+  | { kind: "inflight" }
+  | { kind: "error"; error: SheetApiError };
 
 export type SheetStoreV2PortraitOutcome =
   | { kind: "ok"; assetId: string; source: "upload" | "url" | "ai" }
@@ -129,5 +148,9 @@ export interface SheetStoreV2 {
     input: SheetStoreV2FinalGenerationInput,
   ): Promise<SheetStoreV2FinalGenerationOutcome>;
   downloadFinalPdf(): Promise<Uint8Array | null>;
+  generateAiDraft(input: {
+    mode: "pc" | "npc";
+    prompt: string;
+  }): Promise<SheetStoreV2AiDraftOutcome>;
   reset(): void;
 }

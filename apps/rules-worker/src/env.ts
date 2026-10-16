@@ -14,6 +14,13 @@ export interface Env {
   SHEET_VISION_MODEL?: string;
   SHEET_PRESENTATION_MODEL?: string;
   SHEET_PORTRAIT_MODEL?: string;
+  /**
+   * Explicit model for advanced character authoring (14.14): NPC
+   * instruction-driven blank-value authoring and AI-assisted draft
+   * proposals. Both narrow adapters may share this model; the domain ports
+   * remain separate. Absent binding/model fails closed (no authoring port).
+   */
+  SHEET_AUTHORING_MODEL?: string;
   SHEET_DRAFT_DEBUG?: string;
   SHEET_VISION_DEBUG_RAW_RESPONSE?: string;
   AI?: Ai;

@@ -10,6 +10,8 @@ import { createD1SheetSessionRepository } from "./infrastructure/db/sheet-sessio
 import { createD1SheetRunRepository } from "./infrastructure/db/sheet-run-repository.js";
 import { createD1DraftHeadRepository } from "./infrastructure/db/draft-head-repository.js";
 import { createCloudflareAiFinalPresentation } from "./infrastructure/sheet-final-presentation.js";
+import { createCloudflareAiNpcAuthoring } from "./infrastructure/sheet-npc-authoring.js";
+import { createCloudflareAiDraftCreation } from "./infrastructure/sheet-ai-draft-creation.js";
 import { createCloudflarePortraitGeneration } from "./infrastructure/sheet-portrait-generation.js";
 import { createR2CharacterSheetPortraitAssetStore } from "./infrastructure/r2-character-sheet-portraits.js";
 import { createPdfJsPageExtractor } from "./infrastructure/pdfjs-extractor.js";
@@ -75,6 +77,16 @@ export function createAppDeps(env: Env): AppDeps {
     env.AI === undefined || env.SHEET_PRESENTATION_MODEL === undefined
       ? undefined
       : createCloudflareAiFinalPresentation(env.AI, env.SHEET_PRESENTATION_MODEL);
+  // Advanced character authoring (14.14) shares one explicit model across two
+  // separate narrow ports. Missing AI binding or model fails closed.
+  const npcAuthoringPort =
+    env.AI === undefined || env.SHEET_AUTHORING_MODEL === undefined
+      ? undefined
+      : createCloudflareAiNpcAuthoring(env.AI, env.SHEET_AUTHORING_MODEL);
+  const aiDraftCreationPort =
+    env.AI === undefined || env.SHEET_AUTHORING_MODEL === undefined
+      ? undefined
+      : createCloudflareAiDraftCreation(env.AI, env.SHEET_AUTHORING_MODEL);
   const portraitAssetStore =
     env.SHEET_ARTIFACTS === undefined
       ? undefined
@@ -138,6 +150,8 @@ export function createAppDeps(env: Env): AppDeps {
     ...(sheetArtifactStore === undefined ? {} : { sheetArtifactStore }),
     ...(sheetVisualExtraction === undefined ? {} : { sheetVisualExtraction }),
     ...(finalPresentationPort === undefined ? {} : { finalPresentationPort }),
+    ...(npcAuthoringPort === undefined ? {} : { npcAuthoringPort }),
+    ...(aiDraftCreationPort === undefined ? {} : { aiDraftCreationPort }),
     ...(portraitAssetStore === undefined ? {} : { portraitAssetStore }),
     ...(portraitGenerationPort === undefined ? {} : { portraitGenerationPort }),
     debugSheetDrafts: env.SHEET_DRAFT_DEBUG === "true",

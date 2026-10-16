@@ -28,3 +28,5 @@ export * from "./final-generation-contract.js";
 export * from "./final-generation-transport.js";
 export * from "./final-presentation.js";
 export * from "./final-value-resolution.js";
+export * from "./npc-value-authoring.js";
+export * from "./ai-draft-creation.js";

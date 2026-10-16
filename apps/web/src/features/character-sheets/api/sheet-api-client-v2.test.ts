@@ -269,6 +269,32 @@ describe("SheetApiClientV2", () => {
     expect(result.draftVersion).toBe(4);
   });
 
+  it("M3. generateAiDraft posts mode + prompt (never a Draft) to generate-ai", async () => {
+    const { client } = makeClient(async (input, init) => {
+      expect(String(input)).toBe(
+        `${SESSION_URL}/sessions/${SESSION_ID}/drafts/generate-ai`,
+      );
+      expect(init?.method).toBe("POST");
+      const body = JSON.parse(String(init?.body));
+      expect(body).toEqual({
+        schemaVersion: "1",
+        mode: "npc",
+        prompt: "A large orc.",
+      });
+      expect(body).not.toHaveProperty("draft");
+      expect(body).not.toHaveProperty("fields");
+      return jsonResponse(201, makeDraftV2({ mode: "npc" }));
+    });
+
+    const draft = await client.generateAiDraft(SESSION_ID, "token.123", {
+      schemaVersion: "1",
+      mode: "npc",
+      prompt: "A large orc.",
+    });
+    expect(draft.mode).toBe("npc");
+    expect(draft.confirmed).toBe(false);
+  });
+
   it("N. downloadFinalPdf returns raw PDF bytes", async () => {
     const pdfBytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52]);
     const { client } = makeClient(async (input, init) => {

@@ -170,6 +170,68 @@ describe("createLocalSheetBackendV2", () => {
     ).rejects.toThrow();
   });
 
+  it("creates an AI draft through the real proposal compiler", async () => {
+    const api = createLocalSheetBackendV2();
+    const session = await api.createSession("token");
+    const created = await api.generateAiDraft(session.sessionId, session.accessToken, {
+      schemaVersion: "1",
+      mode: "npc",
+      prompt: "A large orc.",
+    });
+    expect(created.schemaVersion).toBe("2");
+    expect(created.mode).toBe("npc");
+    expect(created.confirmed).toBe(false);
+    expect(created.version).toBe(1);
+    expect(created.characterName).toBe("A large orc.");
+    // Ordinary draft afterwards: mutate + confirm through the same backend.
+    const mutated = await api.mutateDraft(session.sessionId, session.accessToken, created.draftId, {
+      expectedVersion: 1,
+      mutation: { op: "set_value", key: "proposal_strength", value: 7 },
+    });
+    expect(mutated.draft.values["proposal_strength"]).toBe(7);
+  });
+
+  it("fills NPC blanks deterministically when local npcInstructions are set", async () => {
+    const api = createLocalSheetBackendV2();
+    const session = await api.createSession("token");
+    const draft = createExampleDraftV2(session.sessionId);
+    const created = await api.createDraft(session.sessionId, session.accessToken, draft);
+    // Blank the bounded age field before confirm so the local fake must fill it.
+    const blanked = await api.mutateDraft(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      { expectedVersion: 1, mutation: { op: "clear_value", key: "age" } },
+    );
+    expect(blanked.draft.values["age"]).toBeUndefined();
+    const confirmed = await api.confirmDraft(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      { expectedVersion: blanked.draft.version },
+    );
+    expect(confirmed.confirmed).toBe(true);
+    const started = await api.generateFinalSheet(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      {
+        expectedVersion: confirmed.version,
+        options: {
+          threat: "medium",
+          visualStyle: "medieval",
+          instructions: null,
+          npcInstructions: "Brave and loyal.",
+          portrait: { kind: "none" },
+        },
+        seed: "local-seed-1",
+      },
+    );
+    expect(started.status).toBe("READY");
+    const pdf = await api.downloadFinalPdf(session.sessionId, session.accessToken, started.runId);
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
   it("rejects a session-mismatched draft as invalid", async () => {
     const api = createLocalSheetBackendV2();
     const session = await api.createSession("token");

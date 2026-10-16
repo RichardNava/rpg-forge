@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CanonicalVisualStyleSchema,
   InstructionsSchema,
+  NpcInstructionsSchema,
   PortraitConfigSchema,
   ThreatLevelSchema,
 } from "./final-generation-contract.js";
@@ -21,6 +22,7 @@ export const FinalGenerationStartRequestV1Schema = z.strictObject({
       threat: ThreatLevelSchema.nullish(),
       visualStyle: CanonicalVisualStyleSchema,
       instructions: InstructionsSchema,
+      npcInstructions: NpcInstructionsSchema,
       portrait: PortraitConfigSchema,
     })
     .strict(),

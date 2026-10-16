@@ -140,6 +140,143 @@ describe("CharacterWorkshopV2", () => {
     expect(medieval.getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("offers Generate Character with AI as an enabled entry, distinct from final generation", async () => {
+    render(<CharacterWorkshopV2 />);
+    const aiEntry = screen.getByRole("button", {
+      name: /Generate Character with AI/i,
+    });
+    expect((aiEntry as HTMLButtonElement).disabled).toBe(false);
+    // Final generation only exists after confirm — never on the landing.
+    expect(
+      screen.queryByRole("button", { name: /Generate Final Sheet with AI/i }),
+    ).toBeNull();
+
+    fireEvent.click(aiEntry);
+    const dialog = screen.getByRole("dialog", {
+      name: "Generate Character with AI",
+    });
+    expect(dialog).toBeTruthy();
+    // Prompt is required before submitting.
+    expect(
+      (within(dialog).getByRole("button", {
+        name: "Create editable draft with AI",
+      }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("creates an editable unconfirmed draft with AI in local mode", async () => {
+    render(<CharacterWorkshopV2 />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Generate Character with AI/i }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Generate Character with AI",
+    });
+    fireEvent.change(within(dialog).getByLabelText("Character description"), {
+      target: { value: "A large, clumsy orc scout." },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "NPC",
+      }),
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "Create editable draft with AI",
+      }),
+    );
+
+    // The AI draft enters the normal Workshop: editable, unconfirmed.
+    await waitFor(() => {
+      expect(screen.getByLabelText("Sheet title")).toBeTruthy();
+    });
+    expect(
+      screen.getByText("Strength", {
+        selector: ".character-workshop__field-label",
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/confirmed and read-only/i)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Generate Final Sheet with AI/i }),
+    ).toBeNull();
+
+    // The returned draft remains editable through the ordinary editor.
+    const notes = screen.getByLabelText("Notes");
+    fireEvent.change(notes, { target: { value: "Local edit works." } });
+    await waitFor(() =>
+      expect((notes as HTMLTextAreaElement).value).toBe("Local edit works."),
+    );
+  });
+
+  it("shows NPC generation instructions only for NPC final generation", async () => {
+    render(<CharacterWorkshopV2 />);
+    fireEvent.click(screen.getByRole("button", { name: /Create manually/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Sheet title")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm sheet" }));
+    const confirmDialog = screen.getByRole("dialog", {
+      name: "Confirm character sheet",
+    });
+    fireEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Confirm sheet" }),
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/confirmed and read-only/i)).toBeTruthy();
+    });
+    // PC drafts (manual default) never show NPC authoring instructions.
+    expect(
+      screen.queryByLabelText(/NPC generation instructions/i),
+    ).toBeNull();
+    expect(
+      screen.getByLabelText(/Presentation instructions/i),
+    ).toBeTruthy();
+  });
+
+  it("shows NPC generation instructions for NPC final generation", async () => {
+    const { container } = render(<CharacterWorkshopV2 />);
+    fireEvent.click(screen.getByRole("button", { name: /Create manually/i }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Sheet title")).toBeTruthy();
+    });
+    const npcButton = container.querySelector(
+      'button[aria-label="Non-Player Character"]',
+    ) as HTMLButtonElement | null;
+    expect(npcButton).not.toBeNull();
+    fireEvent.click(npcButton!);
+    await waitFor(() => {
+      expect(
+        container.querySelector(
+          'button[aria-label="Non-Player Character"][aria-pressed="true"]',
+        ),
+      ).not.toBeNull();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm sheet" }));
+    const confirmDialog = screen.getByRole("dialog", {
+      name: "Confirm character sheet",
+    });
+    fireEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Confirm sheet" }),
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/confirmed and read-only/i)).toBeTruthy();
+    });
+    const npcInstructions = screen.getByLabelText(
+      /NPC generation instructions/i,
+    );
+    expect(npcInstructions).toBeTruthy();
+    fireEvent.change(npcInstructions, {
+      target: { value: "Big and clumsy." },
+    });
+    expect((npcInstructions as HTMLTextAreaElement).value).toBe(
+      "Big and clumsy.",
+    );
+    // Presentation instructions remain a separate field.
+    expect(
+      screen.getByLabelText(/Presentation instructions/i),
+    ).toBeTruthy();
+  });
+
   it("emits only DraftMutationV2 operations", async () => {
     const seen: string[] = [];
     const { container } = render(<CharacterWorkshopV2 />);

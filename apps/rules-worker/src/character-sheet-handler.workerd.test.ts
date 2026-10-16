@@ -165,6 +165,39 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
     expect(response.status).toBe(404);
   });
 
+  it("gates AI draft creation on auth and request validity without touching AI", async () => {
+    // Pre-port gates only: auth and request validation run before any
+    // authoring port is consulted, so no inference quota is reachable here.
+    const seeded = await seedSheetSession(db);
+    const unauthorized = await worker.fetch(
+      request(
+        `/v1/character-sheets/sessions/${seeded.sessionId}/drafts/generate-ai`,
+        "not-the-token",
+        {
+          method: "POST",
+          body: { schemaVersion: "1", mode: "npc", prompt: "An orc." },
+        },
+      ),
+      { DB: db, SHEET_ARTIFACTS: bucket() },
+    );
+    expect(unauthorized.status).toBe(404);
+
+    const invalid = await worker.fetch(
+      request(
+        `/v1/character-sheets/sessions/${seeded.sessionId}/drafts/generate-ai`,
+        seeded.accessToken,
+        {
+          method: "POST",
+          body: { schemaVersion: "1", mode: "npc", prompt: "   " },
+        },
+      ),
+      { DB: db, SHEET_ARTIFACTS: bucket() },
+    );
+    expect(invalid.status).toBe(400);
+    const body = (await invalid.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("SHEET_DRAFT_INVALID");
+  });
+
   it("creates, edits, reads back, rerolls and confirms a draft via real D1 and R2", async () => {
     const seeded = await seedSheetSession(db);
     const { sessionId, accessToken } = seeded;
