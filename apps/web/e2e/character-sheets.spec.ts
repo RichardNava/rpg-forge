@@ -194,14 +194,14 @@ test("manual authoring happy path: create, edit, reparent, confirm, export, rest
 
   // 11. PC/NPC preference + threat level.
   await page
-    .getByRole("button", { name: "Player character", exact: true })
+    .getByRole("button", { name: "Player Character", exact: true })
     .click();
   await expect(page.getByLabel("Threat")).toBeHidden();
   await page
-    .getByRole("button", { name: "Non-player character", exact: true })
+    .getByRole("button", { name: "Non-Player Character", exact: true })
     .click();
-  await page.getByRole("button", { name: "Veteran" }).click();
-  await expect(page.getByRole("button", { name: "Veteran" })).toHaveAttribute(
+  await page.getByRole("button", { name: "Elite" }).click();
+  await expect(page.getByRole("button", { name: "Elite" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -247,11 +247,31 @@ test("manual authoring happy path: create, edit, reparent, confirm, export, rest
     /grid-area: span 2 \/ 1 \/ auto \/ span 2/,
   );
 
-  // 15-16. PDF download occurs with a PDF filename.
+  // 14b. NPC authoring instructions ride along, separate from presentation.
+  await page
+    .getByLabel(/NPC generation instructions/i)
+    .fill("Strong and hardy.");
+  await expect(page.getByLabel(/NPC generation instructions/i)).toHaveValue(
+    "Strong and hardy.",
+  );
+
+  // 15-16. Generate the final styled sheet, then download a valid PDF.
+  await page
+    .getByRole("button", { name: "Generate Final Sheet with AI" })
+    .click();
+  const downloadButton = page.getByRole("button", {
+    name: "Download Final PDF",
+  });
+  await expect(downloadButton).toBeEnabled();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download PDF" }).click();
+  await downloadButton.click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const { readFileSync } = await import("node:fs");
+  const header = readFileSync(downloadPath!).subarray(0, 5).toString("utf8");
+  expect(header).toBe("%PDF-");
 
   // 17-18. Restart restores the landing.
   await page.getByRole("button", { name: "Start a new sheet" }).click();
@@ -394,9 +414,8 @@ test("E2E B — visual resize and placement commit grid geometry", async ({
     },
   );
   await page.mouse.up();
-  // Give the async store update time to complete before polling.
-  await page.waitForTimeout(200);
-  // Wait for inspector to reflect the committed layout.
+  // The poll below retries against the committed store state, so no fixed
+  // wait is needed before it (14.15 removed the historical 200ms sleep).
   await expect
     .poll(async () => {
       return (
@@ -607,15 +626,20 @@ await expect(page.locator(`[data-canvas-node="${emptySectionKey}"]`)).toBeHidden
       if (closeButton) closeButton.click();
     }
   });
-  await page.waitForTimeout(500);
+  // The delete dialog closes as an observable condition instead of a sleep.
+  await expect(
+    page.locator('[role="dialog"][aria-label="Delete section"]'),
+  ).toBeHidden();
 
   // Attempt to delete Non-Empty Section (should be rejected with explanation)
   // Click on the section heading to select it in the inspector
   await page.locator(`#canvas-section-${nonEmptySectionKey}`).click({ force: true });
-  await page.waitForTimeout(2000);
+  // Selection renders as an observable condition instead of a sleep.
+  await expect(
+    page.getByRole("button", { name: "Remove section" }).first(),
+  ).toBeVisible();
   // Verify the section is selected in the inspector (Remove section button should be visible)
-  await page.getByRole("button", { name: "Remove section" }).first().click({ timeout: 15000 });
-  // Check for error message in the delete dialog
+  await page.getByRole("button", { name: "Remove section" }).click();
   await expect(page.locator('[role="dialog"][aria-label="Delete section"]')).toBeVisible();
   await expect(page.locator('[role="dialog"][aria-label="Delete section"]')).toContainText(/empty/i);
   await page.getByRole("button", { name: /cancel/i }).click();
@@ -636,4 +660,133 @@ await expect(page.locator(`[data-canvas-node="${emptySectionKey}"]`)).toBeHidden
   await expect(page.locator('[data-canvas-node="field_b"]')).toBeVisible();
   await expect(await canvasOrder(page)).toContain("field_b");
   // Field B should be back at root level
+});
+
+test("E2E F — AI creation NPC: describe, edit, threat, instructions, confirm, final PDF", async ({
+  page,
+}) => {
+  await page.goto("/character-sheets");
+  await expect(
+    page.getByRole("heading", {
+      name: /how do you want to create your character\?/i,
+    }),
+  ).toBeVisible();
+
+  // Generate Character with AI stays visually distinct from final generation.
+  await page.getByRole("button", { name: /Generate Character with AI/i }).click();
+  const dialog = page.getByRole("dialog", { name: "Generate Character with AI" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "NPC" }).click();
+  await dialog.getByLabel("Character description").fill("A large, clumsy orc scout.");
+  await dialog.getByRole("button", { name: "Create editable draft with AI" }).click();
+
+  // The proposal enters the normal Workshop: editable, unconfirmed.
+  await expect(page.getByRole("heading", { name: "Sheet canvas" })).toBeVisible();
+  await expect(page.locator('[data-canvas-node="proposal_strength"]')).toBeVisible();
+  await expect(page.getByText(/confirmed and read-only/i)).toBeHidden();
+
+  // Override a proposed value through the ordinary editor.
+  await page.getByLabel("Strength", { exact: true }).fill("7");
+  await expect(page.getByLabel("Strength", { exact: true })).toHaveValue("7");
+
+  // Confirm, then NPC threat + instructions, then the final styled PDF.
+  await page.getByRole("button", { name: "Confirm sheet" }).click();
+  const confirmDialog = page.getByRole("dialog", {
+    name: "Confirm character sheet",
+  });
+  await confirmDialog.getByRole("button", { name: "Confirm sheet" }).click();
+  await expect(page.getByText(/confirmed and read-only/i)).toBeVisible();
+  await page.getByRole("button", { name: "Elite" }).click();
+  await page.getByLabel(/NPC generation instructions/i).fill("Strong and hardy.");
+  await page.getByRole("button", { name: "Generate Final Sheet with AI" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download Final PDF" });
+  await expect(downloadButton).toBeEnabled();
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const { readFileSync } = await import("node:fs");
+  expect(readFileSync(downloadPath!).subarray(0, 5).toString("utf8")).toBe("%PDF-");
+});
+
+// Minimal 1x1 RGBA PNG for deterministic portrait upload (magic-validated,
+// decodes to 1x1 in the browser; no external fetch involved).
+const ONE_PIXEL_PNG = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+  0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+  0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+]);
+
+test("E2E G — portrait: slot, upload, preview, move, confirm, final PDF", async ({
+  page,
+}) => {
+  await openManualEditor(page);
+
+  // Two root columns so the default 3:4 portrait frame fits the page
+  // (single-column frames overflow by design and fail closed).
+  await page.getByLabel("Sheet columns").selectOption("2");
+
+  // Add the Portrait Slot: a structural grid node, not a field.
+  await page.getByRole("button", { name: "Add portrait" }).click();
+  await expect(page.locator(".canvas-slot__placeholder")).toBeVisible();
+
+  // Upload converges to the single active source; preview is protected.
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await page.getByLabel("Portrait image file").setInputFiles({
+    name: "orc.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(ONE_PIXEL_PNG),
+  });
+  await expect(page.getByAltText("Portrait preview")).toBeVisible();
+
+  // The slot moves through the existing keyboard flow.
+  const moveHandle = page.getByRole("button", { name: "Move Portrait slot" });
+  await moveHandle.focus();
+  await page.keyboard.press("Space");
+  const moveDialog = page.getByRole("dialog", { name: /Move Portrait/ });
+  await expect(moveDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Confirm, generate the final sheet, download a valid PDF.
+  await page.getByRole("button", { name: "Confirm sheet" }).click();
+  const confirmDialog = page.getByRole("dialog", {
+    name: "Confirm character sheet",
+  });
+  await confirmDialog.getByRole("button", { name: "Confirm sheet" }).click();
+  await expect(page.getByText(/confirmed and read-only/i)).toBeVisible();
+  await page.getByRole("button", { name: "Generate Final Sheet with AI" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download Final PDF" });
+  // Image embedding renders slower than text-only sheets: wait out the
+  // generating status first, then require the ready download.
+  await expect(page.getByText(/Generating the final sheet/)).toBeHidden({
+    timeout: 60000,
+  });
+  await expect(downloadButton).toBeEnabled({ timeout: 10000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/i);
+});
+
+test("E2E H — upload rejects non-sheet files with a visible error", async ({
+  page,
+}) => {
+  // Local extraction is remote-AI-only by design; the browser remainder is
+  // the upload plumbing: invalid files are rejected with a visible message
+  // and extraction success paths stay covered by worker fake-vision tests.
+  await page.goto("/character-sheets");
+  await page.getByRole("button", { name: /Choose a file/i }).click();
+  const dialog = page.getByRole("dialog", { name: "Upload an existing sheet" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Sheet document").setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("not a character sheet"),
+  });
+  await expect(dialog.getByRole("alert")).toBeVisible();
 });

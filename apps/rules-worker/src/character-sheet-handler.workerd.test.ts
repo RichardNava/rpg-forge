@@ -142,7 +142,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         `/v1/character-sheets/sessions/${seeded.sessionId}`,
         seeded.accessToken,
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
@@ -160,7 +160,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         `/v1/character-sheets/sessions/${seeded.sessionId}`,
         "not-the-token",
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(response.status).toBe(404);
   });
@@ -178,7 +178,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
           body: { schemaVersion: "1", mode: "npc", prompt: "An orc." },
         },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(unauthorized.status).toBe(404);
 
@@ -191,7 +191,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
           body: { schemaVersion: "1", mode: "npc", prompt: "   " },
         },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(invalid.status).toBe(400);
     const body = (await invalid.json()) as { error: { code: string } };
@@ -209,7 +209,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         accessToken,
         { method: "POST", body: makeDraft(sessionId, draftId) },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(create.status).toBe(201);
     const created = (await create.json()) as CharacterSheetDraftV2;
@@ -232,7 +232,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
           },
         },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(patch.status).toBe(200);
     const v2 = (await patch.json()) as CharacterSheetDraftV2;
@@ -245,7 +245,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
         accessToken,
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(latest.status).toBe(200);
     expect(
@@ -257,7 +257,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}?version=1`,
         accessToken,
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(original.status).toBe(200);
     expect(
@@ -270,7 +270,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         accessToken,
         { method: "POST", body: { expectedVersion: 2, seed: "workerd-seed" } },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(reroll.status).toBe(200);
     const rerollBody = (await reroll.json()) as {
@@ -295,7 +295,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         accessToken,
         { method: "POST", body: { expectedVersion: 3 } },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(confirm.status).toBe(200);
     const confirmed = (await confirm.json()) as CharacterSheetDraftV2;
@@ -315,7 +315,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         accessToken,
         { method: "POST", body: makeDraft(sessionId, draftId) },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(first.status).toBe(201);
 
@@ -325,7 +325,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         accessToken,
         { method: "POST", body: makeDraft(sessionId, draftId) },
       ),
-      { DB: db, SHEET_ARTIFACTS: bucket() },
+      { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
     );
     expect(second.status).toBe(409);
     const body = (await second.json()) as { error: { code: string } };
@@ -348,7 +348,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
         accessToken,
         { method: "POST", body: makeDraft(sessionId, draftId) },
       ),
-      { DB: db },
+      { DB: db, RATE_LIMIT_MODE: "local" },
     );
     expect(response.status).toBe(503);
     const body = (await response.json()) as { error: { code: string } };
@@ -415,7 +415,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
       const seeded = await seedSheetSession(db);
       const { sessionId, accessToken } = seeded;
       const draftId = crypto.randomUUID();
-      const withEnv = { DB: db, SHEET_ARTIFACTS: bucket() };
+      const withEnv = { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" };
 
       const create = await worker.fetch(
         request(
@@ -539,7 +539,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
       const seeded = await seedSheetSession(db);
       const { sessionId, accessToken } = seeded;
       const draftId = crypto.randomUUID();
-      const withEnv = { DB: db, SHEET_ARTIFACTS: bucket() };
+      const withEnv = { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" };
 
       const create = await worker.fetch(
         request(
@@ -670,7 +670,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
           `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}`,
           accessToken,
         ),
-        { DB: db, SHEET_ARTIFACTS: bucket() },
+        { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
       );
       expect(current.status).toBe(200);
       const currentBody = (await current.json()) as CharacterSheetDraftV2;
@@ -687,7 +687,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
           `/v1/character-sheets/sessions/${sessionId}/drafts/${draftId}?version=1`,
           accessToken,
         ),
-        { DB: db, SHEET_ARTIFACTS: bucket() },
+        { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
       );
       expect(historicalGet.status).toBe(200);
       const historicalBody =
@@ -716,7 +716,7 @@ describe("character-sheet draft HTTP API with real D1 and R2", () => {
             },
           },
         ),
-        { DB: db, SHEET_ARTIFACTS: bucket() },
+        { DB: db, SHEET_ARTIFACTS: bucket(), RATE_LIMIT_MODE: "local" },
       );
       expect(patch.status).toBe(200);
       const mutated = (await patch.json()) as CharacterSheetDraftV2;

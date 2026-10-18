@@ -14,6 +14,9 @@ export const DRAFT_ERROR_CODES = [
   "version_conflict",
   "projection_invalid",
   "writeback_invalid",
+  "undo_not_available",
+  "undo_already_consumed",
+  "undo_source_missing",
 ] as const;
 
 export type DraftErrorCode = (typeof DRAFT_ERROR_CODES)[number];

@@ -32,7 +32,7 @@ import {
 } from "@repo/character-sheet-draft";
 import type { DraftHeadIdentity } from "@repo/character-sheet-session";
 import type { DraftV2Runtime } from "./draft-v2-runtime.js";
-import { readCurrentDraftV2, persistNextDraftV2 } from "./draft-v2-runtime.js";
+import { readCurrentDraftV2, persistUndoDraftV2 } from "./draft-v2-runtime.js";
 
 export type { DraftV2Runtime };
 

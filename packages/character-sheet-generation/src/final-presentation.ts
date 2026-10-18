@@ -327,7 +327,7 @@ export function createStructuralSummary(
     mode: "pc" | "npc";
     fields: readonly { key: string }[];
     sections: readonly { key: string }[];
-    structure: readonly { kind: "field" | "section"; key: string; parentKey: string | null }[];
+    structure: readonly { kind: "field" | "section" | "slot"; key: string; parentKey: string | null }[];
     layout?: { root?: { columns: number } } | undefined;
   },
 ): StructuralSummaryV1 {

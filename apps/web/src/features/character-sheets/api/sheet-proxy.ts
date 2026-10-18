@@ -124,6 +124,20 @@ export function resolveCharacterSheetProxyPath(
     second !== undefined &&
     third === "drafts" &&
     fourth !== undefined &&
+    fifth === "undo"
+  ) {
+    return {
+      kind: "ok",
+      upstreamPath: `${UPSTREAM_CHARACTER_SHEET_PATH}/sessions/${second}/drafts/${fourth}/undo`,
+    };
+  }
+
+  if (
+    method === "POST" &&
+    first === "sessions" &&
+    second !== undefined &&
+    third === "drafts" &&
+    fourth !== undefined &&
     fifth === "generate"
   ) {
     return {
@@ -308,6 +322,10 @@ export async function proxyCharacterSheetRequest(
   const contentDisposition = upstreamResponse.headers.get("content-disposition");
   if (contentDisposition !== null) {
     responseHeaders.set("content-disposition", contentDisposition);
+  }
+  const noSniff = upstreamResponse.headers.get("x-content-type-options");
+  if (noSniff !== null) {
+    responseHeaders.set("x-content-type-options", noSniff);
   }
   // Binary payloads (final PDF, portrait PNG/JPEG) must pass through as raw
   // bytes: decoding them as UTF-8 text would corrupt non-UTF8 sequences.

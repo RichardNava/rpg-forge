@@ -231,6 +231,8 @@ function makeHarness(): Harness {
         heads.claim(identity, expectedVersion, claimId, claimsAt),
       commit: (identity, claimId, expected, committedAt) =>
         heads.commit(identity, claimId, expected, committedAt),
+      commitUndo: (identity, claimId, expected, committedAt) =>
+        heads.commitUndo(identity, claimId, expected, committedAt),
       release: (identity, claimId, version, releasedAt) =>
         heads.release(identity, claimId, version, releasedAt),
       findStalePending: (now, staleAfterMs, limit) =>
@@ -271,6 +273,10 @@ function stubHeads(
       overrides.commit ??
       ((identity, claimId, expected, committedAt) =>
         base.commit(identity, claimId, expected, committedAt)),
+    commitUndo:
+      overrides.commitUndo ??
+      ((identity, claimId, expected, committedAt) =>
+        base.commitUndo(identity, claimId, expected, committedAt)),
     release:
       overrides.release ??
       ((identity, claimId, version, releasedAt) =>

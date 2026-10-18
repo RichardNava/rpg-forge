@@ -121,6 +121,21 @@ describe("resolveCharacterSheetProxyPath", () => {
     });
   });
 
+  it("accepts the draft undo endpoint", () => {
+    expect(
+      resolveCharacterSheetProxyPath("POST", [
+        "sessions",
+        SESSION_ID,
+        "drafts",
+        DRAFT_ID,
+        "undo",
+      ]),
+    ).toMatchObject({
+      kind: "ok",
+      upstreamPath: `/v1/character-sheets/sessions/${SESSION_ID}/drafts/${DRAFT_ID}/undo`,
+    });
+  });
+
   it("accepts the AI draft-creation endpoint", () => {
     expect(
       resolveCharacterSheetProxyPath("POST", [

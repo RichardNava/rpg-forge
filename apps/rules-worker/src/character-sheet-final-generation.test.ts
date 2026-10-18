@@ -439,11 +439,14 @@ describe("final generation (14.12)", () => {
     expect(pdf.headers.get("content-type")).toBe("application/pdf");
     expect(pdf.headers.get("cache-control")).toBe("no-store");
     expect(pdf.headers.get("content-disposition")).toMatch(/^attachment; filename="[^"]+\.pdf"$/);
+    expect(pdf.headers.get("x-content-type-options")).toBe("nosniff");
     const bytes = new Uint8Array(await pdf.arrayBuffer());
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
 
-    // Dedicated rate-limit key, not the extraction key.
-    expect(harness.rateLimiter.calls).toContain("sheet-final-generation:unknown");
+    // Dedicated session-scoped rate-limit key, not the extraction key.
+    expect(harness.rateLimiter.calls).toContain(
+      `sheet-final-generation:${sessionId}`,
+    );
   });
 
   it("confirmed NPC draft generates with threat and deterministic values", async () => {

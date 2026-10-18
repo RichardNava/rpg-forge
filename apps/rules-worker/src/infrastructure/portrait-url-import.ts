@@ -9,6 +9,9 @@ export const PORTRAIT_URL_MAX_CHARS = 2048;
 /** Maximum followed redirects when importing a portrait URL. */
 export const PORTRAIT_URL_MAX_REDIRECTS = 3;
 
+/** Per-attempt fetch timeout for portrait URL imports. */
+export const PORTRAIT_FETCH_TIMEOUT_MS = 15_000;
+
 export type PortraitUrlRejectionCode =
   | "invalid_url"
   | "insecure_scheme"
@@ -26,7 +29,7 @@ export interface PortraitUrlImportSuccess {
 
 export interface PortraitUrlImportFailure {
   readonly kind: "rejected";
-  readonly code: PortraitUrlImportRejectionCode;
+  readonly code: PortraitUrlRejectionCode;
   readonly message: string;
 }
 
@@ -64,9 +67,63 @@ function isForbiddenPortraitHost(hostname: string): boolean {
   if (host === "local" || host.endsWith(".local") || host.endsWith(".localhost")) return true;
   if (host === "[::1]" || host === "[::]") return true;
   const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
-  if (isIpv4Literal(bare)) return isPrivateIpv4(bare);
-  if (bare.includes(":")) return isPrivateIpv6(bare);
+  // Single-integer IPv4 form ("https://2130706433/"): WHATWG keeps the
+  // hostname as-is, so normalize to dotted-decimal before the private check.
+  // Octal/hex dotted forms are already normalized by the URL parser.
+  const dotted = normalizeSingleIntegerIpv4(bare);
+  if (dotted === null) return true;
+  if (isIpv4Literal(dotted)) return isPrivateIpv4(dotted);
+  // Embedded-IPv4 IPv6 forms ("::ffff:127.0.0.1"): judge the trailing IPv4
+  // part; malformed embedded forms are forbidden outright.
+  if (dotted.includes(":") && dotted.includes(".")) {
+    const embedded = dotted.slice(dotted.lastIndexOf(":") + 1);
+    if (!isIpv4Literal(embedded)) return true;
+    if (isPrivateIpv4(embedded)) return true;
+  }
+  if (dotted.includes(":")) return isPrivateIpv6(dotted);
   return false;
+}
+
+/**
+ * Extracts dotted-decimal IPv4 from an IPv4-mapped IPv6 suffix (the 32 bits
+ * after "::ffff:"). Returns null for malformed suffixes (forbidden).
+ */
+function ipv4FromMappedSuffix(suffix: string): string | null {
+  if (suffix.includes(".")) {
+    return isIpv4Literal(suffix) ? suffix : null;
+  }
+  const groups = suffix.split(":");
+  if (groups.length < 1 || groups.length > 2) return null;
+  const padded = groups.length === 1 ? ["0", groups[0] as string] : groups;
+  const high = Number.parseInt(padded[0] ?? "", 16);
+  const low = Number.parseInt(padded[1] ?? "", 16);
+  if (
+    !Number.isInteger(high) ||
+    !Number.isInteger(low) ||
+    high < 0 ||
+    high > 0xffff ||
+    low < 0 ||
+    low > 0xffff
+  ) {
+    return null;
+  }
+  return `${(high >>> 8) & 255}.${high & 255}.${(low >>> 8) & 255}.${low & 255}`;
+}
+
+/**
+ * Converts a single-integer IPv4 hostname to dotted-decimal. Returns null
+ * when the host is not a single integer (caller continues) or is an
+ * out-of-range integer (forbidden).
+ */
+function normalizeSingleIntegerIpv4(host: string): string | null {
+  if (!/^\d+$/.test(host)) return host;
+  const value = Number(host);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) {
+    return null;
+  }
+  return (
+    `${(value >>> 24) & 255}.${(value >>> 16) & 255}.${(value >>> 8) & 255}.${value & 255}`
+  );
 }
 
 function isIpv4Literal(host: string): boolean {
@@ -94,6 +151,13 @@ function isPrivateIpv4(host: string): boolean {
 function isPrivateIpv6(host: string): boolean {
   const h = host.toLowerCase();
   if (h === "::1" || h === "::") return true;
+  // IPv4-mapped IPv6: the URL parser translates "::ffff:127.0.0.1" to
+  // "::ffff:7f00:1", so judge the embedded last 32 bits as IPv4.
+  if (h.startsWith("::ffff:")) {
+    const mapped = ipv4FromMappedSuffix(h.slice("::ffff:".length));
+    if (mapped === null) return true;
+    return isPrivateIpv4(mapped);
+  }
   if (h.startsWith("fe80:") || h.startsWith("fe90:") || h.startsWith("fea0:") || h.startsWith("feb0:")) {
     // Covers fe80::/10 approximately via nibble check below.
   }
@@ -130,7 +194,13 @@ export async function importPortraitFromUrl(
   for (let hop = 0; hop <= PORTRAIT_URL_MAX_REDIRECTS; hop += 1) {
     let response: Response;
     try {
-      response = await fetchImpl(current, { method: "GET", redirect: "manual" });
+      // Bounded per-attempt timeout: a hanging origin must not hold a worker
+      // request indefinitely. Injected test doubles ignore the signal.
+      response = await fetchImpl(current, {
+        method: "GET",
+        redirect: "manual",
+        signal: AbortSignal.timeout(PORTRAIT_FETCH_TIMEOUT_MS),
+      });
     } catch {
       return { kind: "rejected", code: "fetch_failed", message: "The portrait URL could not be fetched." };
     }

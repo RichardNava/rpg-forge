@@ -16,10 +16,12 @@ class FakeR2Bucket implements R2BucketLike {
     value: string | Uint8Array,
     options?: { httpMetadata?: { contentType?: string; cacheControl?: string } },
   ): Promise<unknown> {
+    const contentType = options?.httpMetadata?.contentType;
+    const cacheControl = options?.httpMetadata?.cacheControl;
     this.objects.set(key, {
       bytes: typeof value === "string" ? new TextEncoder().encode(value) : value.slice(),
-      contentType: options?.httpMetadata?.contentType,
-      cacheControl: options?.httpMetadata?.cacheControl,
+      ...(contentType === undefined ? {} : { contentType }),
+      ...(cacheControl === undefined ? {} : { cacheControl }),
     });
     return {};
   }

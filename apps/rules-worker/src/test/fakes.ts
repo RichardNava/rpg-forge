@@ -890,6 +890,8 @@ export class FakeDraftHeadRepository implements DraftHeadRepositoryPort {
       pendingSince: null,
       createdAt: now,
       updatedAt: now,
+      undoSourceVersion: null,
+      undoConsumed: false,
     };
     this.rows.set(this.key(identity), head);
     return { kind: "created", head: cloneDraftHead(head) };

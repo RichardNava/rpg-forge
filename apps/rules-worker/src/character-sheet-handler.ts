@@ -6,6 +6,7 @@ import {
 import {
   DraftError,
   SheetDraftCreateRequestV2Schema,
+  parseDraftMutationV2,
   type CharacterSheetDraftIdentity,
   type CharacterSheetDraftStoreV2,
   type CharacterSheetDraftV2,
@@ -296,9 +297,8 @@ async function handleExtractSheetDocument(
     return errorResponse("SHEET_DOCUMENT_INVALID_REQUEST");
   }
   // Reject before multipart parsing can allocate an unbounded upload.
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
   const rateLimit = await deps.rateLimiter.consume(
-    `sheet-document-extraction:${clientIp}`,
+    `sheet-document-extraction:${auth.sessionId}`,
   );
   if (rateLimit.kind === "unavailable") {
     return errorResponse("RATE_LIMIT_UNAVAILABLE");
@@ -588,6 +588,15 @@ async function handleCreateDraft(
   if (auth.kind === "response") {
     return auth.response;
   }
+  const writeLimit = await deps.rateLimiter.consume(
+    `sheet-draft-write:${auth.sessionId}`,
+  );
+  if (writeLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (writeLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
   if (!hasJsonContentType(request)) {
     return errorResponse("INVALID_REQUEST", "Expected application/json.");
   }
@@ -658,8 +667,7 @@ async function handleGenerateAiDraft(
     return errorResponse("SHEET_DRAFT_INVALID");
   }
 
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const rateLimit = await deps.rateLimiter.consume(`sheet-ai-draft:${clientIp}`);
+  const rateLimit = await deps.rateLimiter.consume(`sheet-ai-draft:${auth.sessionId}`);
   if (rateLimit.kind === "unavailable") {
     return errorResponse("RATE_LIMIT_UNAVAILABLE");
   }
@@ -797,6 +805,15 @@ async function handleMutateDraft(
   if (auth.kind === "response") {
     return auth.response;
   }
+  const writeLimit = await deps.rateLimiter.consume(
+    `sheet-draft-write:${auth.sessionId}`,
+  );
+  if (writeLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (writeLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
 
   if (!hasJsonContentType(request)) {
     return errorResponse("INVALID_REQUEST", "Expected application/json.");
@@ -826,13 +843,29 @@ async function handleMutateDraft(
     draftId,
   };
 
+  // The transport union excludes `undo` at runtime but infers weakly;
+  // re-validate into the typed domain union and keep undo on its dedicated
+  // endpoint.
+  let mutation;
+  try {
+    mutation = parseDraftMutationV2(parsed.value.mutation);
+  } catch (error) {
+    return draftErrorToResponse(error);
+  }
+  if (mutation.op === "undo") {
+    return errorResponse(
+      "INVALID_REQUEST",
+      "Undo is a dedicated operation.",
+    );
+  }
+
   let mutated;
   try {
     mutated = await mutateDraftV2(
       runtime,
       draftIdentity,
       parsed.value.expectedVersion,
-      parsed.value.mutation,
+      mutation,
     );
   } catch (error) {
     return draftErrorToResponse(error);
@@ -866,6 +899,15 @@ async function handleRerollDraft(
   const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
   if (auth.kind === "response") {
     return auth.response;
+  }
+  const writeLimit = await deps.rateLimiter.consume(
+    `sheet-draft-write:${auth.sessionId}`,
+  );
+  if (writeLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (writeLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
   }
 
   if (!hasJsonContentType(request)) {
@@ -925,6 +967,15 @@ async function handleConfirmDraft(
   if (auth.kind === "response") {
     return auth.response;
   }
+  const writeLimit = await deps.rateLimiter.consume(
+    `sheet-draft-write:${auth.sessionId}`,
+  );
+  if (writeLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (writeLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
+  }
 
   if (!hasJsonContentType(request)) {
     return errorResponse("INVALID_REQUEST", "Expected application/json.");
@@ -980,6 +1031,15 @@ async function handleUndoDraft(
   const auth = await authorizeSheetSessionFromRequest(sessionId, request, deps);
   if (auth.kind === "response") {
     return auth.response;
+  }
+  const writeLimit = await deps.rateLimiter.consume(
+    `sheet-draft-write:${auth.sessionId}`,
+  );
+  if (writeLimit.kind === "unavailable") {
+    return errorResponse("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (writeLimit.kind === "denied") {
+    return errorResponse("RATE_LIMITED");
   }
 
   if (!hasJsonContentType(request)) {
@@ -1056,9 +1116,8 @@ async function handleGenerateFinal(
     );
   }
 
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
   const rateLimit = await deps.rateLimiter.consume(
-    `sheet-final-generation:${clientIp}`,
+    `sheet-final-generation:${auth.sessionId}`,
   );
   if (rateLimit.kind === "unavailable") {
     return errorResponse("RATE_LIMIT_UNAVAILABLE");
@@ -1150,8 +1209,7 @@ async function handleUploadPortrait(
   if (!request.headers.get("content-type")?.startsWith("multipart/form-data")) {
     return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
   }
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-upload:${clientIp}`);
+  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-upload:${auth.sessionId}`);
   if (rateLimit.kind === "unavailable") {
     return errorResponse("RATE_LIMIT_UNAVAILABLE");
   }
@@ -1245,8 +1303,7 @@ async function handleImportPortraitUrl(
   if (!parsed.success) {
     return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
   }
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-url:${clientIp}`);
+  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-url:${auth.sessionId}`);
   if (rateLimit.kind === "unavailable") {
     return errorResponse("RATE_LIMIT_UNAVAILABLE");
   }
@@ -1322,8 +1379,7 @@ async function handleGeneratePortrait(
   if (!parsed.success) {
     return errorResponse("SHEET_PORTRAIT_INVALID_REQUEST");
   }
-  const clientIp = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-generate:${clientIp}`);
+  const rateLimit = await deps.rateLimiter.consume(`sheet-portrait-generate:${auth.sessionId}`);
   if (rateLimit.kind === "unavailable") {
     return errorResponse("RATE_LIMIT_UNAVAILABLE");
   }
@@ -1416,6 +1472,7 @@ async function handleGetPortraitPreview(
     headers: {
       "content-type": record.metadata.mimeType,
       "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
     },
   });
 }
@@ -1471,6 +1528,7 @@ async function handleGetFinalPdf(
       "content-type": "application/pdf",
       "cache-control": "no-store",
       "content-disposition": `attachment; filename="${filename}.pdf"`,
+      "x-content-type-options": "nosniff",
     },
   });
 }

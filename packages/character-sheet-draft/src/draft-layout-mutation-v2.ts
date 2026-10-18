@@ -186,10 +186,17 @@ function applySetContainerLayout(
   if (current === mutation.columns && draft.layout !== undefined) {
     return draft;
   }
+  // Portrait Slot details are layout authority: a container change must
+  // never silently drop them.
+  const slotDetails = draft.layout?.slotDetails;
+  const completeLayout: DraftLayoutV1 =
+    slotDetails === undefined
+      ? layout
+      : { ...layout, slotDetails: { ...slotDetails } };
   if (mutation.containerKey === null) {
-    layout.root = { columns: mutation.columns };
+    completeLayout.root = { columns: mutation.columns };
   } else {
-    layout.sections[mutation.containerKey] = { columns: mutation.columns };
+    completeLayout.sections[mutation.containerKey] = { columns: mutation.columns };
   }
 
   // Reducing columns must never silently clamp child geometry: every direct
@@ -201,7 +208,7 @@ function applySetContainerLayout(
     )
     .map((placement) => placement.key)
     .filter((key) => {
-      const geometry = layout.nodes[key];
+      const geometry = completeLayout.nodes[key];
       if (geometry === undefined) return false;
       return (
         geometry.columnStart > mutation.columns ||
@@ -217,7 +224,7 @@ function applySetContainerLayout(
     );
   }
 
-  return commitV2(draft, { ...draft, layout });
+  return commitV2(draft, { ...draft, layout: completeLayout });
 }
 
 function applySetNodeLayout(
@@ -241,9 +248,16 @@ function applySetNodeLayout(
           sections: { ...draft.layout.sections },
           nodes: { ...draft.layout.nodes },
         };
-  const columns = parentContainerColumnsForNode(draft, layout, mutation.key);
+  // Portrait Slot details are layout authority: a node change must never
+  // silently drop them.
+  const nodeSlotDetails = draft.layout?.slotDetails;
+  const completeNodeLayout: DraftLayoutV1 =
+    nodeSlotDetails === undefined
+      ? layout
+      : { ...layout, slotDetails: { ...nodeSlotDetails } };
+  const columns = parentContainerColumnsForNode(draft, completeNodeLayout, mutation.key);
   const next: DraftLayoutNodeV1 = { ...mutation.placement };
-  const current = layout.nodes[mutation.key];
+  const current = completeNodeLayout.nodes[mutation.key];
   if (
     current !== undefined &&
     draftNodeLayoutsEqual(current, next) &&
@@ -252,9 +266,9 @@ function applySetNodeLayout(
     return draft;
   }
   assertGeometryFitsParent(mutation.key, next, columns);
-  layout.nodes[mutation.key] = next;
+  completeNodeLayout.nodes[mutation.key] = next;
 
-  return commitV2(draft, { ...draft, layout });
+  return commitV2(draft, { ...draft, layout: completeNodeLayout });
 }
 
 function assertGeometryFitsParent(

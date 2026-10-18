@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   CharacterSheetDraftV2,
   DraftField,
@@ -262,6 +262,7 @@ function FieldInspector({
           )}
           {field.type === "choice" && (
             <ChoiceOptionsEditor
+              key={`${field.key}:${JSON.stringify(field.options ?? [])}`}
               field={field}
               onChange={(options) =>
                 callbacks.onSetFieldType({
@@ -772,13 +773,12 @@ function ChoiceOptionsEditor({
   onChange(options: string[]): void;
   readOnly: boolean;
 }) {
+  // Local draft state initializes from props; the parent keys this editor
+  // by field + options, so external changes remount instead of syncing
+  // state inside an effect.
   const [options, setOptions] = useState<string[]>(field.options ?? []);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
-
-  useEffect(() => {
-    setOptions(field.options ?? []);
-  }, [field.options]);
 
   function commitEdit() {
     if (editingIndex !== null) {

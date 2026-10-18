@@ -29,6 +29,15 @@ export function FieldValueInput({
   onSetValue(value: DraftValue): void;
   onClearValue(): void;
 }) {
+  // Hooks stay unconditional: the checkbox branch below needs the ref/effect,
+  // but hooks must run in the same order on every render.
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  const isCheckboxBlank = value === undefined || value === null;
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = isCheckboxBlank;
+    }
+  }, [isCheckboxBlank]);
   if (field.type === "label") {
     return (
       <span
@@ -41,14 +50,7 @@ export function FieldValueInput({
   }
   if (field.type === "checkbox") {
     // Tri-state: blank (indeterminate) / false / true
-    const isIndeterminate = value === undefined || value === null;
     const isChecked = value === true;
-    const checkboxRef = useRef<HTMLInputElement>(null);
-    useEffect(() => {
-      if (checkboxRef.current) {
-        checkboxRef.current.indeterminate = isIndeterminate;
-      }
-    }, [isIndeterminate]);
     return (
       <input
         ref={checkboxRef}

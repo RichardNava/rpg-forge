@@ -161,6 +161,8 @@ function makeHead(overrides: Partial<DraftHead> = {}): DraftHead {
     pendingVersion: null,
     pendingClaimId: null,
     pendingSince: null,
+    undoSourceVersion: null,
+    undoConsumed: false,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -203,6 +205,10 @@ function makeHarness(head: DraftHead | null = makeHead()): Harness {
       commit: (identity, claimId, expected, committedAt) => {
         events.push("commit");
         return heads.commit(identity, claimId, expected, committedAt);
+      },
+      commitUndo: (identity, claimId, expected, committedAt) => {
+        events.push("commit-undo");
+        return heads.commitUndo(identity, claimId, expected, committedAt);
       },
       release: (identity, claimId, version, releasedAt) => {
         events.push("release");

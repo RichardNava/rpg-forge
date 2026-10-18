@@ -69,6 +69,27 @@ describe("validatePortraitSourceUrl", () => {
       expect(validatePortraitSourceUrl(raw)).toMatchObject({ ok: false, code: "forbidden_host" });
     }
   });
+
+  it("rejects single-integer IPv4 forms for private space", () => {
+    // 2130706433 == 127.0.0.1 ; 16843009 == 1.1.1.1 (public, allowed).
+    expect(validatePortraitSourceUrl("https://2130706433/a.png")).toMatchObject({
+      ok: false,
+      code: "forbidden_host",
+    });
+    expect(validatePortraitSourceUrl("https://16843009/a.png")).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it("rejects IPv4-mapped IPv6 private targets", () => {
+    expect(validatePortraitSourceUrl("https://[::ffff:127.0.0.1]/a.png")).toMatchObject({
+      ok: false,
+      code: "forbidden_host",
+    });
+    expect(validatePortraitSourceUrl("https://[::ffff:1.1.1.1]/a.png")).toMatchObject({
+      ok: true,
+    });
+  });
 });
 
 describe("importPortraitFromUrl", () => {

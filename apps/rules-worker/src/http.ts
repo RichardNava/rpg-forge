@@ -117,24 +117,14 @@ export async function readBoundedJson(
   request: Request,
   maxBytes = MAX_REQUEST_BODY_BYTES,
 ): Promise<unknown | null> {
-  const contentLength = request.headers.get("content-length");
-  if (contentLength !== null) {
-    const parsed = Number.parseInt(contentLength, 10);
-    if (Number.isFinite(parsed) && parsed > maxBytes) {
-      return null;
-    }
-  }
-  let text: string;
-  try {
-    text = await request.text();
-  } catch {
-    return null;
-  }
-  if (text.length > maxBytes) {
+  // Stream-capped: never buffer more than maxBytes regardless of what
+  // content-length claims (it is advisory only and may be absent or forged).
+  const bytes = await readBoundedBytes(request, maxBytes);
+  if (bytes === null) {
     return null;
   }
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
   } catch {
     return null;
   }

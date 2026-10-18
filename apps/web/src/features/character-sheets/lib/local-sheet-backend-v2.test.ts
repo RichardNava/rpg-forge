@@ -232,6 +232,75 @@ describe("createLocalSheetBackendV2", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
+  it("generates a final PDF with an uploaded portrait through the slot", async () => {
+    const api = createLocalSheetBackendV2();
+    const session = await api.createSession("token");
+    const created = await api.createDraft(
+      session.sessionId,
+      session.accessToken,
+      createBlankDraftV2(session.sessionId),
+    );
+    const slotted = await api.mutateDraft(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      {
+        expectedVersion: 1,
+        mutation: { op: "add_portrait_slot", key: "portrait", parentKey: null },
+      },
+    );
+    expect(slotted.draft.slots ?? []).toHaveLength(1);
+    // Two root columns so the default 3:4 portrait frame fits the page
+    // (single-column portrait frames overflow by design and fail closed).
+    const gridded = await api.mutateDraft(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      {
+        expectedVersion: slotted.draft.version,
+        mutation: { op: "set_container_layout", containerKey: null, columns: 2 },
+      },
+    );
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+      0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+      0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+      0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+      0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ]);
+    const ref = await api.uploadPortrait(
+      session.sessionId,
+      session.accessToken,
+      new File([png], "orc.png", { type: "image/png" }),
+    );
+    const confirmed = await api.confirmDraft(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      { expectedVersion: gridded.draft.version },
+    );
+    const started = await api.generateFinalSheet(
+      session.sessionId,
+      session.accessToken,
+      created.draftId,
+      {
+        expectedVersion: confirmed.version,
+        options: {
+          threat: null,
+          visualStyle: "medieval",
+          instructions: null,
+          npcInstructions: null,
+          portrait: { kind: "upload", assetId: ref.assetId },
+        },
+        seed: "local-seed-1",
+      },
+    );
+    expect(started.status).toBe("READY");
+    const pdf = await api.downloadFinalPdf(session.sessionId, session.accessToken, started.runId);
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
   it("rejects a session-mismatched draft as invalid", async () => {
     const api = createLocalSheetBackendV2();
     const session = await api.createSession("token");

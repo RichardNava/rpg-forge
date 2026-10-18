@@ -564,6 +564,53 @@ describe("AI draft creation route (14.14)", () => {
     expect(unavailable.status).toBe(503);
   });
 
+  it("keys AI rate limits by session and throttles draft writes", async () => {
+    const harness = makeAuthoringHarness({ creationProposal: AI_PROPOSAL });
+    const { sessionId, accessToken } = await createSession(harness);
+    await postGenerateAi(harness, sessionId, accessToken, {
+      schemaVersion: "1",
+      mode: "npc",
+      prompt: "A large orc.",
+    });
+    expect(
+      harness.rateLimiter.calls.some(
+        (key) => key === `sheet-ai-draft:${sessionId}`,
+      ),
+    ).toBe(true);
+
+    // Draft writes consume a dedicated session-scoped bucket.
+    const draftId = "draft.write.limit";
+    const created = await handleRequest(
+      new Request(`${SHEET_SESSIONS_URL}/${sessionId}/drafts`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify(makeNpcDraft(sessionId, draftId)),
+      }),
+      harness.deps,
+    );
+    expect(created.status).toBe(201);
+    expect(
+      harness.rateLimiter.calls.some(
+        (key) => key === `sheet-draft-write:${sessionId}`,
+      ),
+    ).toBe(true);
+
+    // A denied write bucket rejects the mutation before any work happens.
+    harness.rateLimiter.result = { kind: "denied" };
+    const denied = await handleRequest(
+      new Request(`${SHEET_SESSIONS_URL}/${sessionId}/drafts/${draftId}`, {
+        method: "PATCH",
+        headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          expectedVersion: 1,
+          mutation: { op: "set_value", key: "notes", value: "x" },
+        }),
+      }),
+      harness.deps,
+    );
+    expect(denied.status).toBe(429);
+  });
+
   it("maps invalid proposals to a typed failure and enforces the rate limit", async () => {
     const harness = makeAuthoringHarness({
       creationProposal: {

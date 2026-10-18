@@ -92,8 +92,6 @@ function makePortraitHarness(options: {
     rulesAnalysisRunRepository: new FakeRulesAnalysisRunRepository(),
     sheetSessionRepository: new FakeSheetSessionRepository(),
     sheetDraftHeadRepository: new FakeDraftHeadRepository(),
-    sheetDraftStoreV2: undefined,
-    sheetArtifactStore: undefined,
     portraitAssetStore:
       options.artifacts ?? createR2CharacterSheetPortraitAssetStore(bucket),
     ...(options.portraitGeneration === null
@@ -152,6 +150,7 @@ describe("portrait upload source", () => {
     expect(preview.status).toBe(200);
     expect(preview.headers.get("content-type")).toBe("image/png");
     expect(preview.headers.get("cache-control")).toBe("no-store");
+    expect(preview.headers.get("x-content-type-options")).toBe("nosniff");
     expect([...new Uint8Array(await preview.arrayBuffer())]).toEqual([...tinyPng()]);
   });
 

@@ -472,6 +472,15 @@ The V2 domain layer now implements its complete lifecycle, independently of any 
 | Portrait integration (14.13)                         | IMPLEMENTED (14.13)       | Portrait Slot spatial authority; upload/URL/AI converge to one session asset; protected preview; server ownership validation; contain-fit styled embedding with style-invariant semantics |
 | NPC instruction-driven authoring (14.14)           | IMPLEMENTED (14.14)       | Bounded npcInstructions fill eligible blank NPC fields only; explicit > AI > threat/default; null preserves 14.12; failures fail the run, never silent fallback; style-independent content |
 | AI-assisted character creation (14.14)             | IMPLEMENTED (14.14)       | Generate Character with AI proposes an editable sheet compiled by app-owned code into an ordinary unconfirmed Draft V2; single Workshop downstream; no runs, no auto-confirm; no Portrait Slot from AI |
+| MVP hardening (14.15)                              | COMPLETE (14.15)          | Zero sheet-owned TS/lint errors; security review remediated; first green production build; 9/9 browser E2E; release-readiness recorded; no new features |
+
+### Phase completion record
+
+14.11 COMPLETE — final-generation contract.
+14.12 COMPLETE — AI final presentation with Medieval/Sci-fi styled PDFs.
+14.13 COMPLETE — portrait slot, sources, and embedding.
+14.14 COMPLETE — NPC instruction authoring and AI-assisted creation.
+14.15 COMPLETE — MVP hardening closure (this phase).
 
 ### V2 response policy (after runtime cutover)
 
@@ -498,4 +507,6 @@ Full transport, concurrency and error contract:
 - **Phase 14.12:** `docs/architecture/phase-14.12/character-sheet-ai-final-presentation.md`
 - **Phase 14.13:** `docs/architecture/phase-14.13/character-sheet-portrait-integration.md`
 - **Phase 14.14:** `docs/architecture/phase-14.14/character-sheet-advanced-ai-authoring.md`
+- **Phase 14.15:** `docs/architecture/phase-14.15/character-sheet-mvp-hardening.md`
+- **Release readiness:** `docs/features/character-sheets-release-readiness.md`
 - **Visual Style:** `.opencode/skills/rpg-frontend-style/SKILL.md`

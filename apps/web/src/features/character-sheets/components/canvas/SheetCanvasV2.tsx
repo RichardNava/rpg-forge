@@ -130,9 +130,9 @@ export function SheetCanvasV2({
     (key: string): string =>
       draft.fields.find((entry) => entry.key === key)?.label ??
       draft.sections.find((entry) => entry.key === key)?.title ??
-      (draft.slots ?? []).find((entry) => entry.key === key) !== undefined
+      ((draft.slots ?? []).find((entry) => entry.key === key) !== undefined
         ? "Portrait"
-        : key,
+        : key),
     [draft],
   );
 

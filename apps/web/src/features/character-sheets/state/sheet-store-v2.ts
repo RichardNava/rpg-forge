@@ -66,9 +66,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
     );
   }
 
-  function workshopForDraft(
-    mode: CharacterSheetDraftV2["mode"],
-  ): WorkshopPreferences {
+  function defaultWorkshopPreferences(): WorkshopPreferences {
     return {
       threatLevel: null,
       visualStyle: "medieval",
@@ -164,7 +162,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           draft,
           saveStatus: "idle",
           savedVersion: draft.version,
-          workshop: workshopForDraft(draft.mode),
+          workshop: defaultWorkshopPreferences(),
           rerolledKeys: null,
           finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
           error: null,
@@ -209,7 +207,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           draft,
           saveStatus: "saved",
           savedVersion: draft.version,
-          workshop: workshopForDraft(draft.mode),
+          workshop: defaultWorkshopPreferences(),
           rerolledKeys: null,
           finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
           error: null,
@@ -494,7 +492,7 @@ export function createSheetStoreV2(options: SheetStoreV2Options): SheetStoreV2 {
           draft,
           saveStatus: "saved",
           savedVersion: draft.version,
-          workshop: workshopForDraft(draft.mode),
+          workshop: defaultWorkshopPreferences(),
           rerolledKeys: null,
           finalGeneration: { status: "idle", runId: null, draftVersion: null, error: null },
           aiDraft: { status: "idle", error: null },

@@ -65,6 +65,9 @@ const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   SHEET_PORTRAIT_NOT_FOUND: 404,
   SHEET_AI_DRAFT_UNAVAILABLE: 503,
   SHEET_AI_DRAFT_FAILED: 500,
+  SHEET_DRAFT_UNDO_NOT_AVAILABLE: 409,
+  SHEET_DRAFT_UNDO_ALREADY_CONSUMED: 409,
+  SHEET_DRAFT_UNDO_SOURCE_MISSING: 500,
   INTERNAL_ERROR: 500,
 };
 
@@ -178,6 +181,12 @@ const ERROR_DEFAULT_MESSAGE: Record<ErrorCode, string> = {
     "AI draft creation is temporarily unavailable. Please try again later.",
   SHEET_AI_DRAFT_FAILED:
     "The AI proposal could not be converted into an editable character sheet.",
+  SHEET_DRAFT_UNDO_NOT_AVAILABLE:
+    "No undo source version is available for this draft.",
+  SHEET_DRAFT_UNDO_ALREADY_CONSUMED:
+    "The one-level Undo has already been consumed.",
+  SHEET_DRAFT_UNDO_SOURCE_MISSING:
+    "The undo source snapshot could not be loaded.",
   INTERNAL_ERROR: "An internal error occurred.",
 };
 

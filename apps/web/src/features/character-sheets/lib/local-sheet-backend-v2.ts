@@ -3,6 +3,7 @@ import {
   applyDraftMutationV2,
   draftError,
   finalizeDraftV2,
+  parseDraftMutationV2,
   rerollLockedDraftValuesV2,
   validateDraftV2,
   type CharacterSheetDraftV2,
@@ -281,19 +282,24 @@ export function createLocalSheetBackendV2(
     }> {
       requireSession(sessionId, accessToken);
       const current = requireOwnedDraft(sessionId, draftId);
+      // Re-validate into the typed domain union; undo stays on its dedicated
+      // local path, mirroring the Worker PATCH contract.
+      const mutation = parseDraftMutationV2(request.mutation);
+      if (mutation.op === "undo") {
+        throw new DraftError(
+          "invalid_mutation",
+          "Undo is a dedicated operation.",
+        );
+      }
       const next = applyDraftMutationV2(
         current,
-        request.mutation as any,
+        mutation,
         request.expectedVersion,
       );
       const key = keyOf(sessionId, draftId);
 
       // Update undo metadata: real mutations set undo source to current version
       if (next.version !== current.version) {
-        const head = draftHeads.get(key) ?? {
-          undoSourceVersion: null,
-          undoConsumed: false,
-        };
         draftHeads.set(key, {
           undoSourceVersion: current.version,
           undoConsumed: false,
@@ -390,7 +396,6 @@ export function createLocalSheetBackendV2(
       }
 
       // Create the undone draft by restoring from the undo source
-      const nextVersion = current.version + 1;
       const undoneDraft: CharacterSheetDraftV2 = {
         ...undoSourceDraft,
         draftId: current.draftId,
@@ -405,8 +410,11 @@ export function createLocalSheetBackendV2(
       };
 
       // Apply the undo mutation which bumps version to current.version + 1
-      const undoMutation = { op: "undo" } as const;
-      const finalDraft = applyDraftMutationV2(undoneDraft, undoMutation as any, undoneDraft.version);
+      const finalDraft = applyDraftMutationV2(
+        undoneDraft,
+        parseDraftMutationV2({ op: "undo" }),
+        undoneDraft.version,
+      );
 
       // Update the head: mark undo as consumed, keep the same undo source version
       draftHeads.set(key, {

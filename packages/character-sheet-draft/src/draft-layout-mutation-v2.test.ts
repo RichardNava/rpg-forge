@@ -103,6 +103,55 @@ function apply(
   return applyDraftMutationV2(draft, mutation, draft.version);
 }
 
+describe("portrait slot detail preservation", () => {
+  function makeSlottedDraft(): CharacterSheetDraftV2 {
+    return {
+      ...makeLayoutDraft(),
+      slots: [{ key: "portrait", type: "portrait" }],
+      structure: [
+        ...makeLayoutDraft().structure,
+        { kind: "slot", key: "portrait", parentKey: null },
+      ],
+      layout: {
+        ...makeLayoutDraft().layout!,
+        slotDetails: { portrait: { aspectRatio: "3:4" } },
+        nodes: {
+          ...makeLayoutDraft().layout!.nodes,
+          portrait: { ...DEFAULT_DRAFT_NODE_LAYOUT_V1 },
+        },
+      },
+    };
+  }
+
+  it("set_container_layout preserves slot details", () => {
+    const next = apply(makeSlottedDraft(), {
+      op: "set_container_layout",
+      containerKey: null,
+      columns: 3,
+    });
+    expect(next.layout?.root.columns).toBe(3);
+    expect(next.layout?.slotDetails).toEqual({
+      portrait: { aspectRatio: "3:4" },
+    });
+  });
+
+  it("set_node_layout preserves slot details", () => {
+    const next = apply(makeSlottedDraft(), {
+      op: "set_node_layout",
+      key: "strength",
+      placement: {
+        columnStart: 1,
+        columnSpan: 2,
+        rowSpan: 1,
+        breakBefore: false,
+      },
+    });
+    expect(next.layout?.slotDetails).toEqual({
+      portrait: { aspectRatio: "3:4" },
+    });
+  });
+});
+
 describe("set_container_layout", () => {
   it("sets Root columns with exactly N+1", () => {
     const draft = makeLayoutDraft();

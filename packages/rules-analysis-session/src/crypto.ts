@@ -23,7 +23,9 @@ export const webCrypto: SessionCrypto = {
     return bytes;
   },
   async sha256Hex(bytes: Uint8Array): Promise<string> {
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    // Copy into an ArrayBuffer-backed view: newer DOM libs type
+    // crypto.subtle.digest as requiring ArrayBuffer (not SharedArrayBuffer).
+    const digest = await crypto.subtle.digest("SHA-256", bytes.slice().buffer);
     return toHex(new Uint8Array(digest));
   },
 };

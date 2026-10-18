@@ -1,49 +1,15 @@
 import { readRulesWorkerConfiguration } from "@/config/env.server";
 import {
+  proxyBodyCapForRoute,
+  readBoundedProxyBody,
+} from "@/features/character-sheets/api/proxy-body-limits";
+import {
   proxyCharacterSheetRequest,
   proxyErrorResponse,
   type CharacterSheetProxyMethod,
 } from "@/features/character-sheets/api/sheet-proxy";
 
 export const dynamic = "force-dynamic";
-
-const EXTRACTION_MAX_REQUEST_BYTES = 16 * 1024 * 1024 + 64 * 1024;
-
-async function readBoundedExtractionBody(
-  request: Request,
-): Promise<ArrayBuffer | null> {
-  const declaredLength = request.headers.get("content-length");
-  if (declaredLength !== null && Number(declaredLength) > EXTRACTION_MAX_REQUEST_BYTES) {
-    return null;
-  }
-  if (request.body === null) {
-    return null;
-  }
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const next = await reader.read();
-      if (next.done) break;
-      size += next.value.byteLength;
-      if (size > EXTRACTION_MAX_REQUEST_BYTES) {
-        await reader.cancel();
-        return null;
-      }
-      chunks.push(next.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const body = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return body.buffer;
-}
 
 async function handleCharacterSheetProxy(
   method: CharacterSheetProxyMethod,
@@ -74,16 +40,36 @@ async function handleCharacterSheetProxy(
 
   const isExtraction =
     method === "POST" && path.length === 3 && path[0] === "sessions" && path[2] === "extraction";
-  const bodyText =
-    method === "GET"
-      ? null
-      : isExtraction
-        ? await readBoundedExtractionBody(request)
-        : await request.arrayBuffer();
-  if (isExtraction && bodyText === null) {
+  const isPortraitUpload =
+    method === "POST" &&
+    path.length === 4 &&
+    path[0] === "sessions" &&
+    path[2] === "portraits" &&
+    path[3] === "upload";
+  // A missing body is forwarded as-is for the Worker to validate; only an
+  // over-cap stream is rejected here.
+  const hasBody = method !== "GET" && request.body !== null;
+  const bodyText = !hasBody
+    ? null
+    : await readBoundedProxyBody(request, proxyBodyCapForRoute(method, path));
+  if (hasBody && bodyText === null) {
+    if (isExtraction) {
+      return proxyErrorResponse(
+        "SHEET_DOCUMENT_TOO_LARGE",
+        "The uploaded document is too large.",
+        413,
+      );
+    }
+    if (isPortraitUpload) {
+      return proxyErrorResponse(
+        "SHEET_PORTRAIT_TOO_LARGE",
+        "The portrait image is too large.",
+        413,
+      );
+    }
     return proxyErrorResponse(
-      "SHEET_DOCUMENT_TOO_LARGE",
-      "The uploaded document is too large.",
+      "INVALID_REQUEST",
+      "The request body is too large.",
       413,
     );
   }
