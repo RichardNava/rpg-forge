@@ -10,8 +10,8 @@ import {
   type FieldCandidate,
   type FieldCandidatesOutput,
   type SectionPlanOutput,
-} from "./intermediate.js";
-import { collectExpressionFieldKeys } from "./formulas.js";
+} from "./intermediate.ts";
+import { collectExpressionFieldKeys } from "./formulas.ts";
 
 export type ParsedPlan =
   { ok: true; plan: SectionPlanOutput } | { ok: false; error: string };

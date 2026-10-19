@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PortraitAssetIdSchema, PortraitAssetSourceSchema } from "./portrait-asset.js";
+import { PortraitAssetIdSchema, PortraitAssetSourceSchema } from "./portrait-asset.ts";
 
 /**
  * Shared portrait transport contracts (14.13). Route identity carries

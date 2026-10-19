@@ -2,17 +2,17 @@ import { z } from "zod";
 import {
   type CharacterName,
   type CharacterSheetAuthoringMode,
-} from "./authoring.js";
+} from "./authoring.ts";
 import {
   applyGenerationInstructions,
   GenerationInstructionApplicationResultSchema,
   type ProposedGenerationInstruction,
-} from "./instructions.js";
+} from "./instructions.ts";
 import {
   resolveSources,
   SourceResolutionResultSchema,
   type SourceResolutionResult,
-} from "./source-merge.js";
+} from "./source-merge.ts";
 import {
   MAX_GENERATION_CONFLICTS,
   NormalizedSheetDefinitionSchema,
@@ -20,7 +20,7 @@ import {
   type NPCAuthoringDefinition,
   type NormalizedSheetDefinition,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 export interface UnifiedSheetGenerationInput {
   mode: CharacterSheetAuthoringMode;

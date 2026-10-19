@@ -2,16 +2,16 @@ import { z } from "zod";
 import {
   createDeterministicRandom,
   stableNameSeed,
-} from "./deterministic.js";
+} from "./deterministic.ts";
 import {
   ThreatLevelSchema,
   type ThreatLevel,
-} from "./final-generation-contract.js";
+} from "./final-generation-contract.ts";
 import {
   THREAT_BIAS,
   NEUTRAL_THREAT_BIAS,
   THREAT_BIAS_WINDOW,
-} from "./final-construction.js";
+} from "./final-construction.ts";
 
 /**
  * Final resolved values result.

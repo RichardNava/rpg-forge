@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { canonicalizeFieldLabel } from "./source-resolution.js";
+import { canonicalizeFieldLabel } from "./source-resolution.ts";
 import {
   parseRulebookDerivedDefinition,
   validateRulebookDerivedDefinition,
   type RulebookDerivedDefinition,
   type RulebookDerivedField,
-} from "./rulebook-derivation.js";
+} from "./rulebook-derivation.ts";
 import {
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
   SOURCE_ID,
-} from "./test/fakes.js";
+} from "./test/fakes.ts";
 
 const HIT_POINTS_RANGE = { min: 1, max: 20 };
 

@@ -1,31 +1,31 @@
 import type { RulesContext } from "@repo/rules-context";
-import type { CharacterSheetAuthoringMode } from "./authoring.js";
-import type { CharacterSheetGenerationRequest } from "./authoring.js";
-import { normalizeGuiSource } from "./gui-normalization.js";
-import type { ProposedGenerationInstruction } from "./instructions.js";
-import { SHEET_GENERATION_RETRIES } from "./model.js";
+import type { CharacterSheetAuthoringMode } from "./authoring.ts";
+import type { CharacterSheetGenerationRequest } from "./authoring.ts";
+import { normalizeGuiSource } from "./gui-normalization.ts";
+import type { ProposedGenerationInstruction } from "./instructions.ts";
+import { SHEET_GENERATION_RETRIES } from "./model.ts";
 import type {
   InstructionExtractionPort,
   RulebookFieldDerivationPort,
-} from "./ports.js";
+} from "./ports.ts";
 import {
   appendValidationFeedback,
   buildRulebookDerivationSystemPrompt,
   buildRulebookDerivationUserPrompt,
-} from "./prompt.js";
+} from "./prompt.ts";
 import {
   parseRulebookDerivedDefinition,
   validateRulebookDerivedDefinition,
   type RulebookDerivationValidationResult,
-} from "./rulebook-derivation.js";
+} from "./rulebook-derivation.ts";
 import type {
   GenerationConflict,
   SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 import {
   resolveUnifiedSheetDefinition,
   type UnifiedSheetGenerationResult,
-} from "./unified-generation.js";
+} from "./unified-generation.ts";
 
 /**
  * A narrow provider-agnostic service dependency. `extractionPort` is reserved

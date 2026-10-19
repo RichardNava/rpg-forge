@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema.js";
+import { MAX_DRAFT_FIELD_KEY_CHARS } from "./draft-schema.ts";
 
 /**
  * Canonical key grammar, intentionally local (not imported) so this module

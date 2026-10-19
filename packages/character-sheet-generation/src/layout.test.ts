@@ -5,7 +5,7 @@ import {
   computeSectionColumns,
   intrinsicHeightHint,
   packSectionPages,
-} from "./layout.js";
+} from "./layout.ts";
 
 describe("compileTheme", () => {
   it("maps player and npc modes to fixed themes", () => {

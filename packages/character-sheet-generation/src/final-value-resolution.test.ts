@@ -4,8 +4,8 @@ import {
   assertFinalValueResolutionEligible,
   FinalResolvedValuesV1Schema,
   type FinalResolvedValuesV1,
-} from "./final-value-resolution.js";
-import type { ThreatLevel } from "./final-generation-contract.js";
+} from "./final-value-resolution.ts";
+import type { ThreatLevel } from "./final-generation-contract.ts";
 
 describe("FinalResolvedValuesV1Schema", () => {
   it("accepts a valid result", () => {

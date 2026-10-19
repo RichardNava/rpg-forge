@@ -6,7 +6,7 @@ import {
   compileAiProposalToDraftV2,
   validateAiDraftProposal,
   type AiDraftProposalV1,
-} from "./ai-draft-creation.js";
+} from "./ai-draft-creation.ts";
 
 function validProposal(): AiDraftProposalV1 {
   return {

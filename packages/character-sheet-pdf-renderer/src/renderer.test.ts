@@ -14,12 +14,12 @@ import {
   specWithMultiplePages,
   specWithUnsupportedFieldType,
   specWithWrongValueType,
-} from "./fixtures.js";
+} from "./fixtures.ts";
 import {
   CharacterSheetPdfRenderError,
   PDF_RENDER_ERROR_CODES,
-} from "./errors.js";
-import { renderCharacterSheetPdf } from "./renderer.js";
+} from "./errors.ts";
+import { renderCharacterSheetPdf } from "./renderer.ts";
 
 async function expectRenderError(
   spec: CharacterSheetSpec,

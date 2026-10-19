@@ -3,8 +3,8 @@ import {
   collectExpressionFieldKeys,
   compileCalculationExpression,
   CompileCalculationError,
-} from "./formulas.js";
-import type { CalculationExpression } from "./intermediate.js";
+} from "./formulas.ts";
+import type { CalculationExpression } from "./intermediate.ts";
 
 const keyToId = new Map([
   ["level", "field-level"],

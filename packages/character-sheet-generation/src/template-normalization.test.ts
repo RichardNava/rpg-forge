@@ -3,9 +3,9 @@ import type { CharacterSheetTemplate } from "@repo/character-sheet-template";
 import {
   normalizeTemplateFields,
   overlayTemplateWithGui,
-} from "./template-normalization.js";
-import type { CharacterSheetAuthoringMode } from "./authoring.js";
-import type { SourceResolvedField } from "./source-resolution.js";
+} from "./template-normalization.ts";
+import type { CharacterSheetAuthoringMode } from "./authoring.ts";
+import type { SourceResolvedField } from "./source-resolution.ts";
 
 const pcTemplate: CharacterSheetTemplate = {
   schemaVersion: 1,

@@ -7,8 +7,8 @@ import {
   ProposedGenerationInstructionSchema,
   RejectedGenerationInstructionSchema,
   ValidatedGenerationInstructionSchema,
-} from "./instructions.js";
-import { MAX_TOTAL_FIELDS } from "./model.js";
+} from "./instructions.ts";
+import { MAX_TOTAL_FIELDS } from "./model.ts";
 import {
   canonicalizeFieldLabel,
   GENERATION_CONFLICT_CODES,
@@ -19,7 +19,7 @@ import {
   type GenerationConflict,
   type NormalizedSheetDefinition,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 const rulebookCitations = [
   {

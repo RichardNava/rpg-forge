@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   SHEET_GENERATION_INPUT_ARTIFACT_VERSION,
   SHEET_GENERATION_SPEC_ARTIFACT_VERSION,
-} from "./model.js";
+} from "./model.ts";
 
 /**
  * The generation input artifact persisted as a temporary object (R2), never in

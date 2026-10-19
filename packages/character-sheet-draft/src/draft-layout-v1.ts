@@ -7,7 +7,7 @@ import {
   SlotDetailsV1Schema,
   type PortraitAspectRatio,
   type SlotDetailsV1,
-} from "./draft-slot-v2.js";
+} from "./draft-slot-v2.ts";
 
 /**
  * Canonical spatial layout contract, version 1 (14.8 spatial foundation).
@@ -89,9 +89,9 @@ export type DraftLayoutNodeV1 = z.infer<typeof DraftLayoutNodeV1Schema>;
 export {
   PortraitAspectRatioSchema as PortraitAspectRatioV1Schema,
   DEFAULT_PORTRAIT_ASPECT_RATIO as DEFAULT_PORTRAIT_ASPECT_RATIO_V1,
-} from "./draft-slot-v2.js";
-export type { PortraitAspectRatio as PortraitAspectRatioV1 } from "./draft-slot-v2.js";
-export type { SlotDetailsV1 } from "./draft-slot-v2.js";
+} from "./draft-slot-v2.ts";
+export type { PortraitAspectRatio as PortraitAspectRatioV1 } from "./draft-slot-v2.ts";
+export type { SlotDetailsV1 } from "./draft-slot-v2.ts";
 
 /**
  * Complete spatial layout for one draft snapshot. When present on a draft it

@@ -7,6 +7,7 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*.ts", "vitest.config.ts", "vitest.workerd.config.ts"]

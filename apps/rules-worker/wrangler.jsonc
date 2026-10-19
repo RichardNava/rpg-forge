@@ -35,7 +35,7 @@
         // The in-memory limiter is intentionally local-only; remote deployments
         // must provide the Cloudflare RATE_LIMITER binding instead.
         "RATE_LIMIT_MODE": "local",
-        "TURNSTILE_MODE": "local",
+        "TURNSTILE_MODE": "production",
         "SHEET_VISION_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
         // Prints raw model output only for a deliberate local diagnostic session.
         // LOCAL-ONLY: never set SHEET_VISION_DEBUG_RAW_RESPONSE in preview/prod;

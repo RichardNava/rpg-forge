@@ -10,21 +10,21 @@ import type {
   RulebookFieldDerivationPort,
   SheetArtifactPort,
   SheetGenerationPort,
-} from "../ports.js";
+} from "../ports.ts";
 import type {
   SheetRunClaimResult,
   SheetRunCreationResult,
   SheetGenerationRunRepositoryPort,
-} from "../repository.js";
+} from "../repository.ts";
 import type {
   SheetGenerationFailureCode,
   SheetGenerationRun,
-} from "../model.js";
+} from "../model.ts";
 import type {
   CalculationCandidate,
   FieldCandidate,
   SectionPlanOutput,
-} from "../intermediate.js";
+} from "../intermediate.ts";
 
 export const FIXED_NOW = new Date("2026-09-08T12:00:00.000Z");
 export const clock = { now: () => FIXED_NOW };

@@ -11,29 +11,29 @@ import type {
   OutputLocale,
   PCPortraitInput,
   VisualStyleKey,
-} from "./authoring.js";
-import { compileCharacterSheet, SheetCompileError } from "./compiler.js";
-import { createDeterministicRandom, stableNameSeed } from "./deterministic.js";
+} from "./authoring.ts";
+import { compileCharacterSheet, SheetCompileError } from "./compiler.ts";
+import { createDeterministicRandom, stableNameSeed } from "./deterministic.ts";
 import {
   CalculationCandidateSchema,
   FieldCandidateSchema,
   type CalculationCandidate,
   type FieldCandidate,
   type SectionPlanOutput,
-} from "./intermediate.js";
-import { MAX_CALCULATIONS, SHEET_GENERATION_RETRIES } from "./model.js";
-import type { Level3NamePort } from "./ports.js";
+} from "./intermediate.ts";
+import { MAX_CALCULATIONS, SHEET_GENERATION_RETRIES } from "./model.ts";
+import type { Level3NamePort } from "./ports.ts";
 import {
   buildCharacterNameSystemPrompt,
   buildCharacterNameUserPrompt,
-} from "./prompt.js";
+} from "./prompt.ts";
 import {
   NormalizedSheetDefinitionSchema,
   SourceResolvedFieldSchema,
   type NormalizedSheetDefinition,
   type SheetFieldSourceProvenance,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 /**
  * Level-3 final construction. The standalone generator construction phase is

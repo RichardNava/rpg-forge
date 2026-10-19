@@ -4,7 +4,7 @@ import type {
   SheetGenerationRun,
   SheetRunCreationResult,
   SheetRunFailureCode,
-} from "./sheet-run.js";
+} from "./sheet-run.ts";
 
 /**
  * Final character-sheet run repository port. It is deliberately distinct from

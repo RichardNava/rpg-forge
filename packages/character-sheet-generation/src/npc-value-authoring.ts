@@ -10,7 +10,7 @@ import {
 import {
   NpcInstructionsSchema,
   type ThreatLevel,
-} from "./final-generation-contract.js";
+} from "./final-generation-contract.ts";
 
 /**
  * NPC instruction-driven blank resolution (14.14).

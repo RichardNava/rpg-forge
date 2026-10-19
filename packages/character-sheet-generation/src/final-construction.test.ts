@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { CharacterSheetSpec } from "@repo/character-sheet-schema";
-import type { CalculationCandidate } from "./intermediate.js";
+import type { CalculationCandidate } from "./intermediate.ts";
 import {
   NormalizedSheetDefinitionSchema,
   type NormalizedSheetDefinition,
   type SourceResolvedField,
-} from "./source-resolution.js";
-import type { Level3NamePort } from "./ports.js";
-import { RULE_ATTACK_ID, makeRulesContext } from "./test/fakes.js";
+} from "./source-resolution.ts";
+import type { Level3NamePort } from "./ports.ts";
+import { RULE_ATTACK_ID, makeRulesContext } from "./test/fakes.ts";
 import {
   CHARACTER_NAME_KEY,
   FinalConstructionError,
   generateCharacterSheetSpec,
   type FinalConstructionFailure,
   type GenerateCharacterSheetSpecInput,
-} from "./final-construction.js";
-import * as finalConstruction from "./final-construction.js";
+} from "./final-construction.ts";
+import * as finalConstruction from "./final-construction.ts";
 
 const context = makeRulesContext();
 

@@ -4,7 +4,7 @@ import {
   CharacterSheetTemplateSourceSchema,
   MAX_TEMPLATE_FIELDS,
   MAX_TEMPLATE_SECTIONS,
-} from "./index.js";
+} from "./index.ts";
 
 const validTemplate = {
   schemaVersion: 1,

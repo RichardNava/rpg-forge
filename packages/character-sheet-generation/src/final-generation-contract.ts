@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CharacterSheetDraftV2Schema } from "@repo/character-sheet-draft";
 import { PortraitAssetIdSchema } from "@repo/character-sheet-portraits";
-import { NPCThreatLevelSchema } from "./authoring.js";
+import { NPCThreatLevelSchema } from "./authoring.ts";
 import type { CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
 
 /**

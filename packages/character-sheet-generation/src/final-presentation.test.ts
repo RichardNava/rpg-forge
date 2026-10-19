@@ -15,7 +15,7 @@ import {
   type FinalPresentationPlanV1,
   type FinalPresentationStyleV1,
   type StructuralSummaryV1,
-} from "./final-presentation.js";
+} from "./final-presentation.ts";
 
 describe("FinalPresentationPlanV1Schema", () => {
   it("accepts a valid medieval plan", () => {

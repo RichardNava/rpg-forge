@@ -10,13 +10,13 @@ import {
   CharacterSheetAuthoringModeSchema,
   NPCDispositionSchema,
   NPCThreatLevelSchema,
-} from "./authoring.js";
-import { SymbolicKeySchema } from "./intermediate.js";
+} from "./authoring.ts";
+import { SymbolicKeySchema } from "./intermediate.ts";
 import {
   MAX_REFERENCED_RULES_PER_FIELD,
   MAX_PLAN_SECTIONS,
   MAX_TOTAL_FIELDS,
-} from "./model.js";
+} from "./model.ts";
 
 export const MAX_SOURCE_CITATIONS_PER_FIELD = 64;
 export const MAX_OVERRIDE_STRING_VALUE_CHARS = 10_000;

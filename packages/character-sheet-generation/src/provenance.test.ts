@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildFieldProvenance, allRuleIds } from "./provenance.js";
+import { buildFieldProvenance, allRuleIds } from "./provenance.ts";
 import {
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
   SOURCE_ID,
-} from "./test/fakes.js";
-import { MAX_REFERENCED_RULES_PER_FIELD } from "./model.js";
+} from "./test/fakes.ts";
+import { MAX_REFERENCED_RULES_PER_FIELD } from "./model.ts";
 
 describe("buildFieldProvenance", () => {
   it("normalizes known rule ids in caller order and unions genuine citations", () => {

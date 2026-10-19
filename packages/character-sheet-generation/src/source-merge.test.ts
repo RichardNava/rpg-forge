@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   resolveSources,
   SourceResolutionResultSchema,
-} from "./source-merge.js";
+} from "./source-merge.ts";
 import {
   canonicalizeFieldLabel,
   SourceResolvedFieldSchema,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 const rulebookRange = { min: 3, max: 18 };
 

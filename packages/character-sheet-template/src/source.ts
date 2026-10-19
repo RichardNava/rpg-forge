@@ -4,7 +4,7 @@ import {
   MAX_TEMPLATE_SOURCE_PAGE,
   TemplateLocaleSchema,
   type TemplateLocale,
-} from "./template.js";
+} from "./template.ts";
 
 /**
  * Where an extracted template comes from. `sheetKey`/`rulebookKey` are opaque

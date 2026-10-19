@@ -1,11 +1,11 @@
-export * from "./errors";
-export * from "./reroll-random";
-export * from "./draft-schema";
-export * from "./versioning";
-export * from "./keys";
-export type { CharacterSheetDraftIdentity } from "./draft-identity";
-export { parseCanonicalCharacterSheetDraft } from "./draft-canonical";
-export type { CharacterSheetDraftV2 } from "./draft-schema-v2";
+export * from "./errors.ts";
+export * from "./reroll-random.ts";
+export * from "./draft-schema.ts";
+export * from "./versioning.ts";
+export * from "./keys.ts";
+export type { CharacterSheetDraftIdentity } from "./draft-identity.ts";
+export { parseCanonicalCharacterSheetDraft } from "./draft-canonical.ts";
+export type { CharacterSheetDraftV2 } from "./draft-schema-v2.ts";
 
 /**
  * 4E1 canonical V2 draft persistence port.
@@ -17,7 +17,7 @@ export type { CharacterSheetDraftV2 } from "./draft-schema-v2";
  * The frozen behavior this port commits to is specified in
  * `docs/architecture/phase-14.7/character-sheet-v2-transport-contract.md`.
  */
-export type { CharacterSheetDraftStoreV2 } from "./draft-store-v2";
+export type { CharacterSheetDraftStoreV2 } from "./draft-store-v2.ts";
 
 /**
  * 4C public V2 read boundary.
@@ -31,14 +31,14 @@ export type { CharacterSheetDraftStoreV2 } from "./draft-store-v2";
  * private implementation detail. Future Web consumers should read the
  * structural view through `buildDraftStructuralReadModelV2`, not the index.
  */
-export { buildDraftStructuralReadModelV2 } from "./draft-read-model-v2";
+export { buildDraftStructuralReadModelV2 } from "./draft-read-model-v2.ts";
 export type {
   DraftFieldReadNodeV2,
   DraftSectionReadNodeV2,
   DraftSlotReadNodeV2,
   DraftReadNodeV2,
   DraftStructuralReadModelV2,
-} from "./draft-read-model-v2";
+} from "./draft-read-model-v2.ts";
 
 /**
  * 4C public V2 projection boundary.
@@ -50,25 +50,25 @@ export type {
  * `draftFieldToSpecField`, `validateProjectedSpec`) and the adapter capacity
  * constants remain private.
  */
-export { projectDraftV2ToSpec } from "./preview/projection-v2";
+export { projectDraftV2ToSpec } from "./preview/projection-v2.ts";
 
 export {
   CHARACTER_SHEET_DRAFT_V2_VERSION,
   CharacterSheetDraftV2Schema,
   validateDraftV2,
-} from "./draft-schema-v2";
+} from "./draft-schema-v2.ts";
 export {
   applyDraftMutationV2,
   DraftMutationV2Schema,
   parseDraftMutationV2,
-} from "./draft-mutation-v2";
-export type { DraftMutationV2 } from "./draft-mutation-v2";
+} from "./draft-mutation-v2.ts";
+export type { DraftMutationV2 } from "./draft-mutation-v2.ts";
 export {
   DraftModeMutationV2Schema,
   parseDraftModeMutationV2,
   applyDraftModeMutationWithExpectedVersionV2,
-} from "./draft-mode-mutation-v2";
-export type { DraftModeMutationV2 } from "./draft-mode-mutation-v2";
+} from "./draft-mode-mutation-v2.ts";
+export type { DraftModeMutationV2 } from "./draft-mode-mutation-v2.ts";
 export {
   DraftAddPortraitSlotMutationV2Schema,
   DraftRemovePortraitSlotMutationV2Schema,
@@ -76,33 +76,33 @@ export {
   DraftSlotRegistryMutationV2Schema,
   parseDraftSlotRegistryMutationV2,
   applyDraftSlotRegistryMutationWithExpectedVersionV2,
-} from "./draft-slot-registry-mutation-v2";
+} from "./draft-slot-registry-mutation-v2.ts";
 export type {
   DraftAddPortraitSlotMutationV2,
   DraftRemovePortraitSlotMutationV2,
   DraftSetPortraitAspectRatioMutationV2,
   DraftSlotRegistryMutationV2,
-} from "./draft-slot-registry-mutation-v2";
+} from "./draft-slot-registry-mutation-v2.ts";
 export {
   DraftSlotV1Schema,
   PortraitAspectRatioSchema,
   SlotDetailsV1Schema,
   DEFAULT_PORTRAIT_ASPECT_RATIO,
   MAX_PORTRAIT_SLOTS,
-} from "./draft-slot-v2";
+} from "./draft-slot-v2.ts";
 export type {
   DraftSlotV1,
   PortraitAspectRatio,
   SlotDetailsV1,
-} from "./draft-slot-v2";
+} from "./draft-slot-v2.ts";
 export {
   DraftUndoMutationV2Schema,
   parseDraftUndoMutationV2,
   applyDraftUndoWithExpectedVersionV2,
-} from "./draft-undo-mutation-v2";
-export type { DraftUndoMutationV2 } from "./draft-undo-mutation-v2";
-export { initialDraftVersionV2 } from "./draft-versioning-v2";
-export type { InitialCharacterSheetDraftV2 } from "./draft-versioning-v2";
+} from "./draft-undo-mutation-v2.ts";
+export type { DraftUndoMutationV2 } from "./draft-undo-mutation-v2.ts";
+export { initialDraftVersionV2 } from "./draft-versioning-v2.ts";
+export type { InitialCharacterSheetDraftV2 } from "./draft-versioning-v2.ts";
 
 /**
  * 14.8 spatial layout boundary.
@@ -126,25 +126,25 @@ export {
   DraftLayoutV1Schema,
   defaultDraftLayoutV1,
   resolveEffectiveDraftLayoutV1,
-} from "./draft-layout-v1";
+} from "./draft-layout-v1.ts";
 export type {
   DraftLayoutContainerV1,
   DraftLayoutNodeV1,
   DraftLayoutV1,
-} from "./draft-layout-v1";
+} from "./draft-layout-v1.ts";
 export {
   DraftLayoutMutationV2Schema,
   parseDraftLayoutMutationV2,
   applyDraftLayoutMutationWithExpectedVersionV2,
-} from "./draft-layout-mutation-v2";
+} from "./draft-layout-mutation-v2.ts";
 export type {
   DraftLayoutMutationV2,
   DraftSetContainerLayoutMutationV2,
   DraftSetNodeLayoutMutationV2,
-} from "./draft-layout-mutation-v2";
-export { rerollLockedDraftValuesV2 } from "./draft-reroll-v2";
-export type { DraftRerollResultV2 } from "./draft-reroll-v2";
-export { finalizeDraftV2 } from "./draft-finalize-v2";
+} from "./draft-layout-mutation-v2.ts";
+export { rerollLockedDraftValuesV2 } from "./draft-reroll-v2.ts";
+export type { DraftRerollResultV2 } from "./draft-reroll-v2.ts";
+export { finalizeDraftV2 } from "./draft-finalize-v2.ts";
 
 /**
  * 4D public V2 transport boundary.
@@ -196,7 +196,7 @@ export {
   SheetDraftUndoRequestV2Schema,
   SheetDraftUndoResponseV2Schema,
   TransportDraftMutationV2Schema,
-} from "./draft-transport-v2";
+} from "./draft-transport-v2.ts";
 export type {
   SheetDraftConfirmRequestV2,
   SheetDraftCreateRequestV2,
@@ -206,4 +206,4 @@ export type {
   SheetDraftSnapshotResponseV2,
   SheetDraftUndoRequestV2,
   SheetDraftUndoResponseV2,
-} from "./draft-transport-v2";
+} from "./draft-transport-v2.ts";

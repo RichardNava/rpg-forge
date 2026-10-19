@@ -8,15 +8,15 @@ import {
   OutputLocaleSchema,
   PCPortraitInputSchema,
   VisualStyleKeySchema,
-} from "./authoring.js";
-import { MAX_TOTAL_FIELDS } from "./model.js";
+} from "./authoring.ts";
+import { MAX_TOTAL_FIELDS } from "./model.ts";
 import {
   canonicalizeFieldLabel,
   NPCAuthoringDefinitionSchema,
   SourceResolvedFieldSchema,
   type SheetFieldSourceProvenance,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 /**
  * Deterministically normalized view of a validated GUI authoring request.

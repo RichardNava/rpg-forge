@@ -4,8 +4,8 @@ import {
   parseStoredSpec,
   serializeSpec,
   type CharacterSheetArtifactErrorCode,
-} from "./index.js";
-import { buildBaseSpec } from "./spec-fixture.js";
+} from "./index.ts";
+import { buildBaseSpec } from "./spec-fixture.ts";
 
 function expectErrorCode(
   fn: () => unknown,

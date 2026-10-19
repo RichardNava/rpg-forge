@@ -3,18 +3,18 @@ export {
   RENDER_METADATA_EPOCH,
   RENDER_PRODUCER,
   RENDER_CREATOR,
-} from "./renderer";
+} from "./renderer.ts";
 export type {
   RenderCharacterSheetPdfInput,
   RenderCharacterSheetPdfOutput,
-} from "./renderer";
-export { renderStyledCharacterSheetPdf } from "./draft-renderer.js";
+} from "./renderer.ts";
+export { renderStyledCharacterSheetPdf } from "./draft-renderer.ts";
 export type {
   RenderStyledDraftPdfInput,
   RenderStyledDraftPdfOutput,
   StyledDraftPdfManifest,
   StyledDraftNodeState,
-} from "./draft-renderer.js";
-export { CharacterSheetPdfRenderError, PDF_RENDER_ERROR_CODES } from "./errors";
-export type { CharacterSheetPdfRenderErrorCode } from "./errors";
-export type { PdfRenderManifest, PdfRenderFormFieldEntry } from "./manifest";
+} from "./draft-renderer.ts";
+export { CharacterSheetPdfRenderError, PDF_RENDER_ERROR_CODES } from "./errors.ts";
+export type { CharacterSheetPdfRenderErrorCode } from "./errors.ts";
+export type { PdfRenderManifest, PdfRenderFormFieldEntry } from "./manifest.ts";

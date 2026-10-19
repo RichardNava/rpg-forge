@@ -5,7 +5,7 @@ import {
   NpcInstructionsSchema,
   PortraitConfigSchema,
   ThreatLevelSchema,
-} from "./final-generation-contract.js";
+} from "./final-generation-contract.ts";
 
 /**
  * Production final-generation start request (14.12).

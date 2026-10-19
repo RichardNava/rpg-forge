@@ -6,8 +6,8 @@ import {
   MAX_DETERMINISTIC_NAME_CHARS,
   stableNameSeed,
   validateDeterministicLocalName,
-} from "./deterministic-local-name.js";
-import type { Level3NamePort } from "./ports.js";
+} from "./deterministic-local-name.ts";
+import type { Level3NamePort } from "./ports.ts";
 
 describe("stableNameSeed", () => {
   it("is deterministic and distributes across seeds", () => {

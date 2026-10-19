@@ -6,12 +6,12 @@ import {
   validateCalculationCandidatesAgainstContext,
   validateFieldCandidatesAgainstContext,
   validateSectionPlanAgainstContext,
-} from "./generate.js";
+} from "./generate.ts";
 import {
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
-} from "./test/fakes.js";
+} from "./test/fakes.ts";
 
 const VALID_PLAN_JSON = JSON.stringify({
   mode: "player",

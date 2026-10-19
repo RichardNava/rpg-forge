@@ -1,4 +1,4 @@
-import { MAX_TOTAL_FIELDS } from "./model.js";
+import { MAX_TOTAL_FIELDS } from "./model.ts";
 import { z } from "zod";
 
 export const MAX_AUTHORING_CONTEXT_CHARS = 20_000;

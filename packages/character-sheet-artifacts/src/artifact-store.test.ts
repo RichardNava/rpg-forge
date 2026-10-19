@@ -6,8 +6,8 @@ import {
   type CharacterSheetArtifactIdentity,
   type CharacterSheetArtifactStore,
   type PutRunArtifactsInput,
-} from "./index.js";
-import { buildBaseSpec } from "./spec-fixture.js";
+} from "./index.ts";
+import { buildBaseSpec } from "./spec-fixture.ts";
 
 const PDF_BYTES = new TextEncoder().encode(
   "%PDF-1.4 artifact test bytes with no valid trailer",

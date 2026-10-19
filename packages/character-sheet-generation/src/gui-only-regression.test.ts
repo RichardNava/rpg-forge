@@ -3,24 +3,24 @@ import {
   NPCGenerationRequestSchema,
   PCGenerationRequestSchema,
   type CharacterSheetGenerationRequest,
-} from "./authoring.js";
+} from "./authoring.ts";
 import {
   CHARACTER_NAME_KEY,
   FinalConstructionError,
   generateCharacterSheetSpec,
-} from "./final-construction.js";
-import type { Level3NamePort } from "./ports.js";
+} from "./final-construction.ts";
+import type { Level3NamePort } from "./ports.ts";
 import {
   NormalizedSheetDefinitionSchema,
   type NormalizedSheetDefinition,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 import {
   FakeRulebookFieldDerivationPort,
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
-} from "./test/fakes.js";
-import { generateNormalizedSheet } from "./unified-service.js";
+} from "./test/fakes.ts";
+import { generateNormalizedSheet } from "./unified-service.ts";
 
 const RULEBOOK_HIT_POINTS_RANGE = { min: 1, max: 20 };
 

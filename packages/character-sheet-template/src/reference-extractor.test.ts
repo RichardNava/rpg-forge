@@ -3,7 +3,7 @@ import {
   createReferenceSheetTemplateExtractor,
   extractSheetTemplate,
   REFERENCE_TEMPLATE_CATALOG,
-} from "./index.js";
+} from "./index.ts";
 
 describe("createReferenceSheetTemplateExtractor", () => {
   it("extracts a cataloged direct-sheet template deterministically", async () => {

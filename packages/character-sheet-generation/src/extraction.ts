@@ -2,30 +2,30 @@ import { z } from "zod";
 import type {
   InstructionExtractionDeps,
   InstructionExtractionPort,
-} from "./ports.js";
+} from "./ports.ts";
 import {
   CharacterSheetAuthoringModeSchema,
   MAX_AUTHORING_CONTEXT_CHARS,
   type CharacterSheetAuthoringMode,
-} from "./authoring.js";
-import { MAX_TOTAL_FIELDS, SHEET_GENERATION_RETRIES } from "./model.js";
+} from "./authoring.ts";
+import { MAX_TOTAL_FIELDS, SHEET_GENERATION_RETRIES } from "./model.ts";
 import {
   ExtractionFieldContextSchema,
   InstructionExtractionOutputSchema,
   type InstructionExtractionDiagnostic,
   type InstructionExtractionOutput,
   type InstructionExtractionResult,
-} from "./extraction-schemas.js";
+} from "./extraction-schemas.ts";
 import {
   appendValidationFeedback,
   buildInstructionExtractionSystemPrompt,
   buildInstructionExtractionUserPrompt,
-} from "./prompt.js";
+} from "./prompt.ts";
 
 export type {
   InstructionExtractionDeps,
   InstructionExtractionPort,
-} from "./ports.js";
+} from "./ports.ts";
 
 export const InstructionExtractionInputSchema = z.strictObject({
   contextInstructions: z.string().max(MAX_AUTHORING_CONTEXT_CHARS).optional(),

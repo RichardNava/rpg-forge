@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   extractSheetTemplate,
   type CharacterSheetTemplateExtractionPort,
-} from "./index.js";
+} from "./index.ts";
 
 const source = {
   kind: "direct-sheet" as const,

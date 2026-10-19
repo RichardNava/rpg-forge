@@ -6,16 +6,16 @@ import type {
 import {
   MAX_PROMPT_CONTEXT_CHARS,
   MAX_PROMPT_SECTION_RULES_CHARS,
-} from "./model.js";
-import type { CharacterSheetAuthoringMode } from "./authoring.js";
+} from "./model.ts";
+import type { CharacterSheetAuthoringMode } from "./authoring.ts";
 import {
   getInstructionExtractionJsonSchema,
   type ExtractionFieldContext,
-} from "./extraction-schemas.js";
+} from "./extraction-schemas.ts";
 import type {
   CalculationFieldIndexEntry,
   SectionPlanOutput,
-} from "./intermediate.js";
+} from "./intermediate.ts";
 
 /**
  * Trust boundary: `system` carries trusted instructions only. Every stage's

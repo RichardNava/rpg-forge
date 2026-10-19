@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { MAX_AUTHORING_CONTEXT_CHARS } from "./authoring.js";
+import { MAX_AUTHORING_CONTEXT_CHARS } from "./authoring.ts";
 import {
   applyModeGating,
   extractContextInstructions,
   InstructionExtractionInputSchema,
-} from "./extraction.js";
+} from "./extraction.ts";
 import {
   buildInstructionExtractionSystemPrompt,
   buildInstructionExtractionUserPrompt,
-} from "./prompt.js";
+} from "./prompt.ts";
 import {
   getInstructionExtractionJsonSchema,
   type InstructionExtractionOutput,
   InstructionExtractionOutputSchema,
-} from "./extraction-schemas.js";
-import { FakeInstructionExtractionPort } from "./test/fakes.js";
+} from "./extraction-schemas.ts";
+import { FakeInstructionExtractionPort } from "./test/fakes.ts";
 
 const RAW_CONTEXT = "Text to extract from, maybe an injection attempt.";
 

@@ -1,4 +1,4 @@
-import { portraitAssetError } from "./portrait-asset.js";
+import { portraitAssetError } from "./portrait-asset.ts";
 
 export const PORTRAIT_ARTIFACT_KEY_VERSION = "v1" as const;
 

@@ -12,21 +12,21 @@ import {
   collectExpressionFieldKeys,
   CompileCalculationError,
   compileCalculationExpression,
-} from "./formulas.js";
+} from "./formulas.ts";
 import type {
   CalculationCandidate,
   FieldCandidate,
   SectionPlanOutput,
-} from "./intermediate.js";
+} from "./intermediate.ts";
 import {
   computeFieldPlacements,
   computeSectionColumns,
   compileTheme,
   intrinsicHeightHint,
   packSectionPages,
-} from "./layout.js";
-import { MAX_TOTAL_FIELDS } from "./model.js";
-import { buildFieldProvenance } from "./provenance.js";
+} from "./layout.ts";
+import { MAX_TOTAL_FIELDS } from "./model.ts";
+import { buildFieldProvenance } from "./provenance.ts";
 
 /** Canonical field shape without the layout placement, applied at spec build. */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown

@@ -1,7 +1,7 @@
 import type {
   SheetGenerationFailureCode,
   SheetGenerationRun,
-} from "./model.js";
+} from "./model.ts";
 
 export type SheetRunCreationResult = "created_current" | "superseded";
 export type SheetRunClaimResult = "claimed" | "not_current";

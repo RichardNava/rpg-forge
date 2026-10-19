@@ -7,8 +7,8 @@ import {
   type Level3NamePort,
   type RulebookFieldDerivationPort,
 } from "@repo/character-sheet-generation";
-import { renderCharacterSheetPdf } from "./renderer.js";
-import { PDF_FIELD_PREFIX } from "./values.js";
+import { renderCharacterSheetPdf } from "./renderer.ts";
+import { PDF_FIELD_PREFIX } from "./values.ts";
 
 class FixedNamePort implements Level3NamePort {
   async generateName(input: {

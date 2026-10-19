@@ -1,5 +1,5 @@
 import type { RepositoryTransition } from "@repo/rules-analysis-session";
-import type { SheetSession } from "./sheet-session.js";
+import type { SheetSession } from "./sheet-session.ts";
 
 /**
  * Narrow persistence contract for temporary character-sheet sessions. No

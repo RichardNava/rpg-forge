@@ -14,12 +14,12 @@ import {
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
-import { CharacterSheetPdfRenderError } from "./errors.js";
+import { CharacterSheetPdfRenderError } from "./errors.ts";
 import {
   planStyledDraftLayout,
   renderStyledCharacterSheetPdf,
   type StyledDraftPdfManifest,
-} from "./draft-renderer.js";
+} from "./draft-renderer.ts";
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");

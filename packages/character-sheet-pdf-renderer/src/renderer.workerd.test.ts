@@ -1,9 +1,9 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
-import { buildBaseSpec } from "./fixtures.js";
-import { renderCharacterSheetPdf } from "./renderer.js";
-import { CharacterSheetPdfRenderError } from "./errors.js";
+import { buildBaseSpec } from "./fixtures.ts";
+import { renderCharacterSheetPdf } from "./renderer.ts";
+import { CharacterSheetPdfRenderError } from "./errors.ts";
 
 describe("character-sheet PDF renderer in workerd", () => {
   it("renders a valid AcroForm PDF inside the workerd runtime", async () => {

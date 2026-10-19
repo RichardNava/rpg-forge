@@ -9,8 +9,8 @@ import { z } from "zod";
 import {
   AuthoredFieldLabelSchema,
   type CharacterSheetAuthoringMode,
-} from "./authoring.js";
-import { MAX_REFERENCED_RULES_PER_FIELD, MAX_TOTAL_FIELDS } from "./model.js";
+} from "./authoring.ts";
+import { MAX_REFERENCED_RULES_PER_FIELD, MAX_TOTAL_FIELDS } from "./model.ts";
 import {
   canonicalizeFieldLabel,
   FieldCategorySchema,
@@ -24,7 +24,7 @@ import {
   type GenerationConflict,
   type GenerationConflictCode,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 export const RULEBOOK_DERIVED_DEFINITION_VERSION = 1;
 

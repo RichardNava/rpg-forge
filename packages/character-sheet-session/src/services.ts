@@ -6,8 +6,8 @@ import {
   type SessionCrypto,
   verifyTokenHash,
 } from "@repo/rules-analysis-session";
-import { isExpired, SHEET_SESSION_LIFETIME_MS } from "./sheet-session.js";
-import type { SheetSessionRepositoryPort } from "./sheet-session-repository.js";
+import { isExpired, SHEET_SESSION_LIFETIME_MS } from "./sheet-session.ts";
+import type { SheetSessionRepositoryPort } from "./sheet-session-repository.ts";
 
 export interface CreateSheetSessionResult {
   sessionId: string;

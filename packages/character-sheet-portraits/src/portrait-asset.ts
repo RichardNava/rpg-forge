@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PortraitMimeType } from "./image-validation.js";
+import type { PortraitMimeType } from "./image-validation.ts";
 
 export const PORTRAIT_ASSET_SOURCES = ["upload", "url", "ai"] as const;
 export type PortraitAssetSource = (typeof PORTRAIT_ASSET_SOURCES)[number];

@@ -8,7 +8,7 @@ import {
   PortraitConfigSchema,
   type FinalGenerationRequestV1,
   type CanonicalVisualStyle,
-} from "./final-generation-contract.js";
+} from "./final-generation-contract.ts";
 import { type CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
 
 function makeConfirmedPcDraft(): CharacterSheetDraftV2 {

@@ -5,8 +5,8 @@ import {
   portraitPathSegment,
   type CharacterSheetPortraitAssetStore,
   type PutPortraitAssetInput,
-} from "./index.js";
-import { PortraitAssetError } from "./portrait-asset.js";
+} from "./index.ts";
+import { PortraitAssetError } from "./portrait-asset.ts";
 
 class InMemoryPortraitStore implements CharacterSheetPortraitAssetStore {
   private readonly assets = new Map<

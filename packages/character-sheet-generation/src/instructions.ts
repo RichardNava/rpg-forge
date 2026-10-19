@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { AuthoredFieldLabelSchema, CharacterNameSchema } from "./authoring.js";
-import { MAX_TOTAL_FIELDS } from "./model.js";
-import { combineDuplicate, mergeProvenance } from "./source-merge.js";
+import { AuthoredFieldLabelSchema, CharacterNameSchema } from "./authoring.ts";
+import { MAX_TOTAL_FIELDS } from "./model.ts";
+import { combineDuplicate, mergeProvenance } from "./source-merge.ts";
 import {
   CanonicalFieldKeySchema,
   canonicalizeFieldLabel,
@@ -21,7 +21,7 @@ import {
   type NormalizedSheetDefinition,
   type ProposedSheetOverride,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 export const MAX_INSTRUCTION_NAME_CHARS = 256;
 export const MAX_PORTRAIT_PROMPT_CHARS = 2_000;

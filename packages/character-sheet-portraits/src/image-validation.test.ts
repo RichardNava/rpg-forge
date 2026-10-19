@@ -6,7 +6,7 @@ import {
   readPngDimensions,
   validatePortraitImageBytes,
   PORTRAIT_MAX_BYTES,
-} from "./image-validation.js";
+} from "./image-validation.ts";
 
 function bytesOf(text: string): Uint8Array {
   const bytes = new Uint8Array(text.length);

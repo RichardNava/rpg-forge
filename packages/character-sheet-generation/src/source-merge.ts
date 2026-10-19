@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_REFERENCED_RULES_PER_FIELD, MAX_TOTAL_FIELDS } from "./model.js";
+import { MAX_REFERENCED_RULES_PER_FIELD, MAX_TOTAL_FIELDS } from "./model.ts";
 import {
   GenerationConflictSchema,
   MAX_GENERATION_CONFLICTS,
@@ -11,7 +11,7 @@ import {
   type GenerationConflictCode,
   type SheetFieldSourceProvenance,
   type SourceResolvedField,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 
 /**
  * Deterministic outcome of source resolution. Fields are the canonical merged

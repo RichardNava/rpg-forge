@@ -4,33 +4,33 @@ import {
   type CharacterSheetSpec,
 } from "@repo/character-sheet-schema";
 import type { RulesContext } from "@repo/rules-context";
-import type { CharacterSheetGenerationRequest } from "../authoring.js";
+import type { CharacterSheetGenerationRequest } from "../authoring.ts";
 import {
   generateCharacterSheetSpec,
   CHARACTER_NAME_KEY,
   FinalConstructionError,
   type FinalConstructionFailure,
   type GenerateCharacterSheetSpecInput,
-} from "../final-construction.js";
-import type { CalculationCandidate } from "../intermediate.js";
-import type { ProposedGenerationInstruction } from "../instructions.js";
-import type { Level3NamePort } from "../ports.js";
-import type { RulebookDerivedDefinition } from "../rulebook-derivation.js";
+} from "../final-construction.ts";
+import type { CalculationCandidate } from "../intermediate.ts";
+import type { ProposedGenerationInstruction } from "../instructions.ts";
+import type { Level3NamePort } from "../ports.ts";
+import type { RulebookDerivedDefinition } from "../rulebook-derivation.ts";
 import {
   NormalizedSheetDefinitionSchema,
   type NormalizedSheetDefinition,
-} from "../source-resolution.js";
+} from "../source-resolution.ts";
 import {
   generateNormalizedSheet,
   type UnifiedGenerationDeps,
-} from "../unified-service.js";
-import type { UnifiedSheetGenerationResult } from "../unified-generation.js";
+} from "../unified-service.ts";
+import type { UnifiedSheetGenerationResult } from "../unified-generation.ts";
 import {
   FakeRulebookFieldDerivationPort,
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
-} from "../test/fakes.js";
+} from "../test/fakes.ts";
 
 const baseContext = makeRulesContext();
 

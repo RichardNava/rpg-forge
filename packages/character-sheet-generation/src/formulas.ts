@@ -1,5 +1,5 @@
 import type { Formula } from "@repo/character-sheet-schema";
-import type { CalculationExpression } from "./intermediate.js";
+import type { CalculationExpression } from "./intermediate.ts";
 
 /**
  * Maps a safe symbolic calculation expression onto the canonical Formula AST.

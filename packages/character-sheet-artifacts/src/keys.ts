@@ -1,4 +1,4 @@
-import { artifactError } from "./errors.js";
+import { artifactError } from "./errors.ts";
 
 export const CHARACTER_SHEET_ARTIFACT_KEY_VERSION = "v1" as const;
 

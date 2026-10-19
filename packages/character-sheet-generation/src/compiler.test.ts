@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { validateCharacterSheetSpecDomain } from "@repo/character-sheet-schema";
-import { compileCharacterSheet, SheetCompileError } from "./compiler.js";
-import { parseFieldCandidates, parseSectionPlan } from "./generate.js";
-import type { FieldCandidate, SectionPlanOutput } from "./intermediate.js";
+import { compileCharacterSheet, SheetCompileError } from "./compiler.ts";
+import { parseFieldCandidates, parseSectionPlan } from "./generate.ts";
+import type { FieldCandidate, SectionPlanOutput } from "./intermediate.ts";
 import {
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
-} from "./test/fakes.js";
+} from "./test/fakes.ts";
 
 const context = makeRulesContext();
 

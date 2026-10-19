@@ -12,7 +12,7 @@ import {
   SHEET_GENERATION_CALCULATIONS_ARTIFACT_VERSION,
   SHEET_GENERATION_FIELDS_ARTIFACT_VERSION,
   SHEET_GENERATION_SECTION_PLAN_ARTIFACT_VERSION,
-} from "./model.js";
+} from "./model.ts";
 
 /**
  * Symbolic keys are the only identifiers the model ever emits. They are

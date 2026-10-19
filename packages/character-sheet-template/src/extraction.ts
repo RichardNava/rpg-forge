@@ -2,12 +2,12 @@ import { z } from "zod";
 import {
   CharacterSheetTemplateSourceSchema,
   type CharacterSheetTemplateSource,
-} from "./source.js";
+} from "./source.ts";
 import {
   CharacterSheetTemplateSchema,
   getSheetTemplateJsonSchema,
   type CharacterSheetTemplate,
-} from "./template.js";
+} from "./template.ts";
 
 /** One bounded correction replay per stage, matching the sheet-generation gate. */
 export const TEMPLATE_EXTRACTION_RETRIES = 2;

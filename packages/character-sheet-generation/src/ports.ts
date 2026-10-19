@@ -5,11 +5,11 @@ import type {
   FieldCandidate,
   SectionPlanOutput,
   CalculationCandidate,
-} from "./intermediate.js";
-import type { SheetGenerationInputArtifact } from "./artifacts.js";
+} from "./intermediate.ts";
+import type { SheetGenerationInputArtifact } from "./artifacts.ts";
 import type { CharacterSheetSpec } from "@repo/character-sheet-schema";
 import type { RulesContext } from "@repo/rules-context";
-import type { CharacterSheetAuthoringMode } from "./authoring.js";
+import type { CharacterSheetAuthoringMode } from "./authoring.ts";
 
 export type SheetGenerationStage =
   "section-plan" | "field-candidates" | "calculations";

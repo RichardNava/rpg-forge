@@ -9,8 +9,8 @@ import {
   PCGenerationRequestSchema,
   generateTemplateBackedSheet,
 } from "@repo/character-sheet-generation";
-import { renderCharacterSheetPdf } from "./renderer.js";
-import { PDF_FIELD_PREFIX } from "./values.js";
+import { renderCharacterSheetPdf } from "./renderer.ts";
+import { PDF_FIELD_PREFIX } from "./values.ts";
 
 async function extractReferenceTemplate(source: {
   kind: "direct-sheet";

@@ -1,5 +1,5 @@
 import type { CharacterSheetTemplate } from "@repo/character-sheet-template";
-import type { CharacterSheetAuthoringMode } from "./authoring.js";
+import type { CharacterSheetAuthoringMode } from "./authoring.ts";
 import {
   canonicalizeFieldLabel,
   GenerationConflictSchema,
@@ -7,8 +7,8 @@ import {
   type GenerationConflict,
   type SheetFieldSourceProvenance,
   type SourceResolvedField,
-} from "./source-resolution.js";
-import { mergeProvenance } from "./source-merge.js";
+} from "./source-resolution.ts";
+import { mergeProvenance } from "./source-merge.ts";
 
 const templateProvenance: SheetFieldSourceProvenance = {
   origins: ["sheet-template"],

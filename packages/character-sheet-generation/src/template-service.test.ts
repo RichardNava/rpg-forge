@@ -4,9 +4,9 @@ import type { CharacterSheetSpec } from "@repo/character-sheet-schema";
 import {
   NPCGenerationRequestSchema,
   PCGenerationRequestSchema,
-} from "./authoring.js";
-import { CHARACTER_NAME_KEY } from "./final-construction.js";
-import { generateTemplateBackedSheet } from "./template-service.js";
+} from "./authoring.ts";
+import { CHARACTER_NAME_KEY } from "./final-construction.ts";
+import { generateTemplateBackedSheet } from "./template-service.ts";
 
 const pcTemplate: CharacterSheetTemplate = {
   schemaVersion: 1,

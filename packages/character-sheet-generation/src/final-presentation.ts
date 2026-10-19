@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CanonicalVisualStyleSchema, type CanonicalVisualStyle } from "./final-generation-contract.js";
+import { CanonicalVisualStyleSchema, type CanonicalVisualStyle } from "./final-generation-contract.ts";
 
 /**
  * Final presentation style variants supported in Phase 14.12.

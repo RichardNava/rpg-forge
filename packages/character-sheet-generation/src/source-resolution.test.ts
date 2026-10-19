@@ -8,8 +8,8 @@ import {
   ProposedSheetOverrideSchema,
   SheetFieldSourceProvenanceSchema,
   SourceResolvedFieldSchema,
-} from "./source-resolution.js";
-import { CanonicalFieldKeySchema } from "./source-resolution.js";
+} from "./source-resolution.ts";
+import { CanonicalFieldKeySchema } from "./source-resolution.ts";
 
 const rulebookProvenance = {
   origins: ["rulebook"],

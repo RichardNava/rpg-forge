@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PortraitMimeType } from "./image-validation.js";
+import type { PortraitMimeType } from "./image-validation.ts";
 
 /**
  * Narrow provider-agnostic portrait image generation port (14.13).

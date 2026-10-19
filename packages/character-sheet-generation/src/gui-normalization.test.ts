@@ -3,12 +3,12 @@ import {
   CharacterSheetGenerationRequestSchema,
   NPCGenerationRequestSchema,
   PCGenerationRequestSchema,
-} from "./authoring.js";
+} from "./authoring.ts";
 import {
   normalizeGuiSource,
   NormalizedGuiSourceSchema,
-} from "./gui-normalization.js";
-import { CanonicalFieldKeySchema } from "./source-resolution.js";
+} from "./gui-normalization.ts";
+import { CanonicalFieldKeySchema } from "./source-resolution.ts";
 
 function parsePc(body: Record<string, unknown>) {
   return PCGenerationRequestSchema.parse(body);

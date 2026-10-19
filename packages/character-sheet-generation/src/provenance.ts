@@ -1,6 +1,6 @@
 import type { FieldProvenance } from "@repo/character-sheet-schema";
 import type { RuleCitation, RulesContext } from "@repo/rules-context";
-import { MAX_REFERENCED_RULES_PER_FIELD } from "./model.js";
+import { MAX_REFERENCED_RULES_PER_FIELD } from "./model.ts";
 
 /**
  * Builds canonical field provenance strictly from the RulesContext. `ruleIds`

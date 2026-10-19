@@ -12,14 +12,14 @@ import type {
   RunArtifactPort,
 } from "@repo/rules-analysis-run";
 import type { Clock } from "@repo/rules-analysis-session";
-import { compileCharacterSheet, SheetCompileError } from "./compiler.js";
+import { compileCharacterSheet, SheetCompileError } from "./compiler.ts";
 import {
   type CalculationCandidate,
   type CalculationFieldIndexEntry,
   type FieldCandidate,
   type FieldCandidatesOutput,
   type SectionPlanOutput,
-} from "./intermediate.js";
+} from "./intermediate.ts";
 import {
   appendValidationFeedback,
   buildCalculationSystemPrompt,
@@ -28,7 +28,7 @@ import {
   buildFieldUserPrompt,
   buildSectionPlanSystemPrompt,
   buildSectionPlanUserPrompt,
-} from "./prompt.js";
+} from "./prompt.ts";
 import {
   parseCalculationCandidates,
   parseFieldCandidates,
@@ -36,14 +36,14 @@ import {
   validateCalculationCandidatesAgainstContext,
   validateFieldCandidatesAgainstContext,
   validateSectionPlanAgainstContext,
-} from "./generate.js";
-import type { SheetArtifactPort, SheetGenerationPort } from "./ports.js";
-import type { SheetGenerationRunRepositoryPort } from "./repository.js";
+} from "./generate.ts";
+import type { SheetArtifactPort, SheetGenerationPort } from "./ports.ts";
+import type { SheetGenerationRunRepositoryPort } from "./repository.ts";
 import {
   SHEET_GENERATION_RETRIES,
   type SheetGenerationFailureCode,
   type SheetGenerationRun,
-} from "./model.js";
+} from "./model.ts";
 
 export interface SheetGenerationIdGenerator {
   uuid(): string;

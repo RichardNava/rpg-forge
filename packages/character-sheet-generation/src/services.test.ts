@@ -7,7 +7,7 @@ import {
   generateSheetCalculations,
   invalidateSheetGenerations,
   readSheetGenerationRun,
-} from "./services.js";
+} from "./services.ts";
 import {
   clock,
   createHarness,
@@ -15,7 +15,7 @@ import {
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
   sheetIdGenerator,
-} from "./test/fakes.js";
+} from "./test/fakes.ts";
 
 const ANALYSIS_ID = "analysis-00000000-0000-4000-8000-000000000000";
 

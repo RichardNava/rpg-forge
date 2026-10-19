@@ -3,23 +3,23 @@ import {
   NPCGenerationRequestSchema,
   PCGenerationRequestSchema,
   type CharacterSheetGenerationRequest,
-} from "./authoring.js";
+} from "./authoring.ts";
 import {
   resolveUnifiedSheetDefinition,
   type UnifiedSheetGenerationInput,
-} from "./unified-generation.js";
+} from "./unified-generation.ts";
 import {
   generateNormalizedSheet,
   type UnifiedGenerationDeps,
-} from "./unified-service.js";
-import { SHEET_GENERATION_RETRIES } from "./model.js";
-import type { GenerationConflict } from "./source-resolution.js";
+} from "./unified-service.ts";
+import { SHEET_GENERATION_RETRIES } from "./model.ts";
+import type { GenerationConflict } from "./source-resolution.ts";
 import {
   FakeRulebookFieldDerivationPort,
   makeRulesContext,
   RULE_ATTACK_ID,
   RULE_HIT_POINTS_ID,
-} from "./test/fakes.js";
+} from "./test/fakes.ts";
 
 const HIT_POINTS_RANGE = { min: 1, max: 20 };
 

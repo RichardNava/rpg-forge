@@ -4,27 +4,27 @@ import type { RulesContext } from "@repo/rules-context";
 import type {
   CharacterSheetGenerationRequest,
   OutputLocale,
-} from "./authoring.js";
+} from "./authoring.ts";
 import {
   createDeterministicLevel3NamePort,
   type DeterministicLocalNamePort,
-} from "./deterministic-local-name.js";
+} from "./deterministic-local-name.ts";
 import {
   generateCharacterSheetSpec,
   type GenerateCharacterSheetSpecInput,
-} from "./final-construction.js";
-import { normalizeGuiSource } from "./gui-normalization.js";
-import type { ProposedGenerationInstruction } from "./instructions.js";
-import type { Level3NamePort } from "./ports.js";
-import type { GenerationConflict } from "./source-resolution.js";
+} from "./final-construction.ts";
+import { normalizeGuiSource } from "./gui-normalization.ts";
+import type { ProposedGenerationInstruction } from "./instructions.ts";
+import type { Level3NamePort } from "./ports.ts";
+import type { GenerationConflict } from "./source-resolution.ts";
 import {
   normalizeTemplateFields,
   overlayTemplateWithGui,
-} from "./template-normalization.js";
+} from "./template-normalization.ts";
 import {
   resolveUnifiedSheetDefinition,
   type UnifiedSheetGenerationResult,
-} from "./unified-generation.js";
+} from "./unified-generation.ts";
 
 /**
  * Template-backed generation service deps. The name port is optional: by

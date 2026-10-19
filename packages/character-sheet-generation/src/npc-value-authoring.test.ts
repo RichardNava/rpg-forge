@@ -5,9 +5,9 @@ import {
   NpcAuthoringError,
   NpcValueAuthoringPlanV1Schema,
   validateNpcAuthoringPlan,
-} from "./npc-value-authoring.js";
-import { resolveFinalValues } from "./final-value-resolution.js";
-import { buildFinalGenerationRequestV1 } from "./final-generation-contract.js";
+} from "./npc-value-authoring.ts";
+import { resolveFinalValues } from "./final-value-resolution.ts";
+import { buildFinalGenerationRequestV1 } from "./final-generation-contract.ts";
 import type { CharacterSheetDraftV2 } from "@repo/character-sheet-draft";
 
 function npcDraft(): {

@@ -1,9 +1,9 @@
 import {
   CharacterSheetTemplateSchema,
   type CharacterSheetTemplate,
-} from "./template.js";
-import type { CharacterSheetTemplateExtractionPort } from "./extraction.js";
-import type { CharacterSheetTemplateSource } from "./source.js";
+} from "./template.ts";
+import type { CharacterSheetTemplateExtractionPort } from "./extraction.ts";
+import type { CharacterSheetTemplateSource } from "./source.ts";
 
 /**
  * The reference extractor is a NON-PRODUCTION, offline stand-in for a

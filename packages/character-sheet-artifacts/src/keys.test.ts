@@ -6,7 +6,7 @@ import {
   getRunArtifactKeys,
   getRunArtifactPrefix,
   getSessionArtifactPrefix,
-} from "./index.js";
+} from "./index.ts";
 
 const SESSION_ID = "b15b4b3a-9a5f-4b6e-8d3c-1f7a6e2d4c0a";
 const RUN_ID = "c2d5c4e1-1b0a-4c2d-8e4f-2a8b9c0d1e2f";

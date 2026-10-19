@@ -1,16 +1,16 @@
-import type { CharacterSheetAuthoringMode, OutputLocale } from "./authoring.js";
+import type { CharacterSheetAuthoringMode, OutputLocale } from "./authoring.ts";
 import {
   createDeterministicRandom,
   stableNameSeed,
   type DeterministicRandom,
-} from "./deterministic.js";
-import type { Level3NamePort } from "./ports.js";
+} from "./deterministic.ts";
+import type { Level3NamePort } from "./ports.ts";
 
 export {
   createDeterministicRandom,
   stableNameSeed,
   type DeterministicRandom,
-} from "./deterministic.js";
+} from "./deterministic.ts";
 
 export const MAX_DETERMINISTIC_NAME_CHARS = 64;
 const MIN_NAME_CHARS = 3;

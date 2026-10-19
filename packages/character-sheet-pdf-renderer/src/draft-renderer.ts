@@ -22,10 +22,10 @@ import {
   type PDFPage,
 } from "pdf-lib";
 
-import { CharacterSheetPdfRenderError } from "./errors.js";
-import { assertSupportedGlyphs } from "./glyphs.js";
-import { fitFieldValue, fitLabel, fitSectionTitle } from "./text.js";
-import { pdfFieldNameFor } from "./values.js";
+import { CharacterSheetPdfRenderError } from "./errors.ts";
+import { assertSupportedGlyphs } from "./glyphs.ts";
+import { fitFieldValue, fitLabel, fitSectionTitle } from "./text.ts";
+import { pdfFieldNameFor } from "./values.ts";
 import {
   FOOTER_HEIGHT,
   HEADER_HEIGHT,
@@ -37,12 +37,12 @@ import {
   SECTION_GAP,
   SECTION_TITLE_HEIGHT,
   WIDGET_PADDING,
-} from "./layout.js";
+} from "./layout.ts";
 import {
   RENDER_CREATOR,
   RENDER_METADATA_EPOCH,
   RENDER_PRODUCER,
-} from "./renderer.js";
+} from "./renderer.ts";
 
 export interface StyledDraftNodeState {
   readonly key: string;

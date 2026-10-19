@@ -1,20 +1,20 @@
 import { z } from "zod";
-import { AuthoredFieldLabelSchema } from "./authoring.js";
+import { AuthoredFieldLabelSchema } from "./authoring.ts";
 import {
   CanonicalFieldKeySchema,
   FieldCategorySchema,
   ProposedSheetOverrideSchema,
-} from "./source-resolution.js";
+} from "./source-resolution.ts";
 import {
   MAX_INSTRUCTION_NAME_CHARS,
   NpcPortraitIntentSchema,
   ProposedGenerationInstructionSchema,
-} from "./instructions.js";
+} from "./instructions.ts";
 import {
   MAX_EXTRACTED_INSTRUCTIONS,
   MAX_EXTRACTION_DIAGNOSTICS,
   MAX_EXTRACTION_DIAGNOSTIC_DETAIL_CHARS,
-} from "./model.js";
+} from "./model.ts";
 
 /**
  * Grounding context the model receives for disambiguation only. Field labels

@@ -6,8 +6,8 @@ import {
   recoverStaleDraftClaims,
   toDraftHeadStableView,
   type DraftSnapshotProbe,
-} from "./index.js";
-import { InMemoryDraftHeadRepository } from "./test/fakes.js";
+} from "./index.ts";
+import { InMemoryDraftHeadRepository } from "./test/fakes.ts";
 
 const ID = { sessionId: "sess-0001", draftId: "draft-a" };
 const NOW = new Date("2026-09-13T09:00:00.000Z");

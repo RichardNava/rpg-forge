@@ -6,7 +6,7 @@ import type {
   DraftHeadIdentity,
   DraftHeadReleaseResult,
   DraftHeadStableView,
-} from "./draft-head.js";
+} from "./draft-head.ts";
 
 /**
  * Narrow persistence contract for D1 draft-head coordination rows. Exact

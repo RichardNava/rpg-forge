@@ -6,7 +6,7 @@ import {
   NPCThreatLevelSchema,
   PCGenerationRequestSchema,
   type NPCGenerationRequest,
-} from "./authoring.js";
+} from "./authoring.ts";
 
 describe("CharacterSheetAuthoringMode", () => {
   it("accepts the private pc/npc modes", () => {

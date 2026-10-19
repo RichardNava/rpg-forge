@@ -3,16 +3,16 @@ import type {
   RepositoryTransition,
   SessionCrypto,
 } from "@repo/rules-analysis-session";
-import type { SheetSessionRepositoryPort } from "../sheet-session-repository.js";
-import type { SheetRunRepositoryPort } from "../sheet-run-repository.js";
-import type { SheetSession } from "../sheet-session.js";
+import type { SheetSessionRepositoryPort } from "../sheet-session-repository.ts";
+import type { SheetRunRepositoryPort } from "../sheet-run-repository.ts";
+import type { SheetSession } from "../sheet-session.ts";
 import type {
   RunCleanupCandidate,
   RunTransitionResult,
   SheetGenerationRun,
   SheetRunCreationResult,
   SheetRunFailureCode,
-} from "../sheet-run.js";
+} from "../sheet-run.ts";
 import type {
   CreateDraftHeadResult,
   DraftHead,
@@ -21,9 +21,9 @@ import type {
   DraftHeadIdentity,
   DraftHeadReleaseResult,
   DraftHeadStableView,
-} from "../draft-head.js";
-import { toDraftHeadStableView } from "../draft-head.js";
-import type { DraftHeadRepositoryPort } from "../draft-head-repository.js";
+} from "../draft-head.ts";
+import { toDraftHeadStableView } from "../draft-head.ts";
+import type { DraftHeadRepositoryPort } from "../draft-head-repository.ts";
 
 export class FakeClock implements Clock {
   private current: Date;

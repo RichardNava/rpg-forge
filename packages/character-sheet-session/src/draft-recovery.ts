@@ -1,5 +1,5 @@
-import { DRAFT_CLAIM_STALE_MS } from "./draft-head.js";
-import type { DraftHeadRepositoryPort } from "./draft-head-repository.js";
+import { DRAFT_CLAIM_STALE_MS } from "./draft-head.ts";
+import type { DraftHeadRepositoryPort } from "./draft-head-repository.ts";
 
 /**
  * Bounded R2-side probe used by stale-claim recovery. The R2 draft store is

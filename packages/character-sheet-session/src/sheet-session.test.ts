@@ -13,13 +13,13 @@ import {
   isExpired,
   type SheetGenerationRun,
   type SheetSession,
-} from "./index.js";
+} from "./index.ts";
 import {
   FakeClock,
   FakeCrypto,
   InMemorySheetRunRepository,
   InMemorySheetSessionRepository,
-} from "./test/fakes.js";
+} from "./test/fakes.ts";
 
 const FIXED_NOW = "2026-09-13T08:00:00.000Z";
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;

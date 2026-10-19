@@ -2,7 +2,7 @@ import {
   CharacterSheetSpecSchema,
   type CharacterSheetSpec,
 } from "@repo/character-sheet-schema";
-import { artifactError } from "./errors.js";
+import { artifactError } from "./errors.ts";
 
 /**
  * Serializes a spec for storage. The spec is re-validated against the shared
